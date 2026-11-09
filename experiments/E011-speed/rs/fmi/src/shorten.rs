@@ -327,7 +327,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
         let cx = reduce::Ctx { host: &host, boot: &boot, specs: &make, cfg: &pcfg, out: &eng, version: &ver };
         let best = reduce::Best { pass: p, end, path: path.clone(), dropped: BTreeSet::new() };
         let deadline = t0 + std::time::Duration::from_secs(wall);
-        let (best, recs) = reduce::rounds(best, &by_k, rounds, deadline, &cx)?;
+        let (best, recs) = reduce::rounds(best, &by_k, rounds, deadline, &cx);
         sum["rounds"] = json!(recs);
         sum["dropped"] = json!(best.dropped);
         sum["route"] = json!(best.path.display().to_string());
@@ -456,6 +456,22 @@ pub fn cmd_trace(argv: &[String]) -> i32 {
 /// workers from FMI_SHORTEN_SEED (1) and FMI_SHORTEN_WORKERS (8).
 pub struct Stage1;
 
+/// The stage's `run` arguments on the movie file `mp` and the archive `root`, into `out` (Stage1): the goal is the
+/// archive's (chain::archive_goal: the game's end, or its goal facts; the review of stage B: `--goal end` always made a
+/// goal-fact archive's stage an error).
+fn stage_argv(root: &Path, mp: &Path, out: &Path) -> Result<Vec<String>, String> {
+    let goal = chain::archive_goal(root)?;
+    let env = |k: &str, d: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).unwrap_or(d.to_string());
+    Ok([
+        "--movie", &mp.display().to_string(), "--archive", &root.display().to_string(), "--goal", goal,
+        "--seed", &env("FMI_SHORTEN_SEED", "1"), "--workers", &env("FMI_SHORTEN_WORKERS", "8"), "--rounds", "3", "--skips",
+        &out.display().to_string(),
+    ]
+    .iter()
+    .map(|x| x.to_string())
+    .collect())
+}
+
 impl fmi_explore::driver::Shortener for Stage1 {
     fn shorten(&self, root: &Path, movie: &[Value]) -> Result<Value, String> {
         let out = root.join("shorten");
@@ -463,18 +479,35 @@ impl fmi_explore::driver::Shortener for Stage1 {
         let mp = out.join("movie.jsonl");
         let text: String = movie.iter().map(|v| format!("{v}\n")).collect();
         std::fs::write(&mp, text).map_err(|e| format!("{}: {e}", mp.display()))?;
-        let env = |k: &str, d: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).unwrap_or(d.to_string());
-        let argv: Vec<String> = [
-            "--movie", &mp.display().to_string(), "--archive", &root.display().to_string(), "--goal", "end",
-            "--seed", &env("FMI_SHORTEN_SEED", "1"), "--workers", &env("FMI_SHORTEN_WORKERS", "8"), "--rounds", "3", "--skips",
-            &out.display().to_string(),
-        ]
-        .iter()
-        .map(|x| x.to_string())
-        .collect();
+        let argv = stage_argv(root, &mp, &out)?;
         let a = args(&argv, &["movie", "archive", "goal", "seed", "workers", "rounds"], &["skips"], 1)?;
         let (ok, mut sum) = run_in(&a)?;
         sum["verified"] = json!(ok);
         Ok(sum)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    /// The driver's stage passes the archive's goal: the game's end, or its goal facts (E012's kitchen); an archive
+    /// with no goal is an error, not the game's end.
+    #[test]
+    fn the_stages_goal_is_the_archives() {
+        let dir = std::env::temp_dir().join(format!("fmi-stage-goal-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let goal_of = |stage: serde_json::Value| -> Result<String, String> {
+            std::fs::write(dir.join("stage.json"), stage.to_string()).unwrap();
+            let argv = super::stage_argv(&dir, &dir.join("movie.jsonl"), &dir.join("shorten"))?;
+            let a = super::args(&argv, &["movie", "archive", "goal", "seed", "workers", "rounds"], &["skips"], 1)?;
+            Ok(a.get("goal").unwrap_or_default().to_string())
+        };
+        assert_eq!(goal_of(json!({"goal": {"end": [1]}})).as_deref(), Ok("end"));
+        assert_eq!(goal_of(json!({"goal": {"owner:566": [1]}})).as_deref(), Ok("facts"));
+        assert_eq!(goal_of(json!({"goal": {"var:443": [1], "bit:20": [0]}})).as_deref(), Ok("facts"));
+        assert!(goal_of(json!({"goal": {}})).is_err());
+        assert!(goal_of(json!({"seed": 1})).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

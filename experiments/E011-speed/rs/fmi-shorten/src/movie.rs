@@ -2,17 +2,20 @@
 //!
 //! * **The files** (`write`): OUT/NAME-NNN.jsonl (the movie: the boot's events and every placed input) and
 //!   OUT/NAME-NNN.steps.jsonl (a first line of settings, the goal's end reason with them; a line per step: its inputs,
-//!   its completion's frame, tick and the stage's digest there, its scan; a last line with the end). NNN is the next
-//!   free number: an earlier version is never overwritten. A version is written as unverified-NNN and becomes
-//!   route-NNN (`promote`) only once verify passes (the review of stage A: a route that failed verify looked like a
-//!   version).
+//!   its completion's frame, tick and the stage's digest there, its scan; `after_end` when its completion is after the
+//!   route's end, which no digest reaches: found on its own fork, it was later than the end the next steps reached; a
+//!   last line with the end). NNN is the next free number: an earlier version is never overwritten. A version is
+//!   written as unverified-NNN and becomes route-NNN (`promote`) only once verify passes (the review of stage A: a
+//!   route that failed verify looked like a version).
 //! * **The stage's digests** (`replay`): the route from boot as the stage runs a movie (its events to BOOT_FRAME at the
 //!   boot, the later ones scheduled as the run reaches them), the digest at each step's completion, and the end.
 //! * **Verify** (`verify`): the version read back from its files, booted fresh twice: by the bridge's launch (the
 //!   whole movie as the boot's input file, run to the first control, then to each completion for its digest, then to
 //!   the end) and standalone (no control channel: the engine runs the movie to its end by itself, the end read from
 //!   its trace). Both must end at the stage's site and tick, the launch with the stage's digest at every completion,
-//!   and the stage's end must be the goal's (its reason, with the site). A movie without its step log fails.
+//!   and the stage's end must be the goal's (its reason, with the site). A movie without its step log fails. A step
+//!   whose completion has no digest is reported unchecked (`unchecked`: after the end, or no digest taken), not passed
+//!   over silently (the review of stage B).
 
 use crate::chain::{self, Sched};
 use crate::verdict::End;
@@ -29,7 +32,8 @@ pub fn steps_path(route: &Path) -> PathBuf {
     route.with_extension("steps.jsonl")
 }
 
-/// Writes the next free `name`-NNN.jsonl in `dir` and its step log; returns the movie's path.
+/// Writes the next free `name`-NNN.jsonl in `dir` and its step log (a step completed after `end`'s frame marked
+/// `after_end`); returns the movie's path.
 pub fn write(dir: &Path, name: &str, route: &[Event], meta: &Value, steps: &[Value], end: &Value) -> Res<PathBuf> {
     std::fs::create_dir_all(dir).map_err(e2s)?;
     for n in 1..1000 {
@@ -42,7 +46,14 @@ pub fn write(dir: &Path, name: &str, route: &[Event], meta: &Value, steps: &[Val
         }
         writeln!(g, "{}", json!({"meta": meta})).map_err(e2s)?;
         for s in steps {
-            writeln!(g, "{s}").map_err(e2s)?;
+            match (s["completion"]["frame"].as_u64(), end["frame"].as_u64()) {
+                (Some(c), Some(f)) if c > f => {
+                    let mut s = s.clone();
+                    s["after_end"] = json!(true);
+                    writeln!(g, "{s}").map_err(e2s)?;
+                }
+                _ => writeln!(g, "{s}").map_err(e2s)?,
+            }
         }
         writeln!(g, "{}", json!({"end": end})).map_err(e2s)?;
         return Ok(p);
@@ -170,6 +181,8 @@ pub fn verify(host: &dyn EngineHost, standalone: Standalone<'_>, route_path: &Pa
     };
     let mut meta = Value::Null;
     let mut want: BTreeMap<u64, u64> = BTreeMap::new();
+    // the steps whose completion has no digest: (k, frame)
+    let mut bare: Vec<(Value, u64)> = Vec::new();
     let mut end: Option<End> = None;
     for l in text.lines().filter(|l| !l.trim().is_empty()) {
         let v: Value = serde_json::from_str(l).map_err(|e| format!("{}: {e}", sp.display()))?;
@@ -181,8 +194,13 @@ pub fn verify(host: &dyn EngineHost, standalone: Standalone<'_>, route_path: &Pa
                 frame: e["frame"].as_u64().unwrap_or(0),
                 reason: e["reason"].as_str().unwrap_or("").to_string(),
             });
-        } else if let (Some(f), Some(d)) = (v["completion"]["frame"].as_u64(), v["digest"].as_str()) {
-            want.insert(f, u64::from_str_radix(d, 16).map_err(e2s)?);
+        } else if let Some(f) = v["completion"]["frame"].as_u64() {
+            match v["digest"].as_str() {
+                Some(d) => {
+                    want.insert(f, u64::from_str_radix(d, 16).map_err(e2s)?);
+                }
+                None => bare.push((v["k"].clone(), f)),
+            }
         }
     }
     let Some(end) = end.filter(|e| !e.reason.is_empty()) else {
@@ -193,6 +211,13 @@ pub fn verify(host: &dyn EngineHost, standalone: Standalone<'_>, route_path: &Pa
     if end.reason != goal {
         return Ok(json!({"ok": false, "why": format!("the step log's end {:?} is not the goal's {goal:?}", end.reason)}));
     }
+    // unchecked: a completion after the end (the game ended first), or before it with no digest taken; the goal's own
+    // at the end is the end's check
+    let unchecked: Vec<Value> = bare
+        .iter()
+        .filter(|(_, f)| *f != end.frame)
+        .map(|(k, f)| json!({"k": k, "frame": f, "why": if *f > end.frame { "after the end" } else { "no digest" }}))
+        .collect();
     let seed = meta["seed"].as_u64().unwrap_or(1) as u32;
     let frames: Vec<u64> = want.keys().copied().collect();
     let max_frame = end.frame + 1000;
@@ -208,7 +233,7 @@ pub fn verify(host: &dyn EngineHost, standalone: Standalone<'_>, route_path: &Pa
     let same = |x: &Option<End>| x.as_ref() == Some(&end);
     let ok = miss.is_empty() && same(&a.end) && same(&b);
     Ok(json!({"ok": ok, "route": route_path.display().to_string(), "events": route.len(),
-              "end": {"frame": end.frame, "tick": end.tick, "reason": end.reason},
+              "end": {"frame": end.frame, "tick": end.tick, "reason": end.reason}, "unchecked": unchecked,
               "launch": {"same_end": same(&a.end), "digests": want.len(), "digest_miss": miss, "boot": a.json()},
               "standalone": {"same_end": same(&b), "end": b.as_ref().map(|e| json!({"frame": e.frame, "tick": e.tick, "reason": e.reason}))}}))
 }

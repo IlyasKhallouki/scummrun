@@ -17,6 +17,11 @@
 //! strict one completes at no t); every judge is the engine's. No click is shifted or named: a found step's inputs are
 //! labelled again (`relabel`: anchor, timing class, identity, as label.rs reads the movie's), so a later pass (item 7)
 //! places them by what they act on, as it places the movie's.
+//!
+//! A trial's engine error (a fork's process gone, a timeout: realize's run, an offer trial, a dialog line or node) is
+//! that trial's outcome, counted with its message in the fallback's report, as the scan counts a candidate's (the
+//! review of stage B: one trial's error stopped the pass); only an error of the base's fork or of the offer's
+//! producer ends the fallbacks.
 
 use crate::label::{self, Anchor, DIALOG};
 use crate::scan::{self, Cfg, Found, In, StepSpec};
@@ -164,7 +169,7 @@ fn by_realize(base: &mut Box<dyn Engine>, spec: &StepSpec, goal: &Goal, after: u
                     e.quit();
                     return Ok((None, json!({"steps": names, "why": format!("no idle stop before {}", s.text())})));
                 }
-                Err(x) => return Err(e2s(x)),
+                Err(x) => return Ok(engine_error(e, &names, x)),
             }
         }
         match realize::realize(&mut e, s, &rcfg) {
@@ -180,13 +185,23 @@ fn by_realize(base: &mut Box<dyn Engine>, spec: &StepSpec, goal: &Goal, after: u
                 e.quit();
                 return Ok((None, json!({"steps": names, "why": format!("ended: {}", st.reason)})));
             }
-            Err(x) => return Err(e2s(x)),
+            Err(x) => return Ok(engine_error(e, &names, x)),
         }
     }
-    let f = judge(&mut e, goal, limit, t, events).map_err(e2s)?;
+    let f = match judge(&mut e, goal, limit, t, events) {
+        Ok(f) => f,
+        Err(x) => return Ok(engine_error(e, &names, x)),
+    };
     e.quit();
     let why = if f.is_some() { "done" } else { "the goal not by the limit" };
     Ok((f, json!({"steps": names, "why": why})))
+}
+
+/// realize's engine error (its fork's process gone, a timeout): the fallback's outcome, with its message, not the
+/// pass's (the review of stage B); `e` is quit.
+fn engine_error(e: Box<dyn Engine>, names: &[String], x: EngineError) -> (Option<Found>, Value) {
+    e.quit();
+    (None, json!({"steps": names, "why": format!("engine error: {x}"), "error": 1}))
 }
 
 /// `run` on a fork of `e` per item, in `workers` threads (a producer forks, the workers take the forks).
@@ -227,8 +242,18 @@ fn by_offer(base: &mut Box<dyn Engine>, goal: &Goal, after: u64, orig: u64, limi
     let inputs = afford::inputs_of(&of);
     let n = inputs.len();
     let best: Mutex<Option<Found>> = Mutex::new(None);
-    // (refused by the bridge, run, completed)
-    let counts = Mutex::new((0usize, 0usize, 0usize));
+    // (refused by the bridge, run, completed, its engine failed)
+    let counts = Mutex::new((0usize, 0usize, 0usize, 0usize));
+    let errors: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+    // a trial's engine error (its fork's process gone, a timeout) is that trial's outcome, counted with its message as
+    // the scan counts a candidate's (scan.rs; the review of stage B: one trial's error stopped the pass)
+    let failed = |inp: &afford::Inputs, x: EngineError| {
+        counts.lock().unwrap().3 += 1;
+        let mut v = errors.lock().unwrap();
+        if v.len() < scan::ERRORS_KEPT {
+            v.push((inp.name(), x.to_string()));
+        }
+    };
     let trial = |mut b: Box<dyn Engine>, inp: afford::Inputs| -> EResult<()> {
         let evs = inp.events(f0);
         let cap = best.lock().unwrap().as_ref().map_or(limit, |f| f.frame).min(limit);
@@ -241,26 +266,34 @@ fn by_offer(base: &mut Box<dyn Engine>, goal: &Goal, after: u64, orig: u64, limi
             }
             Err(x) => {
                 b.quit();
-                return Err(x);
+                failed(&inp, x);
+                return Ok(());
             }
         }
         let r = judge(&mut b, goal, cap, f0, evs);
         b.quit();
-        let mut c = counts.lock().unwrap();
-        c.1 += 1;
-        if let Some(f) = r? {
-            c.2 += 1;
-            drop(c);
-            better(&best, f);
+        match r {
+            Ok(f) => {
+                let mut c = counts.lock().unwrap();
+                c.1 += 1;
+                if let Some(f) = f {
+                    c.2 += 1;
+                    drop(c);
+                    better(&best, f);
+                }
+            }
+            Err(x) => failed(&inp, x),
         }
         Ok(())
     };
+    // only the producer's error (a fork of the offer's engine) ends the trials
     let r = par(&mut e, inputs, workers, &trial);
     e.quit();
     r?;
-    let (refused, run, done) = counts.into_inner().unwrap();
+    let (refused, run, done, error) = counts.into_inner().unwrap();
     let f = best.into_inner().unwrap();
-    Ok((f, json!({"at": f0, "offer": of.json(), "inputs": n, "refused": refused, "run": run, "done": done})))
+    Ok((f, json!({"at": f0, "offer": of.json(), "inputs": n, "refused": refused, "run": run, "done": done, "error": error,
+                  "errors": errors.into_inner().unwrap()})))
 }
 
 /// The dialog lines' search (module docstring).
@@ -276,75 +309,103 @@ fn by_dialogs(base: &mut Box<dyn Engine>, goal: &Goal, after: u64, limit: u64, c
     };
     let mut best: Option<Found> = None;
     let (mut leaves, mut nodes, mut lines) = (0usize, 0usize, 0usize);
+    // a node's or a line's engine error (a fork's process gone, a timeout) is that leaf's outcome, counted with its
+    // message (the frame the node stopped at) as the scan counts a candidate's (scan.rs; the review of stage B: one
+    // line's error stopped the pass)
+    let mut error = 0usize;
+    let mut errors: Vec<(u64, String)> = Vec::new();
+    let mut failed = |f: u64, x: EngineError| {
+        error += 1;
+        if errors.len() < scan::ERRORS_KEPT {
+            errors.push((f, x.to_string()));
+        }
+    };
     let mut stack: Vec<(Box<dyn Engine>, Vec<Event>)> = vec![(e, Vec::new())];
-    let mut go = |stack: &mut Vec<(Box<dyn Engine>, Vec<Event>)>, best: &mut Option<Found>| -> EResult<()> {
-        while let Some((mut n, evs)) = stack.pop() {
-            let cap = best.as_ref().map_or(limit, |f| f.frame).min(limit);
-            let f = n.status().frame;
-            if leaves >= cfg.leaves || f + 1 > cap {
-                leaves += 1;
-                n.quit();
-                continue;
-            }
-            nodes += 1;
+    while let Some((mut n, evs)) = stack.pop() {
+        let cap = best.as_ref().map_or(limit, |f| f.frame).min(limit);
+        let f = n.status().frame;
+        if leaves >= cfg.leaves || f + 1 > cap {
+            leaves += 1;
+            n.quit();
+            continue;
+        }
+        nodes += 1;
+        let offer = (|| -> EResult<Option<afford::Offer>> {
             let o = n.obs(&ObsReq::default())?;
             let h = o.vars.get(afford::VAR_VERB_SCRIPT).copied().unwrap_or(0);
             if !cfg.dialog.contains(&h) {
+                return Ok(None);
+            }
+            afford::offer_cfg(&mut n, &o, false, afford::offer_screen_on()).map(Some)
+        })();
+        let of = match offer {
+            Ok(Some(of)) => of,
+            Ok(None) => {
                 leaves += 1;
                 n.quit();
                 continue;
             }
-            let of = afford::offer_cfg(&mut n, &o, false, afford::offer_screen_on())?;
-            // pushed last first: the offer's first line is tried first
-            for p in of.verbs.iter().rev() {
-                let ev = Event { frame: f + 1, what: Input::Click(p.x, p.y) };
-                let mut c = n.fork()?;
-                let mut path = evs.clone();
-                path.push(ev.clone());
-                let step = |c: &mut Box<dyn Engine>| -> EResult<Option<Status>> {
-                    c.inputs(std::slice::from_ref(&ev))?;
-                    c.run(&RunSpec { frame: Some(f + 1), ..Default::default() })?;
-                    let taken = c.input_log()?.records.iter().any(|r| r.frame == f + 1 && r.verdict == Verdict::Taken);
-                    if !taken {
-                        return Ok(None);
+            Err(x) => {
+                leaves += 1;
+                failed(f, x);
+                n.quit();
+                continue;
+            }
+        };
+        // pushed last first: the offer's first line is tried first
+        for p in of.verbs.iter().rev() {
+            let ev = Event { frame: f + 1, what: Input::Click(p.x, p.y) };
+            let mut c = match n.fork() {
+                Ok(c) => c,
+                Err(x) => {
+                    leaves += 1;
+                    failed(f, x);
+                    break;
+                }
+            };
+            let mut path = evs.clone();
+            path.push(ev.clone());
+            let step = |c: &mut Box<dyn Engine>| -> EResult<Option<Status>> {
+                c.inputs(std::slice::from_ref(&ev))?;
+                c.run(&RunSpec { frame: Some(f + 1), ..Default::default() })?;
+                let taken = c.input_log()?.records.iter().any(|r| r.frame == f + 1 && r.verdict == Verdict::Taken);
+                if !taken {
+                    return Ok(None);
+                }
+                Ok(Some(c.run(&RunSpec { until: until.clone(), idle: true, max_frame: Some(cap), ..Default::default() })?))
+            };
+            lines += 1;
+            match step(&mut c) {
+                Ok(Some(st)) if st.reason == "until" => {
+                    leaves += 1;
+                    // kept only when earlier by (tick, frame): a line run to the best's frame can reach it there with
+                    // more ticks (the review of stage B: the search replaced the best unasked)
+                    if best.as_ref().is_none_or(|b| (st.tick, st.frame) < (b.tick, b.frame)) {
+                        best = Some(Found { t, events: path, frame: st.frame, tick: st.tick });
                     }
-                    Ok(Some(c.run(&RunSpec { until: until.clone(), idle: true, max_frame: Some(cap), ..Default::default() })?))
-                };
-                lines += 1;
-                match step(&mut c) {
-                    Ok(Some(st)) if st.reason == "until" => {
-                        leaves += 1;
-                        *best = Some(Found { t, events: path, frame: st.frame, tick: st.tick });
-                        c.quit();
-                    }
-                    Ok(Some(st)) if st.reason == "idle" => stack.push((c, path)),
-                    Ok(_) | Err(EngineError::Bridge(_)) => {
-                        leaves += 1;
-                        c.quit();
-                    }
-                    Err(EngineError::Ended(st)) => {
-                        leaves += 1;
-                        if matches!(goal, Goal::End(w) if *w == st.reason) && best.as_ref().is_none_or(|b| (st.tick, st.frame) < (b.tick, b.frame)) {
-                            *best = Some(Found { t, events: path, frame: st.frame, tick: st.tick });
-                        }
-                    }
-                    Err(x) => {
-                        c.quit();
-                        n.quit();
-                        return Err(x);
+                    c.quit();
+                }
+                Ok(Some(st)) if st.reason == "idle" => stack.push((c, path)),
+                Ok(_) | Err(EngineError::Bridge(_)) => {
+                    leaves += 1;
+                    c.quit();
+                }
+                Err(EngineError::Ended(st)) => {
+                    leaves += 1;
+                    if matches!(goal, Goal::End(w) if *w == st.reason) && best.as_ref().is_none_or(|b| (st.tick, st.frame) < (b.tick, b.frame)) {
+                        best = Some(Found { t, events: path, frame: st.frame, tick: st.tick });
                     }
                 }
+                Err(x) => {
+                    leaves += 1;
+                    failed(f, x);
+                    c.quit();
+                }
             }
-            n.quit();
         }
-        Ok(())
-    };
-    let r = go(&mut stack, &mut best);
-    for (n, _) in stack {
         n.quit();
     }
-    r.map_err(e2s)?;
-    Ok((best, json!({"at": t, "leaves": leaves, "nodes": nodes, "lines": lines})))
+    Ok((best, json!({"at": t, "leaves": leaves, "nodes": nodes, "lines": lines, "error": error, "errors": errors})))
 }
 
 /// The scan with skips off for the step's span (module docstring), from the step before's completion `after` (the

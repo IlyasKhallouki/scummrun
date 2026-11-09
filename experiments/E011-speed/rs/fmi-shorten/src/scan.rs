@@ -31,7 +31,7 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 /// One input of a step as the scan places it.
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct In {
     pub anchor: Anchor,
     pub timing: Timing,
