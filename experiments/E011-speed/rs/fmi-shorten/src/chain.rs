@@ -7,11 +7,15 @@
 //!   input (the mouse's position and its copies, the sentence being composed, a dialog's lines), so with Archive::held
 //!   as it is nearly every input changes the progress. They are measured, not named (amendment 1), from forks at the
 //!   first control stop of each input handler the movie meets (VAR_VERB_SCRIPT's value there: a game whose first
-//!   control is a dialog shows its sentence interface only later): the keys a click that makes nothing writes (on
-//!   empty space, in the verbs' screen and in the main screen; on a verb slot with no object after it: its record's
-//!   variables and bits, and the world keys that differ from a no-input fork `PROBE_FRAMES` frames later) and those a
-//!   mouse move alone changes (to two corners of the screen, onto a target). A key only a step's own taken input
-//!   writes stays in its progress.
+//!   control is a dialog shows its sentence interface only later): the keys a click that makes nothing writes (the
+//!   probes click on empty space, in the verbs' screen and in the main screen, and on a verb slot with no object after
+//!   it: its record's variables and bits, and the world keys that differ from a no-input fork `PROBE_FRAMES` frames
+//!   later) and those a mouse move alone changes (to two corners of the screen, onto a target). A click makes nothing
+//!   (`made_nothing`, amendment 1(d)'s refused click) when the game refused it, or when its handler only recorded it:
+//!   wrote variables and bits and started no script but its own run (at the sentence interface a click on empty space
+//!   records its point, which the input log calls taken). A probe click that acted (a dialog line chosen, a walk) is
+//!   reported, its keys not counted (the review of stage A). A key only a step's own taken input writes stays in its
+//!   progress.
 //! * **The replay** (`replay`): the movie from boot, frame by frame. At the stop before each input label.rs reads what
 //!   the input will hit; that stop is also the control stop after the input before it, where its facts are kept and
 //!   the input log's records so far taken (the last input's at its own frame's stop, so a game that ends on the next
@@ -374,6 +378,21 @@ pub fn written(r: &InputRecord) -> BTreeSet<Key> {
         .collect()
 }
 
+/// Whether a probe click made nothing (module docstring) by its record (None: none, it never reached the handler):
+/// dropped or ignored; or taken with writes to variables and bits alone and no script started but the handler's own
+/// run. A sentence queued, a walk, a message, a verb slot, the cursor, the gate, an object, an actor or the camera
+/// changed, or another script started, is an act.
+pub fn made_nothing(r: Option<&InputRecord>) -> bool {
+    r.is_none_or(|r| {
+        r.verdict.refused()
+            || r.writes.iter().all(|t| match t.kind {
+                TouchKind::Var | TouchKind::Bit => true,
+                TouchKind::Started => t.a == r.handler,
+                _ => false,
+            })
+    })
+}
+
 /// A fork of `e` with `input` at the next frame, run `PROBE_FRAMES` frames past it: its facts there and the input's
 /// record (None: the game ended first).
 fn probe(e: &mut Box<dyn Engine>, input: Option<&Input>) -> EResult<Option<(Facts, Option<InputRecord>)>> {
@@ -459,9 +478,19 @@ pub fn interface(e: &mut Box<dyn Engine>) -> EResult<Iface> {
         if let Some(r) = &rec {
             keys.extend(written(r));
         }
+        let nothing = made_nothing(rec.as_ref());
+        // the record's writes by kind, a script started with its number
+        let kinds: BTreeSet<String> = rec
+            .iter()
+            .flat_map(|r| r.writes.iter())
+            .map(|t| if t.kind == TouchKind::Started { format!("started:{}", t.a) } else { t.kind.name().to_string() })
+            .collect();
         out.probes.push(json!({"frame": frame, "input": what, "event": event_json(&Event { frame: frame + 1, what: i }),
-                               "verdict": rec.as_ref().map(|r| r.verdict.text()), "keys": keys.iter().map(|k| k.text()).collect::<Vec<_>>()}));
-        out.clicks.extend(keys);
+                               "verdict": rec.as_ref().map(|r| r.verdict.text()), "writes": kinds, "counted": nothing,
+                               "keys": keys.iter().map(|k| k.text()).collect::<Vec<_>>()}));
+        if nothing {
+            out.clicks.extend(keys);
+        }
     }
     Ok(out)
 }

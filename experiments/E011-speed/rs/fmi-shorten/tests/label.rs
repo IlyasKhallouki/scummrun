@@ -341,8 +341,9 @@ fn opts() -> Opts {
 fn replay_steps_keep_and_twin() {
     let mut h = held();
     let ch = chain::replay(&ToyHost, &movie(), &mut h, &opts()).unwrap();
-    // the interface, at the first control stop: the refused clicks' keys (the click's copy, the composing verb, the
-    // mouse they move) and the mouse's; the last object, which only a taken click writes, is not one
+    // the interface, at the first control stop: the keys of the clicks that make nothing (the click's copy, the
+    // composing verb the verb slot's taken click records, the mouse they move) and the mouse's; the last object, which
+    // only a click that acts writes, is not one (amendment 1(d))
     assert_eq!(ch.iface.at, vec![(9, 0)]);
     let k = |v: usize| Key::var(v as u64);
     assert_eq!(ch.iface.clicks, [k(V_MOUSE), k(V_VERB), k(V_CLICK)].into_iter().collect());
@@ -430,6 +431,25 @@ fn anchors_by_the_hit() {
     assert!(label::same_hit(&main(5, 2), &[], &Anchor::Object { id: 5, actor: 2 }));
     assert!(!label::same_hit(&main(5, 0), &[], &Anchor::Object { id: 5, actor: 2 }));
     assert!(!label::same_hit(&main(5, 2), &[], &Anchor::Actor { id: 2 }));
+}
+
+#[test]
+fn a_click_makes_nothing_when_its_handler_only_records_it() {
+    let rec = |verdict, writes: Vec<(TouchKind, i32)>| InputRecord {
+        frame: 5, input: vec![], stat: 0, verdict, area: 2, value: 0, mode: 1, slot: 0, zone: 0, key_match: false, handler: 4,
+        writes: writes.into_iter().map(|(kind, a)| Touch { kind, a, b: 2, old: 0, now: 0 }).collect(), reads: vec![],
+        ops: vec![], ops_dropped: 0, touches_dropped: 0,
+    };
+    assert!(chain::made_nothing(None));
+    assert!(chain::made_nothing(Some(&rec(Verdict::Ignored, vec![(TouchKind::Started, 4)]))));
+    assert!(chain::made_nothing(Some(&rec(Verdict::Dropped("gate".into()), vec![]))));
+    // taken: its point recorded by its own run
+    assert!(chain::made_nothing(Some(&rec(Verdict::Taken, vec![(TouchKind::Started, 4), (TouchKind::Var, 100), (TouchKind::Bit, 3)]))));
+    // acts: another script, a walk, a sentence, a verb slot
+    assert!(!chain::made_nothing(Some(&rec(Verdict::Taken, vec![(TouchKind::Started, 14), (TouchKind::Var, 100)]))));
+    assert!(!chain::made_nothing(Some(&rec(Verdict::Taken, vec![(TouchKind::Walk, 1)]))));
+    assert!(!chain::made_nothing(Some(&rec(Verdict::Taken, vec![(TouchKind::Sentence, 9)]))));
+    assert!(!chain::made_nothing(Some(&rec(Verdict::Taken, vec![(TouchKind::Verb, 2)]))));
 }
 
 #[test]
