@@ -632,3 +632,15 @@ Each laptop try from the idle room-48 entry (28025) named one gap; each was fixe
   19518 with geometric probes (71 clicks, tick 114,658: 31:51 of game time, from 38:11).
 - **Not used:** `e016 g4 --mode chain` re-realized the C0–C8 chain's steps from boot and missed 14 of 23 (walks and
   dialog lines realize does not make), so the chain drifted and stopped in room 49.
+- **The optimized route** (`c9/movie-c9-optimized.jsonl`): the laptop's route after a third pass (pairs of clicks
+  dropped, then each click as before): 67 clicks, frame 19512; with the bridge's automatic '.' and Esc
+  (`skips`) from frame 18741, the earliest at which the fixed clicks still end the game (`skipsearch.py`, a binary
+  search), the end at frame 19477, tick 114,412: **31:47 of game time**, from 38:11 (the route as found) and 50:38
+  (the run's own route). Verified from boot by the bridge's launch and by the standalone launch the video is recorded
+  with.
+- **The run's own route shortened on the VM** (`c9/movie-c9-run-short.jsonl`, two passes, 24 replays at a time):
+  97 clicks, 30785 frames, to 72 clicks, 19606 frames: within 100 frames of the laptop's, from a different chain.
+- **Skips earlier than frame 18741 break the fixed clicks:** the game runs ahead of them. Re-timing clicks by the
+  engine's idle stops (`e016 asap`) does not reproduce the route even without skips (both runs stall in room 49):
+  some clicks are not at idle stops. Open: a re-timing under skips.
+- **The VM** was stopped at 01:40 UTC after 1.7 h of its 5 h booking ($2.06; $4.67 left of the cap).

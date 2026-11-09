@@ -30,6 +30,7 @@
 //!       the boot's entry, then on to KEY = V (up to R frames, default 600) and the movie verified from boot. See
 //!       g4.rs. Writes OUT/g4.json and OUT/chain-events.jsonl.
 
+mod asap;
 mod common;
 mod cp;
 mod g3;
@@ -45,6 +46,7 @@ fn main() {
         Some("g4") => g4::run(&argv[1..]),
         Some("hits") => hits::run(&argv[1..]),
         Some("cp") => cp::run(&argv[1..]),
+        Some("asap") => asap::run(&argv[1..]),
         _ => Err("usage: e016 inlog OUT ... | e016 g3 OUT ... | e016 g4 OUT ...".to_string()),
     };
     if let Err(e) = r {
