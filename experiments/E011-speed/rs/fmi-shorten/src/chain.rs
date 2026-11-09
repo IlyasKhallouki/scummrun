@@ -5,13 +5,18 @@
 //!   and its root's facts, read from the archive folder; no chain of entries is needed), less the interface's keys.
 //! * **The interface's keys** (`interface`): the guide's atoms include the keys the interface itself sets on every
 //!   input (the mouse's position and its copies, the sentence being composed, a dialog's lines), so with Archive::held
-//!   as it is nearly every input changes the progress. They are measured, not named: the variables and bits the input
-//!   log's records say the input handler wrote over the movie, and the world keys a mouse move alone changes (two forks
-//!   at the first stop, the mouse moved to two corners of the screen, one frame).
+//!   as it is nearly every input changes the progress. They are measured, not named (amendment 1), from forks at the
+//!   first control stop of each input handler the movie meets (VAR_VERB_SCRIPT's value there: a game whose first
+//!   control is a dialog shows its sentence interface only later): the keys a click that makes nothing writes (on
+//!   empty space, in the verbs' screen and in the main screen; on a verb slot with no object after it: its record's
+//!   variables and bits, and the world keys that differ from a no-input fork `PROBE_FRAMES` frames later) and those a
+//!   mouse move alone changes (to two corners of the screen, onto a target). A key only a step's own taken input
+//!   writes stays in its progress.
 //! * **The replay** (`replay`): the movie from boot, frame by frame. At the stop before each input label.rs reads what
 //!   the input will hit; that stop is also the control stop after the input before it, where its facts are kept and
-//!   the input log's records so far taken. Every frame's changes to the progress keys are logged, so a step's
-//!   completion is the first frame at which its keep holds. A second replay forks each step's twin (item 3).
+//!   the input log's records so far taken (the last input's at its own frame's stop, so a game that ends on the next
+//!   frame still gives it). Every frame's changes to the progress keys are logged, so a step's completion is the first
+//!   frame at which its keep holds. A second replay forks each step's twins (item 3).
 //! * **Steps** (`Step`): the inputs between two progress changes. An input whose next stop shows no change, or is not
 //!   a control stop, merges into the next step; so does one followed by an input of timing class "next" (label.rs):
 //!   that input is placed as soon as possible after it (a verb, then its object), and the stop between holds the
@@ -22,6 +27,7 @@ use crate::label::{self, Seen, Twin};
 use crate::{e2s, Res};
 use fmi_core::*;
 use fmi_explore::archive::{self, Atom, FactLook, FactMap};
+use fmi_explore::events::event_json;
 use fmi_explore::files;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -212,8 +218,8 @@ pub struct Chain {
     pub start: Facts,
     /// tick at each frame's stop (index: frame)
     pub ticks: Vec<u64>,
-    /// the interface's keys measured (`interface`): by the input log, by the mouse
-    pub iface: (BTreeSet<Key>, BTreeSet<Key>),
+    /// the interface's keys measured (`interface`)
+    pub iface: Iface,
     /// control stops where the facts kept from the frames' changes differed from the engine's (keys)
     pub drift: usize,
     /// the twins' replay against the first at the steps' ends (keys)
@@ -321,32 +327,139 @@ impl Sched {
     }
 }
 
-/// The world keys a mouse move alone changes: two forks of `e` with the mouse moved to two corners of the screen,
-/// one frame each, against each other.
-pub fn mouse_keys(e: &mut Box<dyn Engine>) -> EResult<BTreeSet<Key>> {
-    let f = e.status().frame + 1;
-    let mut out = Vec::new();
-    for (x, y) in [(0, 0), (fmi_explore::afford::SCREEN_W - 1, fmi_explore::afford::SCREEN_H - 1)] {
-        let mut t = e.fork()?;
-        t.inputs(&[Event { frame: f, what: Input::Move(x, y) }])?;
-        t.run(&RunSpec { frame: Some(f), ..Default::default() })?;
-        out.push(t.facts()?);
-        t.quit();
-    }
-    Ok(out[0].diff(&out[1]).into_iter().map(|d| d.0).filter(|k| label::world(*k)).collect())
+/// Frames a probe of the interface runs after its input's frame: the handler's frame and the scripts that answer it.
+pub const PROBE_FRAMES: u64 = 8;
+/// The probe's grid for a point no slot answers: every GRID_STEP pixels of the screen.
+const GRID_STEP: i32 = 4;
+
+/// The interface's keys (module docstring), measured at control stops.
+#[derive(Clone, Debug, Default)]
+pub struct Iface {
+    /// by the clicks that make nothing
+    pub clicks: BTreeSet<Key>,
+    /// by a mouse move
+    pub mouse: BTreeSet<Key>,
+    /// the stops measured: (frame, the input handler there)
+    pub at: Vec<(u64, Val)>,
+    /// each probe: its stop, its input, its record's verdict, its keys
+    pub probes: Vec<Value>,
 }
 
-/// The interface's keys of the input log: the variables and bits its records say the input handler wrote.
-pub fn record_keys(met: &[Met]) -> BTreeSet<Key> {
-    met.iter()
-        .filter_map(|m| m.record.as_ref())
-        .flat_map(|r| r.writes.iter())
+impl Iface {
+    fn add(&mut self, handler: Val, x: Iface) {
+        let frame = x.at.first().map(|a| a.0).unwrap_or(0);
+        self.at.push((frame, handler));
+        self.clicks.extend(x.clicks);
+        self.mouse.extend(x.mouse);
+        self.probes.extend(x.probes.into_iter().map(|mut p| {
+            p["handler"] = json!(handler);
+            p
+        }));
+    }
+}
+
+/// The variables and bits a record says the handler wrote.
+pub fn written(r: &InputRecord) -> BTreeSet<Key> {
+    r.writes
+        .iter()
         .filter_map(|t| match t.kind {
             TouchKind::Var => Some(Key::var(t.a as u64)),
             TouchKind::Bit => Some(Key::bit(t.a as u64)),
             _ => None,
         })
         .collect()
+}
+
+/// A fork of `e` with `input` at the next frame, run `PROBE_FRAMES` frames past it: its facts there and the input's
+/// record (None: the game ended first).
+fn probe(e: &mut Box<dyn Engine>, input: Option<&Input>) -> EResult<Option<(Facts, Option<InputRecord>)>> {
+    let f = e.status().frame + 1;
+    let mut t = e.fork()?;
+    if let Some(i) = input {
+        t.inputs(&[Event { frame: f, what: i.clone() }])?;
+    }
+    let run = |t: &mut Box<dyn Engine>| -> EResult<(Facts, Option<InputRecord>)> {
+        t.run(&RunSpec { frame: Some(f), ..Default::default() })?;
+        let rec = t.input_log()?.records.into_iter().find(|r| r.frame == f);
+        t.run(&RunSpec { frame: Some(f + PROBE_FRAMES), ..Default::default() })?;
+        Ok((t.facts()?, rec))
+    };
+    match run(&mut t) {
+        Ok(x) => {
+            t.quit();
+            Ok(Some(x))
+        }
+        Err(EngineError::Ended(_)) => Ok(None),
+        Err(x) => {
+            t.quit();
+            Err(x)
+        }
+    }
+}
+
+/// The world keys that differ between two facts.
+fn world_diff(a: &Facts, b: &Facts) -> BTreeSet<Key> {
+    a.diff(b).into_iter().map(|d| d.0).filter(|k| label::world(*k)).collect()
+}
+
+/// The interface's keys at `e`'s stop (a control stop), against a no-input fork: forks with the mouse moved to two
+/// corners of the screen and onto the offer's first target (the hover); with a click on empty space, on a point of
+/// the verbs' screen no slot answers and on a point of the main screen no object or actor answers (a walk, which
+/// changes nothing but where ego stands); and with a click on the offer's first verb slot with no object after it.
+pub fn interface(e: &mut Box<dyn Engine>) -> EResult<Iface> {
+    use fmi_explore::afford::{self, SCREEN_H, SCREEN_W};
+    let frame = e.status().frame;
+    let mut out = Iface { at: vec![(frame, 0)], ..Default::default() };
+    let o = e.obs(&ObsReq::default())?;
+    let of = afford::offer_cfg(e, &o, false, afford::offer_screen_on())?;
+    let Some((none, _)) = probe(e, None)? else { return Ok(out) };
+    let mut moves = vec![("corner", Input::Move(0, 0)), ("corner", Input::Move(SCREEN_W - 1, SCREEN_H - 1))];
+    if let Some(t) = of.targets.first() {
+        moves.push(("target", Input::Move(t.x, t.y)));
+    }
+    let mut prev: Option<Facts> = None;
+    for (what, i) in moves {
+        let Some((f, _)) = probe(e, Some(&i))? else { continue };
+        let mut keys = world_diff(&none, &f);
+        if let Some(p) = &prev {
+            keys.extend(world_diff(p, &f));
+        }
+        out.probes.push(json!({"frame": frame, "input": what, "event": event_json(&Event { frame: frame + 1, what: i }),
+                               "keys": keys.iter().map(|k| k.text()).collect::<Vec<_>>()}));
+        out.mouse.extend(keys);
+        prev = Some(f);
+    }
+    // the empty points: the grid's first that no slot, object or actor answers, in the verbs' screen (else any), and
+    // the first in the main screen
+    let pts: Vec<(i32, i32)> = (0..SCREEN_H / GRID_STEP)
+        .flat_map(|j| (0..SCREEN_W / GRID_STEP).map(move |i| (i * GRID_STEP + GRID_STEP / 2, j * GRID_STEP + GRID_STEP / 2)))
+        .collect();
+    let ats = e.at_many(&pts)?;
+    let vzone = ats.iter().find(|a| a.verb_slot > 0).map(|a| a.zone);
+    let empty = |a: &&At| a.verb_slot == 0 && a.main.is_none();
+    let at = ats.iter().filter(empty).find(|a| Some(a.zone) == vzone).or_else(|| ats.iter().find(empty));
+    let floor = ats.iter().find(|a| a.verb_slot == 0 && a.main.is_some_and(|m| m.2 == 0 && m.3 == 0));
+    let mut clicks = Vec::new();
+    if let Some(a) = at {
+        clicks.push(("empty", Input::Click(a.x, a.y)));
+    }
+    if let Some(a) = floor {
+        clicks.push(("floor", Input::Click(a.x, a.y)));
+    }
+    if let Some(v) = of.verbs.first() {
+        clicks.push(("verb", Input::Click(v.x, v.y)));
+    }
+    for (what, i) in clicks {
+        let Some((f, rec)) = probe(e, Some(&i))? else { continue };
+        let mut keys = world_diff(&none, &f);
+        if let Some(r) = &rec {
+            keys.extend(written(r));
+        }
+        out.probes.push(json!({"frame": frame, "input": what, "event": event_json(&Event { frame: frame + 1, what: i }),
+                               "verdict": rec.as_ref().map(|r| r.verdict.text()), "keys": keys.iter().map(|k| k.text()).collect::<Vec<_>>()}));
+        out.clicks.extend(keys);
+    }
+    Ok(out)
 }
 
 /// The rooms of the log's room changes in frames [from, to], after `first`.
@@ -364,9 +477,7 @@ fn rooms_in(log: &[(u64, Key, Val)], first: i64, from: u64, to: u64) -> Vec<i64>
 /// twin. `held`'s interface keys are set here from the replay's measures.
 pub fn replay(host: &dyn EngineHost, movie: &[Event], held: &mut Held, o: &Opts) -> Res<Chain> {
     let mut ch = gather(host, movie, held, o)?;
-    let rec = record_keys(&ch.met);
-    held.iface = rec.union(&ch.iface.1).copied().collect();
-    ch.iface.0 = rec;
+    held.iface = ch.iface.clicks.union(&ch.iface.mouse).copied().collect();
     ch.steps = steps_of(&ch, held);
     for k in 0..ch.steps.len() {
         let s = &ch.steps[k];
@@ -389,7 +500,7 @@ fn gather(host: &dyn EngineHost, movie: &[Event], held: &Held, o: &Opts) -> Res<
     }
     let (mut e, mut sched) = boot(host, movie, o.seed, &o.out)?;
     let first = Stop::of(e.status());
-    let mouse = mouse_keys(&mut e).map_err(e2s)?;
+    let mut iface = Iface::default();
     let facts = e.facts().map_err(e2s)?;
     let init = Facts(facts.0.iter().filter(|(k, _)| held.watched(*k)).copied().collect());
     let mut tr = Track { held, facts, log: Vec::new(), ticks: Vec::new(), since: 0, first_idle: None };
@@ -406,6 +517,11 @@ fn gather(host: &dyn EngineHost, movie: &[Event], held: &Held, o: &Opts) -> Res<
         let now = e.facts().map_err(e2s)?;
         drift += tr.facts.diff(&now).len();
         tr.facts = now;
+        // the interface at the first control stop of each input handler (the first stop's when it is not one)
+        let handler = tr.facts.val(Key::var(fmi_explore::afford::VAR_VERB_SCRIPT as u64));
+        if (i == 0 && iface.at.is_empty()) || (st.idle.is_some() && !iface.at.iter().any(|a| a.1 == handler)) {
+            iface.add(handler, first_control(&mut e).map_err(e2s)?);
+        }
         if i == 0 {
             start = tr.facts.clone();
         } else {
@@ -426,11 +542,12 @@ fn gather(host: &dyn EngineHost, movie: &[Event], held: &Held, o: &Opts) -> Res<
         tr.since = ev.frame;
         tr.first_idle = None;
     }
-    // after the last input: its record, then on to the game's end
+    // after the last input: its record at its own frame's stop (the handler runs before the decision point), then on
+    // to the game's end
     let last = inputs.last().unwrap().frame;
     let mut end: Option<Status> = None;
     sched.upto(&mut e, u64::MAX)?;
-    let mut res = tr.run(&mut e, last + 1);
+    let mut res = tr.run(&mut e, last);
     if res.is_ok() {
         take_log(&mut e, &mut recs)?;
         res = tr.run(&mut e, last + 1 + o.tail);
@@ -457,7 +574,21 @@ fn gather(host: &dyn EngineHost, movie: &[Event], held: &Held, o: &Opts) -> Res<
             taken = Some(m.ev.frame);
         }
     }
-    Ok(Chain { met, steps: Vec::new(), first, end, log: tr.log, init, start, ticks: tr.ticks, iface: (BTreeSet::new(), mouse), drift, twin_differs: 0 })
+    Ok(Chain { met, steps: Vec::new(), first, end, log: tr.log, init, start, ticks: tr.ticks, iface, drift, twin_differs: 0 })
+}
+
+/// The interface's keys (`interface`) at the stop before the first input when it is a control stop, else at the
+/// first control stop of a fork run on from it with no input (at most afford::W frames).
+fn first_control(e: &mut Box<dyn Engine>) -> EResult<Iface> {
+    if e.status().idle.is_some() {
+        return interface(e);
+    }
+    let mut t = e.fork()?;
+    let end = t.status().frame + fmi_explore::afford::W;
+    let st = t.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() })?;
+    let out = if st.reason == "idle" { interface(&mut t) } else { Ok(Iface::default()) };
+    t.quit();
+    out
 }
 
 /// The steps of the inputs met (module docstring).
@@ -470,7 +601,7 @@ fn steps_of(ch: &Chain, held: &Held) -> Vec<Step> {
     let mut room = from.room;
     for (i, m) in ch.met.iter().enumerate() {
         let last = i + 1 == n;
-        if !last && (m.next.idle.is_none() || label::timing(ch.met[i + 1].gap) == label::Timing::Next) {
+        if !last && (m.next.idle.is_none() || label::timing_of(&ch.met[i + 1]) == label::Timing::Next) {
             continue;
         }
         let to = Progress::of(&m.facts, held);
@@ -501,8 +632,8 @@ fn steps_of(ch: &Chain, held: &Held) -> Vec<Step> {
     out
 }
 
-/// Item 3: the movie again from boot; at each step's start (the stop before its first input) a twin with its RNG
-/// changed, run to the step's end and compared with this replay's facts there.
+/// Item 3: the movie again from boot; at each step's start (the stop before its first input) its twins, each with its
+/// RNG changed its own way (label::TWIN_FLIPS), run to the step's end and compared with this replay's facts there.
 fn twins(host: &dyn EngineHost, movie: &[Event], ch: &mut Chain, held: &Held, o: &Opts) -> Res<()> {
     let (mut e, mut sched) = boot(host, movie, o.seed, &o.out.with_extension("twins"))?;
     sched.upto(&mut e, u64::MAX)?;
@@ -512,16 +643,26 @@ fn twins(host: &dyn EngineHost, movie: &[Event], ch: &mut Chain, held: &Held, o:
         if e.status().frame < at {
             e.run(&RunSpec { frame: Some(at), ..Default::default() }).map_err(e2s)?;
         }
-        let t = label::twin(&mut e).map_err(e2s)?;
+        let mut ts = Vec::new();
+        for flip in label::TWIN_FLIPS {
+            ts.push(label::twin(&mut e, flip).map_err(e2s)?);
+        }
         match e.run(&RunSpec { frame: Some(end), ..Default::default() }) {
             Ok(_) => {
                 let f = e.facts().map_err(e2s)?;
                 // this replay (the movie scheduled at the boot) against the first's (scheduled as it went) at the end
                 let i = ch.steps[k].inputs.end - 1;
                 ch.twin_differs += ch.met[i].facts.diff(&f).len();
-                ch.steps[k].twin = Some(label::twin_diff(t, end, &f, held));
+                let mut tw = Twin { frame: end, ..Default::default() };
+                for (j, t) in ts.into_iter().enumerate() {
+                    tw.add(j, label::twin_diff(t, end, &f, held));
+                }
+                ch.steps[k].twin = Some(tw);
             }
             Err(EngineError::Ended(_)) => {
+                for t in ts {
+                    t.quit();
+                }
                 // the last step: its end is the frame before the game's
                 ch.steps[k].twin = Some(Twin { frame: end, ended: Some("the replay ended first".into()), ..Default::default() });
                 return Ok(());

@@ -5,17 +5,19 @@
 use fmi_core::*;
 use fmi_explore::archive::Atom;
 use fmi_shorten::chain::{self, Held, Opts, Progress};
-use fmi_shorten::label::{self, Anchor, Seen, Timing};
+use fmi_shorten::label::{self, Anchor, HitId, Seen, Timing};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 const VERB: i32 = 7;
 const THING: i32 = 50;
 const DOOR: i32 = 51;
-/// toy variables: the composing verb and the click's copy (the handler writes them), the mouse (the engine), the draw
+/// toy variables: the composing verb and the click's copy (the handler writes them), the mouse (the engine), the draw,
+/// the last object a sentence was queued on (only a taken object click writes it)
 const V_VERB: usize = 30;
 const V_CLICK: usize = 31;
 const V_MOUSE: usize = 20;
 const V_DRAW: usize = 40;
+const V_LAST: usize = 34;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Effect {
@@ -72,21 +74,23 @@ impl Toy {
             writes.push(Touch { kind: TouchKind::Var, a: k as i32, b: 0, old: t.vars[k], now: v });
             t.vars[k] = v;
         };
+        w(self, V_CLICK, x);
         if at.verb_slot == 1 {
             w(self, V_VERB, VERB);
-        } else if let Some((vx, _, o, _)) = at.main {
-            w(self, V_CLICK, vx);
+        } else if let Some((_, _, o, _)) = at.main {
             if o == THING && self.vars[V_VERB] == VERB && self.owner == 0 {
                 w(self, V_VERB, 0);
+                w(self, V_LAST, THING);
                 writes.push(Touch { kind: TouchKind::Sentence, a: VERB, b: THING, old: 0, now: 0 });
                 self.busy = Some((self.st.frame + 3, Effect::PickUp));
             } else if o == DOOR {
+                w(self, V_LAST, DOOR);
                 // the walk to the door's own spot, wherever on it the click was
                 writes.push(Touch { kind: TouchKind::Walk, a: 1, b: 0, old: 210, now: 90 });
                 self.busy = Some((self.st.frame + 5, Effect::Door));
             }
         }
-        let verdict = if writes.is_empty() { Verdict::Ignored } else { Verdict::Taken };
+        let verdict = if writes.iter().all(|t| t.kind == TouchKind::Var && t.a == V_CLICK as i32) { Verdict::Ignored } else { Verdict::Taken };
         InputRecord {
             frame: self.st.frame, input: vec![Input::Click(x, y)], stat: 0, verdict, area: if at.verb_slot > 0 { 1 } else { 2 },
             value: if at.verb_slot > 0 { VERB } else { 0 }, mode: 1, slot: at.verb_slot, zone: at.zone, key_match: false,
@@ -212,6 +216,91 @@ impl Engine for Toy {
 
 struct ToyHost;
 
+/// The toy, ended at a frame (the game's own end).
+struct EndHost(u64);
+
+struct Ending(Toy, u64);
+
+impl Engine for Ending {
+    fn pid(&self) -> u32 {
+        1
+    }
+    fn status(&self) -> &Status {
+        &self.0.st
+    }
+    fn run(&mut self, spec: &RunSpec) -> EResult<Status> {
+        let to = spec.frame.ok_or_else(|| EngineError::Bridge("the toy runs to a frame".into()))?;
+        while self.0.st.frame < to {
+            self.0.step();
+            if self.0.st.frame >= self.1 {
+                let mut st = self.0.st.clone();
+                st.ended = true;
+                st.reason = "restart".into();
+                return Err(EngineError::Ended(Box::new(st)));
+            }
+        }
+        self.0.st.reason = "frame".into();
+        Ok(self.0.st.clone())
+    }
+    fn inputs(&mut self, events: &[Event]) -> EResult<()> {
+        self.0.inputs(events)
+    }
+    fn obs(&mut self, req: &ObsReq) -> EResult<Obs> {
+        self.0.obs(req)
+    }
+    fn facts(&mut self) -> EResult<Facts> {
+        self.0.facts()
+    }
+    fn holds(&mut self, c: &[Cond]) -> EResult<bool> {
+        self.0.holds(c)
+    }
+    fn at(&mut self, x: i32, y: i32) -> EResult<At> {
+        self.0.at(x, y)
+    }
+    fn set_rng(&mut self, s: u32) -> EResult<()> {
+        self.0.set_rng(s)
+    }
+    fn segment(&mut self, on: bool) -> EResult<()> {
+        self.0.segment(on)
+    }
+    fn runs(&mut self) -> EResult<RunsReply> {
+        self.0.runs()
+    }
+    fn explain(&mut self, a: Option<&ExplainArm>) -> EResult<()> {
+        self.0.explain(a)
+    }
+    fn explain_log(&mut self) -> EResult<ExplainReply> {
+        self.0.explain_log()
+    }
+    fn fork(&mut self) -> EResult<Box<dyn Engine>> {
+        Ok(Box::new(Ending(self.0.clone(), self.1)))
+    }
+    fn fork_each(&mut self, _n: u32) -> EResult<(Status, Vec<Box<dyn Engine>>)> {
+        Err(EngineError::Bridge("no fork_each".into()))
+    }
+    fn state_json(&mut self, _r: &ObsReq) -> EResult<String> {
+        Err(EngineError::Bridge("no json".into()))
+    }
+    fn cpu_s(&self) -> f64 {
+        0.0
+    }
+    fn quit(self: Box<Self>) {}
+    fn input_log(&mut self) -> EResult<InputLog> {
+        self.0.input_log()
+    }
+}
+
+impl EngineHost for EndHost {
+    fn boot(&self, cfg: &BootCfg) -> EResult<Box<dyn Engine>> {
+        let mut t = Ending(toy(), self.0);
+        t.0.pending = cfg.events.iter().filter(|e| cfg.frame.is_none_or(|f| e.frame <= f)).cloned().collect();
+        if let Some(f) = cfg.frame {
+            t.run(&RunSpec { frame: Some(f), ..Default::default() })?;
+        }
+        Ok(Box::new(t))
+    }
+}
+
 impl EngineHost for ToyHost {
     fn boot(&self, cfg: &BootCfg) -> EResult<Box<dyn Engine>> {
         let mut t = toy();
@@ -227,7 +316,7 @@ impl EngineHost for ToyHost {
 fn held() -> Held {
     let any = || Atom { values: Default::default(), any: true };
     let mut atoms = BTreeMap::new();
-    for k in [V_VERB, V_CLICK, V_MOUSE, V_DRAW] {
+    for k in [V_VERB, V_CLICK, V_MOUSE, V_DRAW, V_LAST] {
         atoms.insert(format!("var:{k}"), any());
     }
     atoms.insert(format!("owner:{THING}"), Atom { values: [1].into_iter().collect(), any: false });
@@ -252,28 +341,47 @@ fn opts() -> Opts {
 fn replay_steps_keep_and_twin() {
     let mut h = held();
     let ch = chain::replay(&ToyHost, &movie(), &mut h, &opts()).unwrap();
-    // the interface: the handler's variables by the records, the mouse by the two moves
-    assert_eq!(ch.iface.0, [Key::var(V_VERB as u64), Key::var(V_CLICK as u64)].into_iter().collect());
-    assert_eq!(ch.iface.1, [Key::var(V_MOUSE as u64)].into_iter().collect());
+    // the interface, at the first control stop: the refused clicks' keys (the click's copy, the composing verb, the
+    // mouse they move) and the mouse's; the last object, which only a taken click writes, is not one
+    assert_eq!(ch.iface.at, vec![(9, 0)]);
+    let k = |v: usize| Key::var(v as u64);
+    assert_eq!(ch.iface.clicks, [k(V_MOUSE), k(V_VERB), k(V_CLICK)].into_iter().collect());
+    assert_eq!(ch.iface.mouse, [k(V_MOUSE)].into_iter().collect());
     assert_eq!(ch.drift, 0);
     // the verb and its object are one step (the object's timing is "next"); the door is the next
     assert_eq!(ch.steps.len(), 2);
     let (a, b) = (&ch.steps[0], &ch.steps[1]);
     assert_eq!(a.inputs, 0..2);
-    assert_eq!(a.changed, vec![Key::owner(THING as u64)]);
-    assert_eq!(a.keep, vec![(Key::owner(THING as u64), 1)]);
+    assert_eq!(a.changed, vec![k(V_LAST), Key::owner(THING as u64)]);
+    assert_eq!(a.keep, vec![(k(V_LAST), THING as i64), (Key::owner(THING as u64), 1)]);
     assert_eq!(a.completion.map(|c| c.0), Some(15));
     assert_eq!(b.inputs, 2..3);
-    assert!(b.changed.contains(&chain::ROOM) && b.changed.contains(&Key::var(V_DRAW as u64)));
+    assert!(b.changed.contains(&chain::ROOM) && b.changed.contains(&k(V_DRAW)) && b.changed.contains(&k(V_LAST)));
     assert_eq!(b.completion.map(|c| c.0), Some(35));
     assert_eq!(b.rooms, vec![1, 2]);
-    // the twin: the draw differs on the door's step only
+    // the twins: the draw differs on the door's step only, in each of the three
     assert!(a.twin.as_ref().unwrap().draw.is_empty());
-    assert_eq!(b.twin.as_ref().unwrap().draw, vec![Key::var(V_DRAW as u64)]);
+    assert_eq!(b.twin.as_ref().unwrap().draw, vec![k(V_DRAW)]);
+    assert_eq!(b.twin.as_ref().unwrap().by, vec![0, 1, 2]);
     let l = label::labels(&ch);
     assert_eq!(l.anchors, vec![Anchor::Verb { id: VERB }, Anchor::Object { id: THING, actor: 0 }, Anchor::Object { id: DOOR, actor: 0 }]);
     assert_eq!(l.timing, vec![Timing::Idle, Timing::Next, Timing::Idle]);
-    assert_eq!(l.ids[1].as_ref().unwrap().sentences, vec![(VERB, THING, 0)]);
+    let id = l.ids[1].as_ref().unwrap();
+    assert_eq!(id.sentences, vec![(VERB, THING, 0)]);
+    // the identity names the hit at the frame before
+    assert_eq!(id.hit, HitId::Object(THING, 0));
+    assert_eq!(l.ids[0].as_ref().unwrap().hit, HitId::Verb(VERB));
+}
+
+#[test]
+fn the_last_inputs_record_is_read_when_the_game_ends_the_next_frame() {
+    // the toy ends the game the frame after a click at frame 40 (any click there)
+    let mut m = movie();
+    m.push(click(40, 205, 60));
+    let mut h = held();
+    let ch = chain::replay(&EndHost(41), &m, &mut h, &Opts { twins: false, ..opts() }).unwrap();
+    assert_eq!(ch.end.as_ref().map(|s| s.frame), Some(41));
+    assert!(ch.met.last().unwrap().record.is_some());
 }
 
 #[test]
@@ -326,10 +434,12 @@ fn anchors_by_the_hit() {
 
 #[test]
 fn timing_and_boxes() {
-    assert_eq!(label::timing(None), Timing::Idle);
-    assert_eq!(label::timing(Some(2)), Timing::Next);
-    assert_eq!(label::timing(Some(label::NEXT_GAP)), Timing::Next);
-    assert_eq!(label::timing(Some(label::NEXT_GAP + 1)), Timing::Idle);
+    assert_eq!(label::timing(None, true), Timing::Idle);
+    assert_eq!(label::timing(Some(2), true), Timing::Next);
+    assert_eq!(label::timing(Some(label::NEXT_GAP), true), Timing::Next);
+    assert_eq!(label::timing(Some(label::NEXT_GAP + 1), true), Timing::Idle);
+    // "idle" needs a control stop (amendment 1)
+    assert_eq!(label::timing(Some(label::NEXT_GAP + 1), false), Timing::Next);
     let b = |x0, y0, x1, y1| WalkBox { ul: (x0, y0), ur: (x1, y0), lr: (x1, y1), ll: (x0, y1), flags: 0 };
     let bx = Boxes { room: 1, boxes: vec![b(0, 0, 500, 500), b(0, 100, 100, 140), b(200, 100, 300, 140)] };
     // box 0 is never one (afford::FIRST_VALID_BOX)

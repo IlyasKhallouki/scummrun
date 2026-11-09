@@ -1,7 +1,8 @@
 //! E024 Part 2, items 2 and 3 (plan.md, "Anchors", "Draw keys"), and G2's re-placement.
 //!
 //! * **Anchors** (`anchor`): each click by what the engine's hit test answers at the stop before it (`observe`: `at`,
-//!   the verb slots' ids, the walk box under a floor point) and the input log's record after it (`identity`). Kinds:
+//!   the verb slots' ids, the walk box under a floor point) and the input log's record after it (`identity`, which
+//!   names that hit, amendment 1: a click on another object is another click whatever its record's area). Kinds:
 //!   Verb{id}, Dialog{id} (a verb slot in the bridge's dialog idle, or taken by an input handler other than the ones
 //!   under which the movie queued sentences: with SPEEDRUN_IDLE=handler the bridge reports no dialog idle, and a
 //!   game's dialog runs its own handler), Object{id, actor} (the actor the hit test also answers
@@ -9,14 +10,17 @@
 //!   both), Actor{id}, Walk{room point, box}, Key; Raw only where the hit test answers nothing. The record's Sentence
 //!   touch is in the identity.
 //! * **Timing class** (`timing`): "next", as soon as possible after the last taken input (within `NEXT_GAP` frames
-//!   of it, the interface's two-frame click spacing); else "idle", at an idle stop.
-//! * **Re-placement** (`place`): the anchor's point at a stop. A verb, dialog line, object or actor by the offer
-//!   (afford::offer_cfg), else at the original point when the hit test there gives it; a walk at its room point less
-//!   the camera's xstart, checked with `at`.
-//! * **Draw keys** (`twin`, `twin_diff`): a fork at the step's start whose RNG state is changed (set_rng, used for
-//!   this analysis only), run to the step's end; the world keys whose values differ.
-//! * **G2** (`check`): the movie again from boot, each click re-placed at its own frame by `place`; its hit and its
-//!   record's identity against the replay's, and each step's keep at its completion frame.
+//!   of it, the interface's two-frame click spacing), or not at a control stop (amendment 1); else "idle", at an idle
+//!   stop.
+//! * **Re-placement** (`place`): the anchor's point at a stop, from the anchor alone (amendment 1: never the movie's
+//!   point). A verb or dialog line by the offer (afford::offer_cfg); an object or actor by the offer's point for it,
+//!   then for an object its actor's and its box's grid (afford::object_grid), the first that answers both; a walk at
+//!   its room point less the camera's xstart, checked with `at`.
+//! * **Draw keys** (`twin`, `twin_diff`): `TWINS` forks at the step's start, each with the RNG state changed its own
+//!   way (set_rng, used for this analysis only), run to the step's end; the world keys whose values differ in any.
+//! * **G2** (`check`): the movie again from boot, each click re-placed at its own frame by `place`; the hit at the
+//!   placed point (`hit_id`) against the replay's, its record's identity against the replay's (a key's or a raw
+//!   point's hit only by its record), and each step's keep at its completion frame.
 
 use crate::chain::{self, Chain, Held, Met, Opts};
 use crate::{e2s, Res};
@@ -31,8 +35,8 @@ pub const DIALOG: &str = "dialog";
 /// The most frames after the last taken input at which an input counts as placed as soon as possible: the interface's
 /// clicks go two frames apart (afford's M4 timing), and one frame more where a frame was spent between.
 pub const NEXT_GAP: u64 = 3;
-/// The twin fork's RNG: the stop's state with these bits flipped.
-pub const TWIN_FLIP: u32 = 0x9E37_79B9;
+/// The twin forks' RNGs (amendment 1, three per step): the stop's state with each one's bits flipped.
+pub const TWIN_FLIPS: [u32; 3] = [0x9E37_79B9, 0x85EB_CA6B, 0xC2B2_AE35];
 
 /// What the stop before an input showed of it.
 #[derive(Clone, Debug, Default)]
@@ -48,6 +52,48 @@ pub struct Seen {
     pub verb_id: Option<i32>,
     /// the walk box under a floor point (FMI_BOXES)
     pub walkbox: Option<i32>,
+    /// what the hit test answers at the click's point
+    pub hit: HitId,
+}
+
+/// What the engine's hit test answers at a point (amendment 1): a verb slot by its verb id (an inventory slot is a
+/// verb slot), a slot the dump does not list by its slot, an object with the actor the test also answers there (0:
+/// none), an actor, the floor of the main screen, or nothing.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum HitId {
+    #[default]
+    None,
+    Verb(i32),
+    Slot(i32),
+    Object(i32, i32),
+    Actor(i32),
+    Floor,
+}
+
+impl HitId {
+    pub fn json(&self) -> Value {
+        match *self {
+            HitId::None => Value::Null,
+            HitId::Verb(v) => json!({"verb": v}),
+            HitId::Slot(s) => json!({"slot": s}),
+            HitId::Object(o, a) => json!({"object": o, "actor": a}),
+            HitId::Actor(a) => json!({"actor": a}),
+            HitId::Floor => json!("floor"),
+        }
+    }
+}
+
+/// The hit `at` answers, with the stop's verb slots.
+pub fn hit_id(at: &At, verbs: &[Verb]) -> HitId {
+    if at.verb_slot > 0 {
+        return verbs.iter().find(|v| v.slot == at.verb_slot).map(|v| HitId::Verb(v.id)).unwrap_or(HitId::Slot(at.verb_slot));
+    }
+    match at.main {
+        Some((_, _, o, a)) if o != 0 => HitId::Object(o, a),
+        Some((_, _, _, a)) if a != 0 => HitId::Actor(a),
+        Some(_) => HitId::Floor,
+        None => HitId::None,
+    }
 }
 
 /// The click's point, for a click or a right click.
@@ -64,14 +110,16 @@ pub fn observe(e: &mut Box<dyn Engine>, ev: &Event) -> EResult<Seen> {
     let mut s = Seen { frame: st.frame, idle: st.idle.clone(), xstart: st.xstart, top: st.screen.map(|x| x.0).unwrap_or(0), ..Default::default() };
     let Some((x, y)) = point(&ev.what) else { return Ok(s) };
     let at = e.at(x, y)?;
+    let mut verbs = Vec::new();
     if at.verb_slot > 0 {
-        let o = e.obs(&ObsReq::default())?;
-        s.verb_id = o.verbs.iter().find(|v| v.slot == at.verb_slot).map(|v| v.id);
+        verbs = e.obs(&ObsReq::default())?.verbs;
+        s.verb_id = verbs.iter().find(|v| v.slot == at.verb_slot).map(|v| v.id);
     } else if let Some((vx, vy, 0, 0)) = at.main {
         if afford::boxes_on() {
             s.walkbox = box_of(&e.boxes()?, (vx, vy));
         }
     }
+    s.hit = hit_id(&at, &verbs);
     s.at = Some(at);
     Ok(s)
 }
@@ -202,18 +250,28 @@ impl Timing {
     }
 }
 
-/// The class of an input `gap` frames after the last taken input (None: the first).
-pub fn timing(gap: Option<u64>) -> Timing {
+/// The class of an input `gap` frames after the last taken input (None: the first), at a control stop or not: "idle"
+/// needs one (amendment 1).
+pub fn timing(gap: Option<u64>, control: bool) -> Timing {
     match gap {
         Some(g) if g <= NEXT_GAP => Timing::Next,
+        Some(_) if !control => Timing::Next,
         _ => Timing::Idle,
     }
 }
 
+/// An input's timing class as the replay met it: its stop before is a control stop when the bridge's idle rule held
+/// there.
+pub fn timing_of(m: &Met) -> Timing {
+    timing(m.gap, m.seen.idle.is_some())
+}
+
 /// What an input did, by its record (plan.md item 4, "Click"): the verdict, the handler's arguments, the sentences
-/// and walks it started. No screen point is in it.
+/// and walks it started; and what the hit test answered at its point at the frame before (amendment 1). No screen
+/// point is in it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Identity {
+    pub hit: HitId,
     pub verdict: String,
     pub area: i32,
     pub value: i32,
@@ -225,9 +283,10 @@ pub struct Identity {
     pub walks: Vec<(i32, i32, i32)>,
 }
 
-pub fn identity(r: &InputRecord) -> Identity {
+pub fn identity(r: &InputRecord, hit: HitId) -> Identity {
     let of = |k: TouchKind| r.writes.iter().filter(move |t| t.kind == k);
     Identity {
+        hit,
         verdict: r.verdict.text(),
         area: r.area,
         value: r.value,
@@ -240,8 +299,8 @@ pub fn identity(r: &InputRecord) -> Identity {
 
 impl Identity {
     pub fn json(&self) -> Value {
-        json!({"verdict": self.verdict, "area": self.area, "value": self.value, "mode": self.mode, "handler": self.handler,
-               "sentences": self.sentences, "walks": self.walks})
+        json!({"hit": self.hit.json(), "verdict": self.verdict, "area": self.area, "value": self.value, "mode": self.mode,
+               "handler": self.handler, "sentences": self.sentences, "walks": self.walks})
     }
 }
 
@@ -257,8 +316,8 @@ pub fn same_hit(at: &At, verbs: &[Verb], a: &Anchor) -> bool {
     }
 }
 
-/// The input that acts on the anchor at this stop (None: no point gives it). `orig` is the input as the movie had it:
-/// its kind (click or right click), and its point, tried after the offer's.
+/// The input that acts on the anchor at this stop, from the anchor alone (None: no point gives it). `orig` is the
+/// input as the movie had it: only its kind (click or right click) is read.
 pub fn place(e: &mut Box<dyn Engine>, a: &Anchor, orig: &Input) -> EResult<Option<Input>> {
     let mk = |x: i32, y: i32| match orig {
         Input::RClick(..) => Input::RClick(x, y),
@@ -282,24 +341,27 @@ pub fn place(e: &mut Box<dyn Engine>, a: &Anchor, orig: &Input) -> EResult<Optio
             let want = |h: &Hit| match (a, *h) {
                 (Anchor::Verb { id } | Anchor::Dialog { id }, Hit::Verb { id: v, .. }) => v == *id,
                 (Anchor::Object { id, .. }, Hit::Object(v)) => v == *id,
-                (Anchor::Object { actor, .. }, Hit::Actor(v)) => v == *actor,
+                (Anchor::Object { actor, .. }, Hit::Actor(v)) => *actor != 0 && v == *actor,
                 (Anchor::Actor { id }, Hit::Actor(v)) => v == *id,
                 _ => false,
             };
-            // the offer's points (an object's, then its actor's), each held to the anchor's own test
-            for p in of.verbs.iter().chain(of.targets.iter()).filter(|p| want(&p.hit)) {
-                let at = e.at(p.x, p.y)?;
-                if same_hit(&at, &o.verbs, a) {
-                    return Ok(Some(mk(p.x, p.y)));
+            // the offer's points (an object's, then its actor's), then the object's box grid; the first held to the
+            // anchor's own test (an object's actor too)
+            let mut pts: Vec<(i32, i32)> = of.verbs.iter().chain(of.targets.iter()).filter(|p| want(&p.hit)).map(|p| (p.x, p.y)).collect();
+            if let Anchor::Object { id, .. } = a {
+                let st = e.status();
+                let top = st.screen.map(|s| s.0).unwrap_or(0);
+                if let Some(r) = o.room_objects.as_deref().unwrap_or(&[]).iter().find(|r| r.id == *id) {
+                    pts.extend(afford::object_grid(r, st.xstart, top));
                 }
             }
-            match point(orig) {
-                Some((x, y)) => {
-                    let at = e.at(x, y)?;
-                    Ok(same_hit(&at, &o.verbs, a).then(|| mk(x, y)))
-                }
-                None => Ok(None),
+            let mut seen = BTreeSet::new();
+            pts.retain(|p| seen.insert(*p));
+            if pts.is_empty() {
+                return Ok(None);
             }
+            let ats = e.at_many(&pts)?;
+            Ok(pts.iter().zip(ats.iter()).find(|(_, at)| same_hit(at, &o.verbs, a)).map(|(p, _)| mk(p.0, p.1)))
         }
     }
 }
@@ -309,30 +371,51 @@ pub fn world(k: Key) -> bool {
     matches!(k.kind(), K_VAR | K_BIT | K_OWNER | K_STATE | K_CLASS | K_ROOM | K_EGO)
 }
 
-/// Item 3: a fork of `e` at its stop with its RNG state changed.
-pub fn twin(e: &mut Box<dyn Engine>) -> EResult<Box<dyn Engine>> {
-    let s = (e.status().rng as u32) ^ TWIN_FLIP;
+/// Item 3: a fork of `e` at its stop with its RNG state changed by `flip`.
+pub fn twin(e: &mut Box<dyn Engine>, flip: u32) -> EResult<Box<dyn Engine>> {
+    let s = (e.status().rng as u32) ^ flip;
     let mut t = e.fork()?;
     t.set_rng(s)?;
     Ok(t)
 }
 
-/// A twin fork's outcome at a step's end.
+/// A step's twin forks' outcome at its end (amendment 1: marked when any twin differs).
 #[derive(Clone, Debug, Default)]
 pub struct Twin {
     pub frame: u64,
-    /// the twin's end reason, when it ended before the frame
+    /// a twin's end reason, when one ended before the frame
     pub ended: Option<String>,
-    /// the world keys whose values differ there: (key, the replay's, the twin's)
+    /// the world keys whose values differ there in some twin: (key, the replay's, the first differing twin's)
     pub keys: Vec<(Key, Val, Val)>,
     /// those of `keys` neither in I nor the interface's
     pub draw: Vec<Key>,
+    /// the twins (by their index in TWIN_FLIPS) with a draw key
+    pub by: Vec<usize>,
 }
 
 impl Twin {
     pub fn json(&self) -> Value {
         json!({"frame": self.frame, "ended": self.ended, "keys": self.keys.len(),
-               "draw": self.draw.iter().map(|k| k.text()).collect::<Vec<_>>()})
+               "draw": self.draw.iter().map(|k| k.text()).collect::<Vec<_>>(), "by": self.by})
+    }
+
+    /// Twin `i`'s outcome added to this one's.
+    pub fn add(&mut self, i: usize, t: Twin) {
+        if self.ended.is_none() {
+            self.ended = t.ended;
+        }
+        for x in t.keys {
+            if !self.keys.iter().any(|y| y.0 == x.0) {
+                self.keys.push(x);
+            }
+        }
+        self.keys.sort();
+        if !t.draw.is_empty() {
+            self.by.push(i);
+        }
+        let mut d: BTreeSet<Key> = self.draw.iter().copied().collect();
+        d.extend(t.draw);
+        self.draw = d.into_iter().collect();
     }
 }
 
@@ -369,9 +452,9 @@ pub fn labels(ch: &Chain) -> Labels {
     let sh = sentence_handlers(ch);
     for m in &ch.met {
         l.anchors.push(anchor(&m.seen, &m.ev, dialog_of(m, &sh)));
-        l.timing.push(timing(m.gap));
+        l.timing.push(timing_of(m));
         l.gap.push(m.gap);
-        l.ids.push(m.record.as_ref().map(identity));
+        l.ids.push(m.record.as_ref().map(|r| identity(r, m.seen.hit)));
     }
     l
 }
@@ -423,7 +506,8 @@ pub fn summary(ch: &Chain, l: &Labels) -> Value {
     json!({"inputs": ch.met.len(), "steps": ch.steps.len(), "anchors": kinds, "objects_with_actor": with_actor, "raw": raw, "timing": timing,
            "verdicts": verdicts, "first": ch.first.json(),
            "end": ch.end.as_ref().map(|s| json!({"frame": s.frame, "tick": s.tick, "reason": s.reason})),
-           "iface": {"records": ch.iface.0.iter().map(|k| k.text()).collect::<Vec<_>>(), "mouse": ch.iface.1.iter().map(|k| k.text()).collect::<Vec<_>>()},
+           "iface": {"at": ch.iface.at, "clicks": ch.iface.clicks.iter().map(|k| k.text()).collect::<Vec<_>>(),
+                     "mouse": ch.iface.mouse.iter().map(|k| k.text()).collect::<Vec<_>>(), "probes": ch.iface.probes},
            "drift": ch.drift, "twin_differs": ch.twin_differs, "twin_draw_steps": ch.steps.iter().filter(|s| s.twin.as_ref().is_some_and(|t| !t.draw.is_empty())).map(|s| s.k).collect::<Vec<_>>()})
 }
 
@@ -445,14 +529,18 @@ pub fn check(host: &dyn EngineHost, movie: &[Event], ch: &Chain, l: &Labels, o: 
             keeps.entry(c.saturating_sub(1)).or_default().push((s.k, false));
         }
     }
-    // and the frame after the last input, for its record before the game's end
-    let after = ch.met.last().map(|m| m.ev.frame + 1).into_iter();
+    // and the last input's own frame, for its record before the game's end (amendment 1: a game that ends on the next
+    // frame still gives it)
+    let after = ch.met.last().map(|m| m.ev.frame).into_iter();
     let stops: BTreeSet<u64> = at_frame.keys().chain(keeps.keys()).copied().chain(after).collect();
     let n = ch.met.len();
     let mut placed: Vec<Option<Input>> = vec![None; n];
-    let mut hit: Vec<bool> = vec![false; n];
+    // the hit at the placed point, by the stop's hit test alone (None for a key)
+    let mut hit: Vec<Option<HitId>> = vec![None; n];
     let mut recs: BTreeMap<u64, InputRecord> = BTreeMap::new();
     let mut keep_at: BTreeMap<usize, (Option<bool>, Option<bool>)> = BTreeMap::new();
+    // the keys of a keep that do not hold at its completion: (key, want, got)
+    let mut keep_miss: BTreeMap<usize, Vec<(Key, Val, Val)>> = BTreeMap::new();
     let mut ended: Option<Status> = None;
     for &t in &stops {
         if e.status().frame < t {
@@ -475,6 +563,10 @@ pub fn check(host: &dyn EngineHost, movie: &[Event], ch: &Chain, l: &Labels, o: 
                 let x = keep_at.entry(k).or_default();
                 if at_c {
                     x.0 = Some(holds);
+                    let miss: Vec<(Key, Val, Val)> = ch.steps[k].keep.iter().filter(|&&(key, v)| f.val(key) != v).map(|&(key, v)| (key, v, f.val(key))).collect();
+                    if !miss.is_empty() {
+                        keep_miss.insert(k, miss);
+                    }
                 } else {
                     x.1 = Some(holds);
                 }
@@ -488,9 +580,7 @@ pub fn check(host: &dyn EngineHost, movie: &[Event], ch: &Chain, l: &Labels, o: 
                 if let Some((x, y)) = point(inp) {
                     let verbs = e.obs(&ObsReq::default()).map_err(e2s)?.verbs;
                     let at = e.at(x, y).map_err(e2s)?;
-                    hit[i] = same_hit(&at, &verbs, &l.anchors[i]);
-                } else {
-                    hit[i] = true;
+                    hit[i] = Some(hit_id(&at, &verbs));
                 }
                 e.inputs(&[Event { frame: m.ev.frame, what: inp.clone() }]).map_err(e2s)?;
             }
@@ -515,20 +605,31 @@ pub fn check(host: &dyn EngineHost, movie: &[Event], ch: &Chain, l: &Labels, o: 
     let mut rows = Vec::new();
     let (mut n_placed, mut n_hit, mut n_id, mut n_moved) = (0, 0, 0, 0);
     for (i, m) in ch.met.iter().enumerate() {
-        let got = recs.get(&m.ev.frame).map(identity);
+        let got = recs.get(&m.ev.frame).map(|r| identity(r, hit[i].unwrap_or_default()));
         let same_id = got.is_some() && got == l.ids[i];
+        // a key or a raw point counts by its record alone (amendment 1)
+        let same = match l.anchors[i] {
+            Anchor::Key { .. } | Anchor::Raw { .. } => same_id,
+            _ => hit[i] == Some(m.seen.hit),
+        };
         n_placed += placed[i].is_some() as usize;
-        n_hit += hit[i] as usize;
+        n_hit += same as usize;
         n_id += same_id as usize;
         let moved = placed[i].as_ref().is_some_and(|p| *p != m.ev.what);
         n_moved += moved as usize;
-        if placed[i].is_none() || !hit[i] || !same_id || moved {
+        if placed[i].is_none() || !same || !same_id || moved {
             rows.push(json!({"i": i, "frame": m.ev.frame, "anchor": l.anchors[i].json(),
                              "placed": placed[i].as_ref().map(|p| event_json(&Event { frame: m.ev.frame, what: p.clone() })),
-                             "hit": hit[i], "identity": got.as_ref().map(Identity::json), "want": l.ids[i].as_ref().map(Identity::json)}));
+                             "hit": hit[i].map(|h| h.json()), "same_hit": same, "identity": got.as_ref().map(Identity::json), "want": l.ids[i].as_ref().map(Identity::json)}));
         }
     }
-    let keep_rows: Vec<Value> = keep_at.iter().map(|(k, (c, b))| json!({"k": k, "at_completion": c, "before": b})).collect();
+    let keep_rows: Vec<Value> = keep_at
+        .iter()
+        .map(|(k, (c, b))| {
+            let miss = keep_miss.get(k).map(|v| v.iter().map(|(key, w, g)| json!([key.text(), w, g])).collect::<Vec<_>>());
+            json!({"k": k, "at_completion": c, "before": b, "miss": miss})
+        })
+        .collect();
     let n_keep = keep_at.values().filter(|x| x.0 == Some(true)).count();
     let n_keep_early = keep_at.values().filter(|x| x.1 == Some(true)).count();
     let want_end = ch.end.as_ref().map(|s| (s.frame, s.tick, s.reason.clone()));
