@@ -605,3 +605,30 @@ Each laptop try from the idle room-48 entry (28025) named one gap; each was fixe
 - **The run:** the VM (n2-custom-30-49152, booked to 04:43 UTC, $6.07) resumes play10 (the C8 archive, 30,006
   entries) with these switches since 23:53 UTC, the new build from 00:15. The 21 GB reading cache of the old switches
   was deleted (its keys hold the switches; none could be reused).
+
+## Amendment (28), 2026-11-09 00:20–01:10 UTC: C9, the demo finished
+
+- **The light's records (`FMI_READ_STRING_SUMMARY=1`).** "Use wand with beads" gives IQ points (global 144), which start
+  global 145: a loop over the 154 characters of the points string, each an unknown, so every run giving points passed
+  the path limit and was cut. The reading kept only the "points already given" records, and the engine, giving them
+  the first time, matched none. A global script that reads a string's characters in a loop is now summarized as the
+  inventory hook is (not run, its writes guessed); the light's records start local 203 either way (room 48 from the
+  wand held: 7 s, 18,802 records with and without).
+- **The run stays at its front (`FMI_SELECT_FURTHEST=1`).** After the restart with the new model the cells tried least
+  were the early rooms' (room 69) and the dark room got no job. Selection now keeps the cells within one guide atom of
+  the most held (play10: 19 cells, 18 in room 48).
+- **C9 on the laptop first** (tries chained by hand from entry 28025: ladder, box and wand in try 8; light, statue and
+  door from the wand held, 33 frames; the end by a free try from the open door, 36 moves ending at the door's
+  restart, `restart@1:582:48:0067`). The chain's movie, 89 clicks from boot, ends the game at frame 23324 in a fresh
+  engine (`c9/movie-c9.jsonl`, `c9/end-from-boot.jsonl`).
+- **C9 by the run itself** (the VM, all switches, `FMI_SELECT_FURTHEST=1` from 00:34): the room's entries placed the
+  ladder, opened the box, took the wand, lit the room and opened the door, and job j09747, a free try from entry
+  33601, walked through the door: the ladder's C9 at 01:05 UTC (entry 33633). Its movie, 97 clicks from boot, ends
+  the game at frame 30785, tick 182,260 (50:38 of game time), verified from boot by the bridge's own launch and by a
+  standalone one.
+- **Shortened, engine-judged (`compress.py`).** Each test replays the whole movie from boot (1.2 s) and keeps a change
+  when the game ends at the same site no later: a click dropped, else moved with every later click as early as it can
+  go. The laptop's 89 clicks: 23324 frames to 19584 (pass 1: 17 clicks dropped, one wait of 3,550 frames removed), to
+  19518 with geometric probes (71 clicks, tick 114,658: 31:51 of game time, from 38:11).
+- **Not used:** `e016 g4 --mode chain` re-realized the C0–C8 chain's steps from boot and missed 14 of 23 (walks and
+  dialog lines realize does not make), so the chain drifted and stopped in room 49.
