@@ -573,3 +573,35 @@ Measured on the laptop, one job at a time from the archive's own states:
 - **The stairway walk:** local 204 places the ladder only when the walk ends within 10 px of (381,129); the scripts
   cannot say whether it does, the engine can. The light does not depend on it: local 203 starts global 84 first, which
   sets `Var[444]` to -1.
+
+## Amendment (27), 2026-11-08 22:00 – 2026-11-09 00:20 UTC: the dark room played through, step by step
+
+Each laptop try from the idle room-48 entry (28025) named one gap; each was fixed, gated and committed:
+
+- **A refuted check on a non-fact (`FMI_REFINE_CHECKS=1`).** The sentence script's first test reads `Var[105]`, the
+  last sentence's object, which no reading held; three plans chose the record the engine contradicts and the attempt
+  waited 3,600 frames twice. A window's refuted check whose record says `?(not a fact: var:N)` now makes N a fact,
+  as a split does.
+- **The sentence the player makes.** The ladder's and the beads' Use entries are `doSentence(8,Local[0],VAR_ME)`:
+  the player makes "use ladder with stairway" (8,583,584) and the ladder re-issues (8,584,583). `e016 g3` on the
+  engine: (8,584,583) no clicks in 60 candidates; (8,583,584) in 6, and local 206 placed the ladder 8 frames on.
+  - `FMI_READ_B_SWAP=1`: such an object takes as B each object whose own entry takes it as B (the player's form
+    built), and gets no one-object sentence (alone it re-issues (8,0,A), and the interface asks for B first).
+  - `FMI_READ_QUEUE=1` with the switch `wait_both`: a doSentence holds its sentence, which runs where the run's own
+    step ends when the sentence script's slots are not live (checkAndRunSentenceScript at the frame's end). The
+    re-issue happens just before the sentence script's `WaitForActor(VAR_EGO)`; wait_both's passing branch ends the
+    script in the same record, and the held sentence runs there. Room 48 reads in 55 s, 200 MB, 22,024 actions.
+  - `FMI_REALIZE_QUEUED=1`: a planned sentence the engine's sentence script begins with no input within 8 frames
+    is played with no clicks (the slot's locals, or the object's code in the run log).
+  - `FMI_REALIZE_SWAP=1` (realizing (v,a,b) by the swapped clicks) works on the engine but the strict window refuses
+    the first run's writes; kept off.
+- **Steps no clicks make (`FMI_BAN_TRY`).** A window that formed no input bans its label for the try at once (a
+  held object's Use waits for B: "use 934" alone stopped try 6); a deviation counts its refuted record's label (try 7
+  replayed "look at the archway" and a continuation no record matched 13 times, to the replan limit).
+- **Both objects held.** The realizer searches the first verb's whole grid of A's and B's slots: "use wand with
+  beads" was beyond 60 candidates; `e016 g3` finds it at 75, and the light (local 203) runs the next frame.
+- **Try 8** (before the last fix): ladder placed (frame 23149), box opened (23195), wand taken (23224); the light's
+  sentence was not found in 60 candidates.
+- **The run:** the VM (n2-custom-30-49152, booked to 04:43 UTC, $6.07) resumes play10 (the C8 archive, 30,006
+  entries) with these switches since 23:53 UTC, the new build from 00:15. The 21 GB reading cache of the old switches
+  was deleted (its keys hold the switches; none could be reused).
