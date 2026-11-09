@@ -375,22 +375,32 @@ fn a_forward_pass_and_its_route_verified() {
     assert_eq!(stage.end.as_ref().map(|e| (e.frame, e.tick)), Some((16, 96)));
     let rows = vec![serde_json::json!({"k": 0, "completion": {"frame": 10, "tick": 60}, "digest": format!("{:016x}", stage.digests[&10])})];
     let endv = serde_json::json!({"frame": 16, "tick": 96, "reason": "restart@1:2:3:0004"});
-    let r = movie::write(&dir, "route", &p.route, &serde_json::json!({"seed": 1}), &rows, &endv).unwrap();
+    let meta = serde_json::json!({"seed": 1, "goal_end": "restart@1:2:3:0004"});
+    let r = movie::write(&dir, "unverified", &p.route, &meta, &rows, &endv).unwrap();
     // never overwritten: the next is 002
-    let r2 = movie::write(&dir, "route", &p.route, &serde_json::json!({"seed": 1}), &rows, &endv).unwrap();
-    assert!(r.ends_with("route-001.jsonl") && r2.ends_with("route-002.jsonl"));
+    let r2 = movie::write(&dir, "unverified", &p.route, &meta, &rows, &endv).unwrap();
+    assert!(r.ends_with("unverified-001.jsonl") && r2.ends_with("unverified-002.jsonl"));
     let alone = |route: &[Event], seed: u32, _max: u64, d: &Path| -> Result<Option<End>, String> {
         Ok(movie::replay(&host, route, seed, &[], 100, d)?.end)
     };
     let v = movie::verify(&host, &alone, &r, &dir.join("v")).unwrap();
     assert_eq!(v["ok"], true, "{v}");
+    // verified: a route of its own name, with its step log, never over another
+    std::fs::write(dir.join("route-001.jsonl"), "").unwrap();
+    let rr = movie::promote(&r, "route").unwrap();
+    assert!(rr.ends_with("route-002.jsonl") && movie::steps_path(&rr).exists() && !r.exists() && !movie::steps_path(&r).exists());
+    assert_eq!(movie::verify(&host, &alone, &rr, &dir.join("vr")).unwrap()["ok"], true);
+    // an end that is not the goal's fails
+    let other = serde_json::json!({"seed": 1, "goal_end": "restart@9:9:9:0009"});
+    let r4 = movie::write(&dir, "unverified", &p.route, &other, &rows, &endv).unwrap();
+    assert_eq!(movie::verify(&host, &alone, &r4, &dir.join("v4")).unwrap()["ok"], false);
     // a movie without its step log fails
     std::fs::remove_file(movie::steps_path(&r2)).unwrap();
     let v = movie::verify(&host, &alone, &r2, &dir.join("v2")).unwrap();
     assert_eq!(v["ok"], false);
     // a digest that differs fails
     let bad = vec![serde_json::json!({"k": 0, "completion": {"frame": 10, "tick": 60}, "digest": "0000000000000001"})];
-    let r3 = movie::write(&dir, "route", &p.route, &serde_json::json!({"seed": 1}), &bad, &endv).unwrap();
+    let r3 = movie::write(&dir, "unverified", &p.route, &meta, &bad, &endv).unwrap();
     assert_eq!(movie::verify(&host, &alone, &r3, &dir.join("v3")).unwrap()["ok"], false);
     let _ = std::fs::remove_dir_all(&dir);
 }

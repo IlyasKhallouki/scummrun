@@ -9,16 +9,18 @@
 //! are stage B): the movie's steps (as `label`, with the twins' draw keys unless
 //! --no-twins), then the forward pass, each step found again in order from boot (fmi-shorten pass.rs; --no-ego: a
 //! step's goal without where ego stands), with --skips under text and cutscene skips from boot (skips.rs); a pass that
-//! reaches the game's end is written as OUT/route-NNN.jsonl with its step log OUT/route-NNN.steps.jsonl (each step's
-//! completion, tick and digest from the stage's replay of the route) and verified from boot (movie.rs); a pass that
-//! stops is written as OUT/stopped-NNN.jsonl with its log. OUT/run-NNN.json (and stdout) gets the summary.
+//! reaches the goal (the movie's end reason, with its site, where the stage's replay of the route ends too) is written
+//! as OUT/unverified-NNN.jsonl with its step log (each step's completion, tick and digest from that replay), verified
+//! from boot (movie.rs), and renamed OUT/route-NNN.jsonl only if that passes; a pass that stops is written as
+//! OUT/stopped-NNN.jsonl with its log. OUT/run-NNN.json (and stdout) gets the summary. Exit 0 only with a verified
+//! route; 2 when the run went through without one (stopped, or verify failed); 1 on an error.
 
 use fmi_explore::events::event_of;
 use fmi_core::{EngineHost, Event};
 use fmi_engine::{Host, HostCfg};
 use fmi_shorten::chain::{self, Held, Opts};
 use fmi_shorten::scan::{Cfg, Cost};
-use fmi_shorten::verdict::End;
+use fmi_shorten::verdict::{End, Goal};
 use fmi_shorten::{draws, label, movie, pass, skips};
 use serde_json::{json, Value};
 use std::io::Write;
@@ -133,7 +135,7 @@ fn write_json(p: &Path, v: &Value) -> Result<(), String> {
     std::fs::write(p, serde_json::to_string_pretty(v).map_err(|e| e.to_string())?).map_err(|e| format!("{}: {e}", p.display()))
 }
 
-fn run_in(a: &super::Args) -> Result<(), String> {
+fn run_in(a: &super::Args) -> Result<bool, String> {
     let t0 = std::time::Instant::now();
     if a.get("rounds").is_some_and(|r| r != "0") {
         return Err("--rounds: the reductions (plan.md item 7) are stage B, not built: no round can run".into());
@@ -160,6 +162,10 @@ fn run_in(a: &super::Args) -> Result<(), String> {
     let l = label::labels(&ch);
     let root = |k: fmi_core::Key| held.root.get(&k.text()).copied().unwrap_or(0);
     let (specs, origs) = pass::specs(&ch, &l, !a.flag("no-ego"), &root)?;
+    // the goal: the game's end with the movie's reason (its site with it)
+    let Some(Goal::End(goal_end)) = specs.last().map(|s| s.goal.clone()) else {
+        return Err("the movie does not end the game: no goal".into());
+    };
     let label_s = t0.elapsed().as_secs_f64();
     eprintln!("labels: {} inputs, {} steps ({label_s:.1} s)", ch.met.len(), specs.len());
     // item 8: skips from boot
@@ -215,7 +221,7 @@ fn run_in(a: &super::Args) -> Result<(), String> {
                    "scan": s.scan.json(), "relaxed": s.relaxed.as_ref().map(|r| r.json())})
         })
         .collect();
-    let meta = json!({"movie": movie_path, "archive": archive, "goal": goal, "seed": seed, "skips": a.flag("skips"), "ego": !a.flag("no-ego"),
+    let meta = json!({"movie": movie_path, "archive": archive, "goal": goal, "goal_end": goal_end, "seed": seed, "skips": a.flag("skips"), "ego": !a.flag("no-ego"),
                       "env": env, "boot": boot.iter().map(fmi_explore::events::event_json).collect::<Vec<_>>(),
                       "workers": scan_cfg.workers, "chunk": scan_cfg.chunk, "w": pcfg.w});
     let end_json = |e: &End| json!({"frame": e.frame, "tick": e.tick, "reason": e.reason});
@@ -225,12 +231,17 @@ fn run_in(a: &super::Args) -> Result<(), String> {
                                   "end": p.end.as_ref().map(|f| json!({"frame": f.frame, "tick": f.tick}))},
                          "stage": {"end": stage.end.as_ref().map(end_json), "digests": stage.digests.len(), "error": stage_err},
                          "cost": cost.json()});
+    let mut verified = false;
     match (&p.end, &stage.end) {
-        (Some(f), Some(e)) if e.frame == f.frame && e.tick == f.tick => {
-            let route = movie::write(&out, "route", &p.route, &meta, &rows, &end_json(e))?;
-            eprintln!("route: {}", route.display());
-            let v = movie::verify(&host, &|r: &[Event], s: u32, mt: u64, d: &Path| standalone(&hcfg, r, s, mt, d), &route, &eng.join("verify"))?;
-            sum["route"] = json!(route.display().to_string());
+        // the stage's own replay ends where the pass did, at the goal's site (the review of stage A)
+        (Some(f), Some(e)) if e.frame == f.frame && e.tick == f.tick && e.reason == goal_end => {
+            let draft = movie::write(&out, "unverified", &p.route, &meta, &rows, &end_json(e))?;
+            let alone = |r: &[Event], s: u32, mt: u64, d: &Path| standalone(&hcfg, r, s, mt, d);
+            let v = movie::verify(&host, &alone, &draft, &eng.join("verify")).unwrap_or_else(|x| json!({"ok": false, "error": x}));
+            verified = v["ok"] == true;
+            let path = if verified { movie::promote(&draft, "route")? } else { draft };
+            eprintln!("{}: {}", if verified { "route" } else { "unverified" }, path.display());
+            sum[if verified { "route" } else { "unverified_route" }] = json!(path.display().to_string());
             sum["verify"] = v;
         }
         _ => {
@@ -248,13 +259,17 @@ fn run_in(a: &super::Args) -> Result<(), String> {
         }
     }
     println!("{sum}");
-    Ok(())
+    Ok(verified)
 }
 
 pub fn cmd_run(argv: &[String]) -> i32 {
     let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds"];
     match args(argv, &opts, &["skips", "no-twins", "no-ego"], 1).and_then(|a| run_in(&a)) {
-        Ok(()) => 0,
+        Ok(true) => 0,
+        Ok(false) => {
+            eprintln!("fmi shorten run: no verified route");
+            2
+        }
         Err(e) => {
             eprintln!("fmi shorten run: {e}");
             1
@@ -264,9 +279,10 @@ pub fn cmd_run(argv: &[String]) -> i32 {
 
 /// `fmi shorten verify ROUTE [--ends] OUT` (item 9): ROUTE checked from its files as `run` checks a version it wrote
 /// (the bridge's settings from its step log's first line); with --ends, a diagnostic only: the movie's end by the
-/// bridge's launch and standalone, with no step log and no verdict.
+/// bridge's launch and standalone, with no step log and no verdict. Exit 0 when the check passes (with --ends: both
+/// launches end, at the same frame, tick and reason), 2 when it does not, 1 on an error.
 pub fn cmd_verify(argv: &[String]) -> i32 {
-    let r = (|| -> Result<(), String> {
+    let r = (|| -> Result<bool, String> {
         let a = args(argv, &[], &["ends"], 2)?;
         let route = PathBuf::from(a.pos.first().ok_or("ROUTE")?);
         let out = PathBuf::from(a.pos.get(1).ok_or("OUT")?);
@@ -286,15 +302,16 @@ pub fn cmd_verify(argv: &[String]) -> i32 {
             let b = movie::launch(&host, &ev, 1, &[], 1_000_000, &out.join("launch"))?;
             let s = standalone(&hcfg, &ev, 1, fmi_engine::host::MAX_TICKS, &out.join("standalone"))?;
             let e = |x: &Option<End>| x.as_ref().map(|e| json!({"frame": e.frame, "tick": e.tick, "reason": e.reason}));
-            json!({"launch": e(&b.end), "standalone": e(&s), "same": b.end == s})
+            json!({"launch": e(&b.end), "standalone": e(&s), "same": b.end.is_some() && b.end == s})
         } else {
             movie::verify(&host, &|r: &[Event], sd: u32, mt: u64, d: &Path| standalone(&hcfg, r, sd, mt, d), &route, &out)?
         };
         println!("{v}");
-        Ok(())
+        Ok(v["ok"] == true || v["same"] == true)
     })();
     match r {
-        Ok(()) => 0,
+        Ok(true) => 0,
+        Ok(false) => 2,
         Err(e) => {
             eprintln!("fmi shorten verify: {e}");
             1

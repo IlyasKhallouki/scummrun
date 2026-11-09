@@ -1,16 +1,18 @@
 //! E024 Part 2, item 9 (plan.md, "Verify"): a version of the route, its step log, and its check from boot.
 //!
-//! * **The files** (`write`): OUT/route-NNN.jsonl (the movie: the boot's events and every placed input) and
-//!   OUT/route-NNN.steps.jsonl (a first line of settings; a line per step: its inputs, its completion's frame, tick and
-//!   the stage's digest there, its scan; a last line with the end). NNN is the next free number: an earlier version is
-//!   never overwritten.
+//! * **The files** (`write`): OUT/NAME-NNN.jsonl (the movie: the boot's events and every placed input) and
+//!   OUT/NAME-NNN.steps.jsonl (a first line of settings, the goal's end reason with them; a line per step: its inputs,
+//!   its completion's frame, tick and the stage's digest there, its scan; a last line with the end). NNN is the next
+//!   free number: an earlier version is never overwritten. A version is written as unverified-NNN and becomes
+//!   route-NNN (`promote`) only once verify passes (the review of stage A: a route that failed verify looked like a
+//!   version).
 //! * **The stage's digests** (`replay`): the route from boot as the stage runs a movie (its events to BOOT_FRAME at the
 //!   boot, the later ones scheduled as the run reaches them), the digest at each step's completion, and the end.
 //! * **Verify** (`verify`): the version read back from its files, booted fresh twice: by the bridge's launch (the
 //!   whole movie as the boot's input file, run to the first control, then to each completion for its digest, then to
 //!   the end) and standalone (no control channel: the engine runs the movie to its end by itself, the end read from
-//!   its trace). Both must end at the stage's site and tick, the launch with the stage's digest at every completion.
-//!   A movie without its step log fails.
+//!   its trace). Both must end at the stage's site and tick, the launch with the stage's digest at every completion,
+//!   and the stage's end must be the goal's (its reason, with the site). A movie without its step log fails.
 
 use crate::chain::{self, Sched};
 use crate::verdict::End;
@@ -46,6 +48,30 @@ pub fn write(dir: &Path, name: &str, route: &[Event], meta: &Value, steps: &[Val
         return Ok(p);
     }
     Err(format!("{}: no free route number", dir.display()))
+}
+
+/// `p` (a version's movie, with its step log) renamed to the next free `name`-NNN.jsonl of its folder, never
+/// overwriting one; returns the new path.
+pub fn promote(p: &Path, name: &str) -> Res<PathBuf> {
+    let dir = p.parent().ok_or(format!("{}: no folder", p.display()))?;
+    for n in 1..1000 {
+        let q = dir.join(format!("{name}-{n:03}.jsonl"));
+        // a link fails where the name is taken: never overwritten
+        if std::fs::hard_link(p, &q).is_err() {
+            continue;
+        }
+        if let Err(e) = std::fs::hard_link(steps_path(p), steps_path(&q)) {
+            let _ = std::fs::remove_file(&q);
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                continue;
+            }
+            return Err(format!("{}: {e}", steps_path(&q).display()));
+        }
+        std::fs::remove_file(p).map_err(e2s)?;
+        std::fs::remove_file(steps_path(p)).map_err(e2s)?;
+        return Ok(q);
+    }
+    Err(format!("{}: no free {name} number", dir.display()))
 }
 
 /// A route file's events.
@@ -162,6 +188,11 @@ pub fn verify(host: &dyn EngineHost, standalone: Standalone<'_>, route_path: &Pa
     let Some(end) = end.filter(|e| !e.reason.is_empty()) else {
         return Ok(json!({"ok": false, "why": "the step log has no end"}));
     };
+    // the end must be the goal's: the game's end with its reason and site (the review of stage A)
+    let goal = meta["goal_end"].as_str().unwrap_or("");
+    if end.reason != goal {
+        return Ok(json!({"ok": false, "why": format!("the step log's end {:?} is not the goal's {goal:?}", end.reason)}));
+    }
     let seed = meta["seed"].as_u64().unwrap_or(1) as u32;
     let frames: Vec<u64> = want.keys().copied().collect();
     let max_frame = end.frame + 1000;
