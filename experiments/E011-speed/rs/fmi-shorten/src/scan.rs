@@ -138,11 +138,17 @@ impl Counts {
     }
 }
 
+/// G6 (plan.md): a refused candidate's budget, and an accepted one's plus a frame's.
+pub const BUDGET_MS: f64 = 3.0;
+pub const BUDGET_MS_PER_FRAME: f64 = 0.15;
+
 /// The candidates' costs (G6): those that stopped at the first click (no point, refused, another identity), and
 /// those whose first click was taken (wall ms and frames run).
 #[derive(Clone, Debug, Default)]
 pub struct Cost {
     pub refused: (usize, f64, f64),
+    /// refused candidates over BUDGET_MS
+    pub refused_over: usize,
     pub accepted: Vec<(f64, u64)>,
 }
 
@@ -152,6 +158,7 @@ impl Cost {
             self.refused.0 += 1;
             self.refused.1 += ms;
             self.refused.2 = self.refused.2.max(ms);
+            self.refused_over += (ms > BUDGET_MS) as usize;
         } else {
             self.accepted.push((ms, frames));
         }
@@ -160,6 +167,7 @@ impl Cost {
         self.refused.0 += o.refused.0;
         self.refused.1 += o.refused.1;
         self.refused.2 = self.refused.2.max(o.refused.2);
+        self.refused_over += o.refused_over;
         self.accepted.extend(o.accepted.iter().copied());
     }
     /// The accepted candidates' least-squares line ms = a + b * frames.
@@ -181,8 +189,10 @@ impl Cost {
         let (n, sum, max) = self.refused;
         let frames: u64 = self.accepted.iter().map(|a| a.1).sum();
         let ms: f64 = self.accepted.iter().map(|a| a.0).sum();
-        json!({"refused": {"n": n, "mean_ms": if n > 0 { sum / n as f64 } else { 0.0 }, "max_ms": max},
-               "accepted": {"n": self.accepted.len(), "ms": ms, "frames": frames,
+        // G6's budget for an accepted candidate: BUDGET_MS plus BUDGET_MS_PER_FRAME a frame run
+        let over = self.accepted.iter().filter(|&&(ms, f)| ms > BUDGET_MS + BUDGET_MS_PER_FRAME * f as f64).count();
+        json!({"refused": {"n": n, "mean_ms": if n > 0 { sum / n as f64 } else { 0.0 }, "max_ms": max, "over_budget": self.refused_over},
+               "accepted": {"n": self.accepted.len(), "ms": ms, "frames": frames, "over_budget": over,
                             "fit": self.fit().map(|(a, b)| json!({"ms": a, "ms_per_frame": b}))}})
     }
 }
