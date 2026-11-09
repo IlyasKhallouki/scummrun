@@ -1286,7 +1286,19 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["tried"].as_array_mut().unwrap().push(rec);
             }
             let entry_frame = entry["frame"].as_i64().unwrap_or(0);
-            let frames: Vec<i64> = att.checkpoints.iter().map(|c| c.frame as i64).collect();
+            let att_stop: Option<String> = att.res.get("stop").and_then(|s| s.as_str()).map(|s| s.to_string());
+            // E024 Part 1 (FMI_AFFORD_P0=1): an attempt whose stop triggers the affordance step, on its trailing empty
+            // windows with no input after their start P0, commits no checkpoint after P0 and runs the step there
+            let at_p0 = if mech::afford_p0() && att.engine.is_some() && tt.is_some() && nov.is_some()
+                && mech::trigger_of_stop(att_stop.as_deref()).is_some()
+            {
+                let stop_cp = played_from.map(|si| &waited.as_ref().unwrap().stops[si].checkpoint);
+                p0_engine(root, &att, entry_frame, stop_cp)
+            } else {
+                None
+            };
+            let p0 = at_p0.as_ref().filter(|x| !matches!(x.1, AtP0::Missed(_))).map(|x| x.0);
+            let frames: Vec<i64> = att.checkpoints.iter().map(|c| c.frame as i64).filter(|f| p0.is_none_or(|p| *f <= p)).collect();
             let plan = step::entries_plan(entry_frame, &att.inputs, &frames).map_err(Err)?;
             let reached = match att.checkpoints.last() {
                 Some(c) => step::target_holds_in(&tg, &goal, &c.facts),
@@ -1296,11 +1308,35 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             att.res["_reached"] = json!(reached);
             att.res["_ready"] = json!(ready);
             out["attempt"] = step::attempt_record(&tg, &att.res, att.secs);
-            let att_engine = att.engine.take();
-            let att_stop: Option<String> = att.res.get("stop").and_then(|s| s.as_str()).map(|s| s.to_string());
+            let mut att_engine = att.engine.take();
+            // E024 Part 1: P0's engine in place of the end's (none at the try's entry: the step runs on the root)
+            let mut p0_rec: Option<Value> = None;
+            let mut p0_root = false;
+            if let Some((p, at)) = at_p0 {
+                let n_after = att.checkpoints.iter().filter(|c| c.frame as i64 > p).count();
+                let how = match at {
+                    AtP0::Missed(why) => {
+                        p0_rec = Some(json!({"frame": p, "missed": why}));
+                        format!("not reached again ({why}): at the attempt's end")
+                    }
+                    at => {
+                        if let Some(e) = att_engine.take() {
+                            machine::port(|| e.quit());
+                        }
+                        p0_root = matches!(at, AtP0::Root);
+                        if let AtP0::Engine(b) = at {
+                            att_engine = Some(b);
+                        }
+                        p0_rec = Some(json!({"frame": p, "root": p0_root, "after": n_after}));
+                        format!("{}, the attempt's {n_after} checkpoints after it not committed", if p0_root { "the entry" } else { "reached again" })
+                    }
+                };
+                log.say(&format!("afford at P0, frame {p}: {how}"));
+            }
             // the entries share the attempt's checkpoints (each a prefix): each checkpoint's text is made once, and the
             // files are written together; the ingest of this process takes them from the stash
-            let kept: Vec<Checkpoint> = att.checkpoints.into_iter().filter(|c| c.frame as i64 > entry_frame).collect();
+            let kept: Vec<Checkpoint> = att.checkpoints.into_iter()
+                .filter(|c| c.frame as i64 > entry_frame && p0.is_none_or(|p| c.frame as i64 <= p)).collect();
             // E012: the attempt's entries are kept, so what they hold is novel no more in this try; the affordance
             // step's entries continue the attempt's movie and checkpoints
             if let Some(n) = nov.as_ref() {
@@ -1367,19 +1403,28 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 }
             }
             // E012, 6 (FMI_AFFORD): the interface's own inputs where the model could not act (R0, the same empty window)
-            if let Some(mut e) = att_engine {
+            if att_engine.is_some() || p0_root {
                 if let (Some(trig), Some(t), Some(nv)) = (mech::trigger_of_stop(att_stop.as_deref()), tt.as_ref(), nov.as_ref()) {
+                    let e: &mut Box<dyn Engine> = match att_engine.as_mut() {
+                        Some(e) => e,
+                        None => &mut *root,
+                    };
                     let f = e.status().frame as i64;
                     let prefix: Vec<Value> = att.inputs.iter().filter(|x| files::as_i64(x.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
                     let c0 = cpu_now();
-                    let a = run_afford(r, &sw, &mut e, trig, t, nv, &*rd, &job, &prefix, &prefix_cps, log);
-                    machine::port(|| e.quit());
-                    let a = a.map_err(Err)?;
+                    let a = run_afford(r, &sw, e, trig, t, nv, &*rd, &job, &prefix, &prefix_cps, log);
+                    if let Some(e) = att_engine {
+                        machine::port(|| e.quit());
+                    }
+                    let mut a = a.map_err(Err)?;
+                    if let Some(p) = p0_rec {
+                        a.record["p0"] = p;
+                    }
                     cpu_set(&mut cpu, "afford", cpu_now() - c0 + a.cpu_s);
                     afford_recs.push(a.record);
                     extras.extend(a.kept);
                     dead.extend(a.dead);
-                } else {
+                } else if let Some(e) = att_engine {
                     machine::port(|| e.quit());
                 }
             }
@@ -1503,6 +1548,38 @@ fn engine_at(root: &mut Box<dyn Engine>, cp: &Checkpoint) -> Result<Box<dyn Engi
         return Err(format!("E012: the wait's stop at frame {} is not reached again from the entry: {d}", cp.frame));
     }
     Ok(b)
+}
+
+/// E024 Part 1: where the affordance step runs instead of the attempt's end engine.
+enum AtP0 {
+    /// P0 is the try's entry: the root itself (as the step with no plan)
+    Root,
+    /// a fork of the root played to P0 and held to P0's checkpoint
+    Engine(Box<dyn Engine>),
+    /// P0's state not reached again: the attempt's end engine, every checkpoint committed
+    Missed(String),
+}
+
+/// E024 Part 1 (FMI_AFFORD_P0): P0 of a played attempt (mech::p0_of over its window records, from its start frame0) when
+/// no input of the attempt lies after it, and the engine there: the root's fork with the attempt's inputs to P0, run to
+/// P0 and held to the attempt's checkpoint at P0 (or the wait's stop it started from), as engine_at holds it.
+fn p0_engine(root: &mut Box<dyn Engine>, att: &Attempt, entry_frame: i64, stop_cp: Option<&Checkpoint>) -> Option<(i64, AtP0)> {
+    let ws = att.res["windows"].as_array()?;
+    let frame0 = att.res["frame0"].as_i64().unwrap_or(entry_frame);
+    let p = mech::p0_of(ws, frame0)?;
+    if att.inputs.iter().any(|x| files::as_i64(x.get("frame")).unwrap_or(i64::MAX) > p) {
+        return None;
+    }
+    if p == entry_frame {
+        return Some((p, AtP0::Root));
+    }
+    let Some(cp) = att.checkpoints.iter().chain(stop_cp).find(|c| c.frame as i64 == p) else {
+        return Some((p, AtP0::Missed(format!("no checkpoint at frame {p}"))));
+    };
+    match machine::port(|| crate::free::engine_at(root, &att.inputs, cp)) {
+        Ok(b) => Some((p, AtP0::Engine(b))),
+        Err(e) => Some((p, AtP0::Missed(e))),
+    }
 }
 
 /// E012's affordance step in the try (mech::afford_step) with the wait's horizon and stops when the wait is on, and
