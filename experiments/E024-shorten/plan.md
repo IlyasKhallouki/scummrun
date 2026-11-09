@@ -221,6 +221,11 @@ It runs as the run's last stage once a goal entry exists (driver.rs:664 stops at
     - Files: run/seed1-route-004.jsonl and its .steps.jsonl.
   - Seed 2: 18,964 after the forward pass, 18,682 after the rounds, verified from boot (run/seed2-route-003.jsonl).
   - Seed 3 stops at step 18, the quiz's last line. Its quiz draw differs from seed 1's, bit 443 is never set, and realize, 31 offer trials, the dialog search (43 leaves) and skips off all find nothing.
+- **Real time is longer than Status.tick: 3:51.5, against 3:46.8.**
+  - Measured from the video capture of seed 1's route (video/, the bridge's SPEEDRUN_VIDEO in the standalone launch, which verifies: same end, 33 of 33 digests).
+  - The screen shows one frame per jiffy, and the end is at qf 55,555, which is 13,888.75 jiffies. That is 231.5 s at 59.998 jiffies a second, against 13,606 ticks (226.8 s).
+  - The 282.75 jiffies the tick clock does not count are the screen's waits: about 19.5 jiffies at each room change (16 of them), and the rest in the skipped cutscenes. The gap grows only at room changes and skips.
+  - The stage's objective (Status.tick) therefore counts a room change about 0.33 s short. The objective should be qf (E025).
 - **Per stretch, seed 1 (ticks):** boot 944, steps 0-3 1,008, 4-8 1,872, the book (9-13) 2,700, the quiz (14-19) 312, the voyage (20, skips off) 1,808, the suit (21-23) 504, the dives (24) 1,062, the cave exit (25) 822, to the end (26-36) 2,574.
 - **Gates:**
 
@@ -233,7 +238,7 @@ It runs as the run's last stage once a goal entry exists (driver.rs:664 stops at
   | G5 | ≤ 9,000 ticks through the book | 6,524 | pass |
   | G6 | refused ≤ 3 ms; accepted 3 ms + 0.15 ms/frame; pass ≤ 10 min; Part I ≤ 2 h | mean 2.6-3.2 ms, max 8.9-11.9 ms; fixed part 13.5-16 ms, 0.034-0.040 ms/frame; 79-93 s; reduction rounds grow with the square of the step count, about 3.3 h a round for Part I | the pass passes, the rest fails |
   | G7 | no game numbers; the kitchen anchored and reached | none; 85/85 anchored, none raw; the pass stops at step 5 of 12, where clicks made while ego walks have no point at 1,680 of 1,761 t's | grep and anchors pass, the goal not met |
-- **Success:** met on seed 1, and seed 2 reaches the end. Not met in full, because seed 3 does not reach the end.
+- **Success:** met on seed 1, also in real time (13,889 jiffies, under 4:00), and seed 2 reaches the end. Not met in full, because seed 3 does not reach the end.
 - **Open (from the review, none of which makes a route wrong):**
   - The driver's stage always passes `--goal end`, so on a goal-fact archive it records an error.
   - One engine error in a fallback trial or a reduction test stops the pass or every round. The scan already counts it as that t's outcome.
