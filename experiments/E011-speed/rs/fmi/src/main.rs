@@ -18,6 +18,16 @@
 //!   fmi guide stats GUIDE.json [--key KEY.json]                                     (guide.py stats)
 //!   fmi read FILE      readings one after another through the readings port, one per line of reader-scope's
 //!                      arguments (E012 resident: read.rs)
+//!   fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
+//!                      E024: a movie's steps, anchors and draw keys (fmi-shorten; shorten.rs)
+//!   fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
+//!                   [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT
+//!                      E024: the movie's steps found again from boot (the forward pass, its fallbacks), its route
+//!                      verified, then the reductions (R rounds)
+//!   fmi shorten verify ROUTE [--ends] OUT
+//!                      E024: a route checked from boot from its files (item 9)
+//!   fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT
+//!                      E024: a diagnostic, the movie's stops frame by frame
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
@@ -26,6 +36,7 @@
 //! With several JOB_DIRs (or "-": one per line on stdin) the tries run one after the other in this process, warm.
 
 mod read;
+mod shorten;
 mod wire;
 mod wire_real;
 mod trycheck;
@@ -62,7 +73,12 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
                 [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
        fmi guide map --goal K=V[,K=V] | part1 | end=1 --out GUIDE.json [--wide] [--seed 1] [--start-boot]
        fmi guide stats GUIDE.json [--key KEY.json]
-       fmi read FILE";
+       fmi read FILE
+       fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
+       fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N] [--no-twins]
+                       [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT
+       fmi shorten verify ROUTE [--ends] OUT
+       fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT";
 
 struct Args {
     pos: Vec<String>,
@@ -167,6 +183,10 @@ fn main() {
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         ("read", Some(_)) => read::cmd_read(&argv[1..]),
+        ("shorten", Some("label")) => shorten::cmd_label(&argv[2..]),
+        ("shorten", Some("run")) => shorten::cmd_run(&argv[2..]),
+        ("shorten", Some("trace")) => shorten::cmd_trace(&argv[2..]),
+        ("shorten", Some("verify")) => shorten::cmd_verify(&argv[2..]),
         _ => usage(),
     };
     std::process::exit(code)
@@ -386,6 +406,10 @@ fn cmd_run(argv: &[String]) -> i32 {
     }
     // E013: stall's two rules as free's port (asked only with FMI_FREE_SHIFT=1)
     fmi_explore::free::set_shift(Box::new(fmi_explore::stall::ArchivePort::default()));
+    // E024 item 3: the shorten stage after a goal stop (asked only with FMI_SHORTEN=1)
+    if driver::shorten_on() {
+        driver::set_shortener(Box::new(shorten::Stage1));
+    }
     let mut stats = DriverStats::default();
     let ver: Option<&dyn fmi_explore::driver::Verifier> = if a.flag("no-verify") { None } else { verifier.as_ref().map(|v| v as &dyn fmi_explore::driver::Verifier) };
     match driver::run(&PathBuf::from(root), workers, &mode, ver, &mut stats) {

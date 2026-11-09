@@ -1,0 +1,14 @@
+[package]
+name = "fmi-shorten"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E024: the system shortens its own route (experiments/E024-shorten/plan.md, Part 2): steps, anchors and draw keys of a movie from boot"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+fmi-explore = { path = "../fmi-explore" }
+# item 6: realize.rs, a fallback
+fmi-play = { path = "../fmi-play" }
+fmi-reading = { path = "../fmi-reading" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }

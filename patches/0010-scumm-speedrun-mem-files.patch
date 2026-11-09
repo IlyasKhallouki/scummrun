@@ -1,0 +1,108 @@
+diff -ruN a/engines/scumm/script_v5.cpp b/engines/scumm/script_v5.cpp
+--- a/engines/scumm/script_v5.cpp
++++ b/engines/scumm/script_v5.cpp
+@@ -2585,6 +2585,13 @@
+ 				error("SO_SAVE_STRING: Unsupported filename %s", filename.c_str());
+ 			}
+ 
++			if (_speedrun && _speedrun->memFiles()) {
++				// E024 (patch 0010, SPEEDRUN_MEM_FILES=1): kept in this process's memory, a save that succeeded
++				const byte *mem = getResourceAddress(rtString, a);
++				_speedrun->setMemFile(filename, mem, resStrLen(mem) + 1);
++				VAR(VAR_SOUNDRESULT) = 0;
++				break;
++			}
+ 			Common::OutSaveFile *file = _saveFileMan->openForSaving(filename);
+ 			if (file != nullptr) {
+ 				byte *ptr;
+@@ -2614,6 +2621,18 @@
+ 				error("SO_LOAD_STRING: Unsupported filename %s", filename.c_str());
+ 			}
+ 
++			// E024 (patch 0010, SPEEDRUN_MEM_FILES=1): a file this process wrote is read from its memory
++			const Common::Array<byte> *mem = _speedrun && _speedrun->memFiles() ? _speedrun->memFile(filename) : nullptr;
++			if (mem != nullptr) {
++				byte *ptr = (byte *)malloc(mem->size() + 1);
++				assert(ptr);
++				if (mem->size())
++					memcpy(ptr, mem->data(), mem->size());
++				ptr[mem->size()] = '\0';
++				loadPtrToResource(rtString, a, ptr);
++				free(ptr);
++				break;
++			}
+ 			Common::InSaveFile *file = _saveFileMan->openForLoading(filename);
+ 			if (file != nullptr) {
+ 				byte *ptr;
+diff -ruN a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -295,6 +295,8 @@
+ 	_imuseTicks = imuseTicks && !strcmp(imuseTicks, "1");
+ 	const char *tempSaves = envValue("SPEEDRUN_TEMP_SAVES");
+ 	_tempSaves = tempSaves && !strcmp(tempSaves, "1");
++	const char *memFiles = envValue("SPEEDRUN_MEM_FILES");
++	_memFiles = memFiles && !strcmp(memFiles, "1");
+ 
+ 	const char *timerNext = envValue("SPEEDRUN_TIMER_NEXT");
+ 	if (timerNext) {
+@@ -553,6 +555,30 @@
+ 	return new Common::MemoryReadStream(copy, _tempSave.size(), DisposeAfterUse::YES);
+ }
+ 
++void SpeedrunBridge::setMemFile(const Common::String &name, const byte *data, uint32 size) {
++	for (uint i = 0; i < _memFileList.size(); i++) {
++		if (_memFileList[i].name == name) {
++			_memFileList[i].data.resize(size);
++			if (size)
++				memcpy(_memFileList[i].data.data(), data, size);
++			return;
++		}
++	}
++	MemFile f;
++	f.name = name;
++	f.data.resize(size);
++	if (size)
++		memcpy(f.data.data(), data, size);
++	_memFileList.push_back(f);
++}
++
++const Common::Array<byte> *SpeedrunBridge::memFile(const Common::String &name) const {
++	for (uint i = 0; i < _memFileList.size(); i++)
++		if (_memFileList[i].name == name)
++			return &_memFileList[i].data;
++	return nullptr;
++}
++
+ void SpeedrunBridge::onCDTrack(int track, int numLoops, int startFrame, int duration, bool playing) {
+ 	if (_finished)
+ 		return;
+diff -ruN a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -339,6 +339,12 @@
+ 	bool tempSaves() const { return _tempSaves; }
+ 	void setTempSave(const byte *data, uint32 size);
+ 	Common::SeekableReadStream *tempSaveStream() const;
++	// E024 (patch 0010): SPEEDRUN_MEM_FILES=1, the files the scripts write and read (roomOps 13 and 14: Indy 4's IQ
++	// points) kept in this process's memory once written, so a fork()ed branch holds its own copy: branches of one
++	// boot never share the save folder's file. A file not written yet is read from the folder, as without it
++	bool memFiles() const { return _memFiles; }
++	void setMemFile(const Common::String &name, const byte *data, uint32 size);
++	const Common::Array<byte> *memFile(const Common::String &name) const;
+ 	/**
+ 	 * First statement of waitForTimer(): every wait the engine makes, the
+ 	 * main loop's 4 * delta and the room-change effects' (dissolve, iris,
+@@ -647,6 +653,12 @@
+ 	bool _tempSaves = false;        // SPEEDRUN_TEMP_SAVES=1 (E021)
+ 	Common::Array<byte> _tempSave;  // the last temporary save's bytes
+ 	bool _hasTempSave = false;
++	bool _memFiles = false;         // SPEEDRUN_MEM_FILES=1 (E024)
++	struct MemFile {
++		Common::String name;
++		Common::Array<byte> data;
++	};
++	Common::Array<MemFile> _memFileList; // the files written, by name
+ 	uint64 _startFrame = 0;         // SPEEDRUN_START_FRAME; 0 = use SPEEDRUN_START
+ 	int _lastRoom = 0;              // for "room" records
+ 	Common::String _envError;       // first invalid variable, reported once the trace is open

@@ -107,8 +107,10 @@ impl HostCfg {
             extra_env.push(("SPEEDRUN_REPORT_RESTART".to_string(), "1".to_string()));
         }
         // E014: the decision point without verb ids (SPEEDRUN_IDLE=handler) and the end's site (SPEEDRUN_END_SITE=1),
-        // passed to every engine when set in this process's environment (an engine with the E014 patch)
-        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE"] {
+        // passed to every engine when set in this process's environment (an engine with the E014 patch).
+        // E024 (plan.md Part 2, item 8): the segment's start frame (SPEEDRUN_START_FRAME, patch 0001) and var 19's
+        // required value (SPEEDRUN_TIMER_NEXT), so skips run from boot; extra_env goes on after TIMER_NEXT=any (spawn)
+        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE", "SPEEDRUN_START_FRAME", "SPEEDRUN_TIMER_NEXT"] {
             if let Some(v) = std::env::var(k).ok().filter(|v| !v.is_empty()) {
                 extra_env.push((k.to_string(), v));
             }
@@ -358,16 +360,15 @@ impl Host {
         &self.cfg
     }
 
-    /// A fresh engine (replay_part1.config's settings, the binary channel, the lean switches when `cfg.lean`), its
-    /// movie from boot as SPEEDRUN_INPUTS (events up to `cfg.frame` when set), stopped at its first decision point.
-    pub fn spawn(&self, cfg: &BootCfg) -> EResult<BinEngine> {
+    /// The engine's command for a boot: its out folder, ini and save folder made, its settings, its movie from boot
+    /// as SPEEDRUN_INPUTS (events up to `cfg.frame` when set); with no control channel (`spawn` adds it).
+    fn command(&self, cfg: &BootCfg) -> EResult<Command> {
         if cfg.seed == ANY_SEED {
             return Err(EngineError::Bridge(
                 "the Any% seed is never used by the system's runs".into(),
             ));
         }
         let h = &*self.cfg;
-        let family = Arc::new(Family::new(h.timeout).map_err(io_err)?);
         let out = &cfg.out_dir;
         let saves = h.saves(out);
         if h.own_saves {
@@ -412,9 +413,7 @@ impl Host {
             .env("XDG_DATA_HOME", out.join("xdg/data"))
             .env("XDG_CACHE_HOME", out.join("xdg/cache"))
             .env("SDL_VIDEODRIVER", "dummy")
-            .env("SDL_AUDIODRIVER", "dummy")
-            .env("SPEEDRUN_CONTROL", &family.sock)
-            .env("SPEEDRUN_WIRE", "bin");
+            .env("SDL_AUDIODRIVER", "dummy");
         // E020 (FMI_IMUSE_TICKS=1): iMUSE's sequencer advances by game time, not on the mixer's wall-time timer
         if std::env::var("FMI_IMUSE_TICKS").is_ok_and(|v| v == "1") {
             cmd.env("SPEEDRUN_IMUSE_TICKS", "1");
@@ -422,6 +421,11 @@ impl Host {
         // E021 (FMI_TEMP_SAVES=1): the scripts' temporary saves and loads are the game's, kept in the engine's memory
         if std::env::var("FMI_TEMP_SAVES").is_ok_and(|v| v == "1") {
             cmd.env("SPEEDRUN_TEMP_SAVES", "1");
+        }
+        // E024 (FMI_MEM_FILES=1, patch 0010): the files the scripts write (roomOps 13, 14) kept in the engine's memory,
+        // so the forks of one boot (a scan's candidates) never share the save folder's file
+        if std::env::var("FMI_MEM_FILES").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_MEM_FILES", "1");
         }
         if !sorted.is_empty() {
             let movie = out.join("prefix.jsonl");
@@ -438,6 +442,40 @@ impl Host {
         for (k, v) in &h.extra_env {
             cmd.env(k, v);
         }
+        Ok(cmd)
+    }
+
+    /// E024 (plan.md Part 2, item 9): the engine run standalone, its movie from boot as `spawn` gives it but no
+    /// control channel: it runs the movie by itself until its end or `max_ticks` (SPEEDRUN_MAX_TICKS), and the end is
+    /// in its trace (OUT/trace.jsonl). Waits for it at most `wall`.
+    pub fn standalone(&self, cfg: &BootCfg, max_ticks: u64, wall: Duration) -> EResult<std::process::ExitStatus> {
+        let mut cmd = self.command(cfg)?;
+        cmd.env("SPEEDRUN_MAX_TICKS", max_ticks.to_string());
+        let log = std::fs::File::create(cfg.out_dir.join("stdout.log")).map_err(io_err)?;
+        let log2 = log.try_clone().map_err(io_err)?;
+        cmd.stdin(Stdio::null()).stdout(log).stderr(log2);
+        let mut child = cmd.spawn().map_err(io_err)?;
+        let t = Instant::now();
+        loop {
+            match child.try_wait().map_err(io_err)? {
+                Some(st) => return Ok(st),
+                None if t.elapsed() < wall => std::thread::sleep(Duration::from_millis(20)),
+                None => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(EngineError::Bridge(format!("standalone: no end within {} s", wall.as_secs())));
+                }
+            }
+        }
+    }
+
+    /// A fresh engine (replay_part1.config's settings, the binary channel, the lean switches when `cfg.lean`), its
+    /// movie from boot as SPEEDRUN_INPUTS (events up to `cfg.frame` when set), stopped at its first decision point.
+    pub fn spawn(&self, cfg: &BootCfg) -> EResult<BinEngine> {
+        let mut cmd = self.command(cfg)?;
+        let family = Arc::new(Family::new(self.cfg.timeout).map_err(io_err)?);
+        cmd.env("SPEEDRUN_CONTROL", &family.sock).env("SPEEDRUN_WIRE", "bin");
+        let out = &cfg.out_dir;
         let log = std::fs::File::create(out.join("stdout.log")).map_err(io_err)?;
         let log2 = log.try_clone().map_err(io_err)?;
         cmd.stdin(Stdio::null()).stdout(log).stderr(log2);
