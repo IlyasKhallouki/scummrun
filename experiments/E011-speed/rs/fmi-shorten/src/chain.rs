@@ -296,6 +296,11 @@ fn take_log(e: &mut Box<dyn Engine>, recs: &mut BTreeMap<u64, Vec<InputRecord>>)
     Ok(())
 }
 
+/// The seed the archive's run played on (stage.json's), the seed its movies were recorded on.
+pub fn archive_seed(root: &Path) -> Option<u32> {
+    files::read_json(&root.join("stage.json")).ok()?["seed"].as_u64().map(|s| s as u32)
+}
+
 /// An archive entry's movie from boot (Archive::movie's: the events of the chain of entries from the root to it),
 /// read only from the archive's entries.jsonl and entries/N.json.gz.
 pub fn archive_movie(root: &Path, entry: usize) -> Res<Vec<Event>> {

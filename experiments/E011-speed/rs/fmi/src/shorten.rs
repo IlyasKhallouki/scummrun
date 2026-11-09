@@ -6,9 +6,10 @@
 //! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings). --entry E
 //! takes the archive's entry E's movie from boot (its chain's events) for --movie, in `run` as well.
 //!
-//! `fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
-//! [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT` (items 4-9): the movie's steps (as
-//! `label`, with the twins' draw keys unless --no-twins), then the forward pass, each step found again in order from
+//! `fmi shorten run --movie M --archive A --goal end --seed S [--movie-seed S0] [--skips] [--workers N] [--chunk C]
+//! [--tail N] [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT` (items 4-9): the movie's
+//! steps (as `label`, on the seed the movie was recorded on: --movie-seed, else the archive's stage.json seed, with
+//! the twins' draw keys unless --no-twins), then the forward pass on seed S, each step found again in order from
 //! boot (fmi-shorten pass.rs; --no-ego: a step's goal without where ego stands), a step the scan does not complete by
 //! the fallbacks (refind.rs, unless --no-fallbacks), with --skips under text and cutscene skips from boot (skips.rs);
 //! a pass that reaches the goal (the movie's end reason, with its site, where the stage's replay of the route ends
@@ -251,6 +252,12 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let mut held = Held::load(Path::new(archive))?;
     let num = |k: &str, d: u64| a.get(k).map(|v| v.parse::<u64>().map_err(|e| format!("--{k}: {e}"))).unwrap_or(Ok(d));
     let seed = num("seed", 1)? as u32;
+    // the movie's steps on the seed its run recorded it on (the archive's, or --movie-seed), the pass on --seed: a
+    // movie replayed on another seed is not the run's (seeds 2 and 3 of movie-c9-run ended no game)
+    let movie_seed = match a.get("movie-seed") {
+        Some(_) => num("movie-seed", 1)? as u32,
+        None => chain::archive_seed(Path::new(archive)).unwrap_or(seed),
+    };
     let rounds = num("rounds", 0)? as usize;
     let wall = num("wall", WALL_S)?;
     let scan_cfg = Cfg { workers: num("workers", 8)? as usize, chunk: num("chunk", 16)? as u32 };
@@ -259,7 +266,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let base = HostCfg::from_env();
     let host0 = Host::new(base.clone()).map_err(|e| format!("the engine host: {e}"))?;
     // items 1-3: the movie's steps as it was run
-    let o = Opts { seed, out: eng.join("replay"), twins: !a.flag("no-twins"), tail: num("tail", 3000)? };
+    let o = Opts { seed: movie_seed, out: eng.join("replay"), twins: !a.flag("no-twins"), tail: num("tail", 3000)? };
     let ch = chain::replay(&host0, &movie, &mut held, &o)?;
     let l = label::labels(&ch);
     let root = |k: fmi_core::Key| held.root.get(&k.text()).copied().unwrap_or(0);
@@ -290,7 +297,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let p = pass::forward(&host, &boot, &specs, &origs, &pcfg)?;
     eprintln!("pass: {:.1} s", p.wall_s);
     let by_k: BTreeMap<usize, pass::Orig> = specs.iter().zip(&origs).map(|(s, o)| (s.k, o.clone())).collect();
-    let meta = json!({"movie": movie_path, "archive": archive, "goal": goal, "goal_end": goal_end, "seed": seed, "skips": a.flag("skips"), "ego": ego,
+    let meta = json!({"movie": movie_path, "archive": archive, "goal": goal, "goal_end": goal_end, "seed": seed, "movie_seed": movie_seed, "skips": a.flag("skips"), "ego": ego,
                       "env": env, "boot": boot.iter().map(fmi_explore::events::event_json).collect::<Vec<_>>(),
                       "workers": scan_cfg.workers, "chunk": scan_cfg.chunk, "w": pcfg.w});
     let st = Stage { host: &host, hcfg: &hcfg, out: &out, eng: &eng, seed, goal_end: &goal_end, meta, origs: &by_k };
@@ -299,7 +306,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
         *m.entry(h.name()).or_default() += 1;
         m
     });
-    let mut sum = json!({"movie": movie_path, "seed": seed, "skips": skips_report, "label": {"inputs": ch.met.len(), "steps": specs.len(),
+    let mut sum = json!({"movie": movie_path, "seed": seed, "movie_seed": movie_seed, "skips": skips_report, "label": {"inputs": ch.met.len(), "steps": specs.len(),
                          "seconds": label_s, "end": ch.end.as_ref().map(|s| json!({"frame": s.frame, "tick": s.tick, "reason": s.reason}))},
                          "pass": {"wall_s": p.wall_s, "steps": p.steps.len(), "how": hows, "stopped": p.stopped, "events": p.route.len(),
                                   "end": p.end.as_ref().map(|f| json!({"frame": f.frame, "tick": f.tick})),
@@ -336,7 +343,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
 }
 
 pub fn cmd_run(argv: &[String]) -> i32 {
-    let opts = ["movie", "entry", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds", "wall"];
+    let opts = ["movie", "entry", "archive", "goal", "seed", "movie-seed", "workers", "chunk", "tail", "rounds", "wall"];
     match args(argv, &opts, &["skips", "no-twins", "no-ego", "no-fallbacks"], 1).and_then(|a| run_in(&a)) {
         Ok((ok, sum)) if ok => {
             println!("{sum}");
