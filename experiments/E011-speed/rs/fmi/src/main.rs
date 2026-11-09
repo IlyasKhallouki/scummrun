@@ -406,6 +406,10 @@ fn cmd_run(argv: &[String]) -> i32 {
     }
     // E013: stall's two rules as free's port (asked only with FMI_FREE_SHIFT=1)
     fmi_explore::free::set_shift(Box::new(fmi_explore::stall::ArchivePort::default()));
+    // E024 item 3: the shorten stage after a goal stop (asked only with FMI_SHORTEN=1)
+    if driver::shorten_on() {
+        driver::set_shortener(Box::new(shorten::Stage1));
+    }
     let mut stats = DriverStats::default();
     let ver: Option<&dyn fmi_explore::driver::Verifier> = if a.flag("no-verify") { None } else { verifier.as_ref().map(|v| v as &dyn fmi_explore::driver::Verifier) };
     match driver::run(&PathBuf::from(root), workers, &mode, ver, &mut stats) {

@@ -71,6 +71,25 @@ pub trait Verifier {
     fn verify(&self, a: &Archive, entry: usize) -> Res<Value>;
 }
 
+/// E024 item 3 (experiments/E024-shorten/plan.md, Part 2), `FMI_SHORTEN=1`: once a goal entry exists the run's last
+/// stage shortens its route, the goal entry's movie from boot with the archive (fmi-shorten, `fmi shorten run`). The
+/// stage depends on this crate, so the binary that links it sets it here (`set_shortener`). Unset: as before.
+pub trait Shortener: Send + Sync {
+    /// The stage on the archive at `root` and the movie `movie` (its events as the archive holds them): its summary.
+    fn shorten(&self, root: &Path, movie: &[Value]) -> Res<Value>;
+}
+
+static SHORTENER: std::sync::OnceLock<Box<dyn Shortener>> = std::sync::OnceLock::new();
+
+pub fn shorten_on() -> bool {
+    std::env::var("FMI_SHORTEN").is_ok_and(|v| v == "1")
+}
+
+/// The shorten stage this binary links (the first set is kept).
+pub fn set_shortener(s: Box<dyn Shortener>) {
+    let _ = SHORTENER.set(s);
+}
+
 struct Thread {
     handle: Option<JoinHandle<(i32, f64)>>,
     cancel: Arc<AtomicBool>,
@@ -801,6 +820,17 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 summary["verify"] = Value::Object(s);
             }
             None => summary["verify"] = Value::Null,
+        }
+        // E024 item 3 (FMI_SHORTEN=1): the shorten stage on the goal entry's movie, its summary in summary.json
+        if shorten_on() {
+            let e = detail["entry"].as_u64().unwrap_or(0) as usize;
+            summary["shorten"] = match SHORTENER.get() {
+                Some(s) => {
+                    say(&format!("goal entry {e}: the shorten stage (E024)"));
+                    a.movie(e).and_then(|m| s.shorten(&a.root, &m)).unwrap_or_else(|x| json!({"error": x}))
+                }
+                None => json!({"error": "no shorten stage in this binary"}),
+            };
         }
     }
     write_json(&a.root.join("summary.json"), &summary, Some(1))?;

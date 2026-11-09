@@ -223,7 +223,7 @@ fn cost_of(p: &pass::Pass) -> Cost {
 /// The wall time the stage may take (plan.md's stop rule: 2 hours).
 const WALL_S: u64 = 7200;
 
-fn run_in(a: &super::Args) -> Result<bool, String> {
+fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let t0 = std::time::Instant::now();
     let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
     let movie_path = a.get("movie").ok_or("--movie")?;
@@ -317,15 +317,18 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
             break;
         }
     }
-    println!("{sum}");
-    Ok(verified)
+    Ok((verified, sum))
 }
 
 pub fn cmd_run(argv: &[String]) -> i32 {
     let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds", "wall"];
     match args(argv, &opts, &["skips", "no-twins", "no-ego", "no-fallbacks"], 1).and_then(|a| run_in(&a)) {
-        Ok(true) => 0,
-        Ok(false) => {
+        Ok((ok, sum)) if ok => {
+            println!("{sum}");
+            0
+        }
+        Ok((_, sum)) => {
+            println!("{sum}");
             eprintln!("fmi shorten run: no verified route");
             2
         }
@@ -419,3 +422,30 @@ pub fn cmd_trace(argv: &[String]) -> i32 {
     }
 }
 
+/// E024 item 3 (`FMI_SHORTEN=1`, fmi-explore driver.rs): the run's last stage, `run` on the goal entry's movie and
+/// the archive into ARCHIVE/shorten, under skips from boot with the plan's rounds (plan.md, "Run"); its seed and
+/// workers from FMI_SHORTEN_SEED (1) and FMI_SHORTEN_WORKERS (8).
+pub struct Stage1;
+
+impl fmi_explore::driver::Shortener for Stage1 {
+    fn shorten(&self, root: &Path, movie: &[Value]) -> Result<Value, String> {
+        let out = root.join("shorten");
+        std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+        let mp = out.join("movie.jsonl");
+        let text: String = movie.iter().map(|v| format!("{v}\n")).collect();
+        std::fs::write(&mp, text).map_err(|e| format!("{}: {e}", mp.display()))?;
+        let env = |k: &str, d: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).unwrap_or(d.to_string());
+        let argv: Vec<String> = [
+            "--movie", &mp.display().to_string(), "--archive", &root.display().to_string(), "--goal", "end",
+            "--seed", &env("FMI_SHORTEN_SEED", "1"), "--workers", &env("FMI_SHORTEN_WORKERS", "8"), "--rounds", "3", "--skips",
+            &out.display().to_string(),
+        ]
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
+        let a = args(&argv, &["movie", "archive", "goal", "seed", "workers", "rounds"], &["skips"], 1)?;
+        let (ok, mut sum) = run_in(&a)?;
+        sum["verified"] = json!(ok);
+        Ok(sum)
+    }
+}

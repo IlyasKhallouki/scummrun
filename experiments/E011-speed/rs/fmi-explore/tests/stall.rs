@@ -292,6 +292,10 @@ impl Step for Scripted {
 }
 
 fn drive(root: &Path) -> Value {
+    drive_with(root, Arc::new(Scripted))
+}
+
+fn drive_with(root: &Path, step: Arc<dyn Step>) -> Value {
     std::env::set_var("E008_FLOOR_GB", "0.01");
     std::env::set_var("E008_EVICT_GB", "0.01");
     std::env::set_var("E008_MEM_SECOND_GB", "0");
@@ -299,7 +303,7 @@ fn drive(root: &Path) -> Value {
     std::env::set_var("E008_DISK_PATH", root);
     std::env::set_var("E008_HEAVY_LOCK", root.join("heavy.lock"));
     let mut st = DriverStats::default();
-    driver::run(root, 1, &StepMode::InProcess(Arc::new(Scripted)), None, &mut st).unwrap()
+    driver::run(root, 1, &StepMode::InProcess(step), None, &mut st).unwrap()
 }
 
 fn same_as_the_files(root: &Path) {
@@ -478,4 +482,58 @@ fn e016_f_the_driver_gives_the_frontier_entry_the_next_worker() {
     let (e, sel) = drive_rooms(true);
     assert_eq!(e, 2);
     assert_eq!(sel["frontier"], json!(true));
+}
+
+/// E024 item 3's step: job n's scripted try, its first new entry holding the goal (owner:566 = 1).
+struct ToGoal;
+
+impl Step for ToGoal {
+    fn run(&self, job_dir: &Path, _log: &JobLog, _cancel: &AtomicBool) -> i32 {
+        let name = job_dir.file_name().unwrap().to_string_lossy().into_owned();
+        script(job_dir, name[1..].parse().unwrap(), true);
+        let p = job_dir.join("new").join("0.json.gz");
+        let mut doc = files::read_gz(&p).unwrap();
+        doc["checkpoints"][0][1]["owner:566"] = json!(1);
+        files::write_gz_default(&p, &doc).unwrap();
+        0
+    }
+}
+
+/// The shorten stage's double: the movie it was given.
+struct Shorten;
+
+impl driver::Shortener for Shorten {
+    fn shorten(&self, root: &Path, movie: &[Value]) -> files::Res<Value> {
+        Ok(json!({"root": root.display().to_string(), "events": movie.len(), "frames": movie.iter().map(|e| e["frame"].clone()).collect::<Vec<_>>()}))
+    }
+}
+
+/// E024 item 3 (`FMI_SHORTEN=1`): a goal stop runs the shorten stage the binary set, on the goal entry's movie from
+/// boot, its summary in summary.json; unset, the summary has none.
+#[test]
+fn e024_a_goal_stop_runs_the_shorten_stage_only_with_its_switch() {
+    let _g = env(false);
+    driver::set_shortener(Box::new(Shorten));
+    for on in [false, true] {
+        if on {
+            std::env::set_var("FMI_SHORTEN", "1");
+        } else {
+            std::env::remove_var("FMI_SHORTEN");
+        }
+        let t = tmp(if on { "shorten-on" } else { "shorten-off" });
+        let a = make(&t, Some(json!({"stop_jobs": 3})));
+        let root = a.root.clone();
+        drop(a);
+        let s = drive_with(&root, Arc::new(ToGoal));
+        assert_eq!(s["stop"], json!("goal"));
+        let e = s["detail"]["entry"].as_u64().unwrap() as usize;
+        let want = Archive::open(&root).unwrap().movie(e).unwrap();
+        if on {
+            assert_eq!(s["shorten"]["events"], json!(want.len()), "{s}");
+            assert_eq!(s["shorten"]["root"], json!(root.display().to_string()));
+        } else {
+            assert!(s.get("shorten").is_none(), "{s}");
+        }
+    }
+    std::env::remove_var("FMI_SHORTEN");
 }
