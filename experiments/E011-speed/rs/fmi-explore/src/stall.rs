@@ -238,13 +238,15 @@ fn child_outcomes(w: &Value) -> Vec<String> {
 }
 
 /// A refusal: a window B ended ("refused input: ..."), or one that ran to its frame bound with every try failing at
-/// the interface (the executor could not make the input take).
+/// the interface (the executor could not make the input take). E024 Part 1 (FMI_READY_END): a ready window that ended
+/// when its tries stopped, none left, is one that ran to its bound.
 pub fn refused_window(w: &Value) -> bool {
     let e = w["end_reason"].as_str().unwrap_or("");
     if e.starts_with("refused input") {
         return true;
     }
-    let bound = e.strip_suffix(" frames").map(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())).unwrap_or(false);
+    let bound = e.strip_suffix(" frames").map(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())).unwrap_or(false)
+        || e == "ready: forking stopped, no try left";
     let oc = child_outcomes(w);
     bound && !oc.is_empty() && oc.iter().all(|k| k == "interface")
 }
@@ -1167,6 +1169,8 @@ mod tests {
         assert!(!refused_window(&win("x", "3600 frames", json!({"spent": 294, "cancelled": 2}))));
         assert!(!refused_window(&win("x", "a needed record refuted in the parent", json!({"interface": 1}))));
         assert!(!refused_window(&win("x", "3600 frames", json!({}))));
+        assert!(refused_window(&win("x", "ready: forking stopped, no try left", json!({"interface": 294, "cancelled": 1}))));
+        assert!(!refused_window(&win("x", "ready: forking stopped, no try left", json!({"spent": 294}))));
         let stop = "the same empty window 2 times on s(1)#2: no cause";
         let run = json!({"windows": [win("w#1", "ready: the first end point in the order of tries", json!({"deviation": 1})),
                                      win("s(1)#2", "ready: the first end point in the order of tries", json!({"deviation": 1})),
