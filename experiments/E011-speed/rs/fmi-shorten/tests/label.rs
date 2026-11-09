@@ -435,6 +435,7 @@ fn anchors_by_the_hit() {
 #[test]
 fn timing_and_boxes() {
     assert_eq!(label::timing(None, true), Timing::Idle);
+    assert_eq!(label::timing(None, false), Timing::Next);
     assert_eq!(label::timing(Some(2), true), Timing::Next);
     assert_eq!(label::timing(Some(label::NEXT_GAP), true), Timing::Next);
     assert_eq!(label::timing(Some(label::NEXT_GAP + 1), true), Timing::Idle);

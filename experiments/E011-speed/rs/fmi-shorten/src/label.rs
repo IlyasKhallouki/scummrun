@@ -250,12 +250,12 @@ impl Timing {
     }
 }
 
-/// The class of an input `gap` frames after the last taken input (None: the first), at a control stop or not: "idle"
-/// needs one (amendment 1).
+/// The class of an input `gap` frames after the last taken input (None: no taken input before it), at a control stop
+/// or not: "idle" needs one (amendment 1), with or without a taken input before (the review of stage A).
 pub fn timing(gap: Option<u64>, control: bool) -> Timing {
     match gap {
         Some(g) if g <= NEXT_GAP => Timing::Next,
-        Some(_) if !control => Timing::Next,
+        _ if !control => Timing::Next,
         _ => Timing::Idle,
     }
 }
