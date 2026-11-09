@@ -5,8 +5,8 @@
 //! a dialog line's) counted as its outcome; the dialog search keeping the earlier of two lines at one frame; a
 //! reduction is kept only for an earlier verified end (verdict::earlier; reduce.rs: a step the game does not need
 //! dropped and kept once its end verifies, a drop that loses the end not kept, nor one whose version does not verify; a
-//! test's engine error fails that test alone, the rounds going on); a forward pass of two steps; a route verified from
-//! its files, and a movie without its step log failing.
+//! test's engine error fails that test alone, the rounds going on; an input's drop whose step's plan changed stale); a
+//! forward pass of two steps; a route verified from its files, and a movie without its step log failing.
 
 use fmi_core::*;
 use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
@@ -653,5 +653,42 @@ fn a_reduction_tests_engine_error_fails_that_test_alone() {
     assert_eq!((&t["drop"]["steps"], t["result"].as_str()), (&serde_json::json!([1]), Some("error")), "{t}");
     assert!(t["error"].as_str().is_some_and(|m| m.contains("did not answer")), "{t}");
     assert_eq!(recs[1]["errors"], 0);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn an_input_drop_whose_plan_changed_is_stale() {
+    let (all, origs) = drop_steps();
+    let (w, d) = (all[0].inputs[0].clone(), door_click());
+    let plan = |inputs: Vec<In>| pass::Plan { inputs, skips_off: false, how: How::Scan };
+    let plans = |inputs: Vec<In>| -> BTreeMap<usize, pass::Plan> { [(1, plan(inputs))].into_iter().collect() };
+    let input = |i| Cand { what: Drop::Input { k: 1, i }, kind: "input", waste: 0 };
+    let start = plans(vec![w.clone(), d.clone()]);
+    // the plan unchanged: the index names the same input
+    assert!(!reduce::stale(&input(1), &start, &start));
+    // the step placed anew by other inputs (the door alone; the two the other way round): index 1 names another input
+    for now in [plans(vec![d.clone()]), plans(vec![d.clone(), w.clone()])] {
+        assert!(reduce::stale(&input(1), &start, &now));
+        assert!(!reduce::stale(&Cand { what: Drop::Steps(vec![1]), kind: "step", waste: 0 }, &start, &now));
+    }
+    // a test of an input the best's plan does not hold: stale, no test of the route unchanged
+    let host = drop_host();
+    let dir = std::env::temp_dir().join(format!("fmi-shorten-g3s-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let rc = RCfg { scan: Cfg { workers: 2, chunk: 4 }, skips: false, leaves: 10, sentence: Default::default(), dialog: Default::default() };
+    let cfg = pass::PassCfg { seed: 1, scan: Cfg { workers: 2, chunk: 4 }, out: dir.join("e"), w: 50, refind: Some(rc) };
+    let p = pass::forward(&host, &[], &all, &origs, &cfg).unwrap();
+    let f = p.end.clone().expect("the end");
+    let best = Best { pass: p, end: End { tick: f.tick, frame: f.frame, reason: "restart@1:2:3:0004".into() }, path: dir.join("route-001.jsonl"), dropped: Default::default() };
+    let specs = |d: &std::collections::BTreeSet<usize>| -> Result<(Vec<StepSpec>, Vec<pass::Orig>), String> {
+        Ok(all.iter().cloned().zip(origs.iter().cloned()).filter(|(s, _)| !d.contains(&s.k)).unzip())
+    };
+    let version = |_p: &pass::Pass, _d: &std::collections::BTreeSet<usize>| -> Result<(Option<End>, std::path::PathBuf, serde_json::Value), String> {
+        Err("no version expected".into())
+    };
+    let cx = reduce::Ctx { host: &host, boot: &[], specs: &specs, cfg: &cfg, out: &dir, version: &version };
+    assert_eq!(best.plans()[&1].inputs.len(), 1);
+    let (nb, rec) = reduce::attempt(&input(1), &best, &cx).unwrap();
+    assert!(nb.is_none() && rec["result"] == "stale", "{rec}");
     let _ = std::fs::remove_dir_all(&dir);
 }

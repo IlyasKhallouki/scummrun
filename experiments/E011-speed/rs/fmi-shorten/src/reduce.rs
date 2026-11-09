@@ -17,9 +17,12 @@
 //!   boot (the caller's `version`, movie.rs).
 //! * **Rounds**: at most `rounds`, each over the candidates of the best at its start (a candidate whose steps a drop
 //!   kept in the round took is passed over); the rounds stop when one gains less than `MIN_GAIN` ticks, or at the
-//!   deadline. A test's error (an engine's: a boot, a fork, a timeout; or its version's) fails that test, recorded with
-//!   its message, and the next goes on: the best so far is verified and stays (the review of stage B: one test's error
-//!   ended every round, and `run` exited without its summary).
+//!   deadline. An input's drop names its index in its step's plan at the round's start: when a drop kept since placed
+//!   that step anew (its plan's inputs changed: a fallback's, labelled), the index would name another input, and the
+//!   drop is passed over as stale (`stale`; the review of stage B). A test's error (an engine's: a boot, a fork, a
+//!   timeout; or its version's) fails that test, recorded with its message, and the next goes on: the best so far is
+//!   verified and stays (the review of stage B: one test's error ended every round, and `run` exited without its
+//!   summary).
 
 use crate::pass::{self, Orig, Pass, PassCfg, Plan, StepRun};
 use crate::refind::{self, How};
@@ -255,13 +258,18 @@ pub fn attempt(c: &Cand, best: &Best, cx: &Ctx) -> Res<(Option<Best>, Value)> {
     let mut plans = best.plans();
     match &c.what {
         Drop::Steps(v) => dropped.extend(v.iter().copied()),
-        Drop::Input { k, i } => {
-            if let Some(p) = plans.get_mut(k) {
-                if *i < p.inputs.len() {
-                    p.inputs.remove(*i);
-                }
+        Drop::Input { k, i } => match plans.get_mut(k) {
+            Some(p) if *i < p.inputs.len() => {
+                p.inputs.remove(*i);
             }
-        }
+            // no such input in the best's plan: nothing to drop, and the route unchanged is no test
+            _ => {
+                let mut rec = c.json();
+                rec["result"] = json!("stale");
+                rec["seconds"] = json!(t0.elapsed().as_secs_f64());
+                return Ok((None, rec));
+            }
+        },
     }
     let j = c.steps().into_iter().min().unwrap_or(0);
     let mut rec = c.json();
@@ -315,6 +323,15 @@ pub fn attempt(c: &Cand, best: &Best, cx: &Ctx) -> Res<(Option<Best>, Value)> {
     }
 }
 
+/// Whether the input drop `c` is stale (module docstring): its step's plan's inputs in `now` (the best's plans) are not
+/// those in `start` (the plans its candidates were made from). A drop of steps never is.
+pub fn stale(c: &Cand, start: &BTreeMap<usize, Plan>, now: &BTreeMap<usize, Plan>) -> bool {
+    match c.what {
+        Drop::Input { k, .. } => start.get(&k).map(|p| &p.inputs) != now.get(&k).map(|p| &p.inputs),
+        Drop::Steps(_) => false,
+    }
+}
+
 /// The rounds (module docstring) from `best`: the best at the end, and each round's record.
 pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline: Instant, cx: &Ctx) -> (Best, Vec<Value>) {
     let mut out = Vec::new();
@@ -322,6 +339,9 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
         let t0 = Instant::now();
         let start = best.end.clone();
         let cands = candidates(&best, origs);
+        let start_plans = best.plans();
+        let mut plans = start_plans.clone();
+        let mut stales = 0;
         let mut taken: BTreeSet<usize> = BTreeSet::new();
         let mut tried = Vec::new();
         let mut kept = 0;
@@ -333,6 +353,10 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
                 break;
             }
             if c.steps().iter().any(|k| taken.contains(k) || best.dropped.contains(k)) {
+                continue;
+            }
+            if stale(c, &start_plans, &plans) {
+                stales += 1;
                 continue;
             }
             let t1 = Instant::now();
@@ -352,10 +376,11 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
                 taken.extend(c.steps());
                 kept += 1;
                 best = nb;
+                plans = best.plans();
             }
         }
         let gain = start.tick.saturating_sub(best.end.tick);
-        out.push(json!({"round": r + 1, "candidates": cands.len(), "tried": tried.len(), "kept": kept, "errors": errors, "gain_ticks": gain,
+        out.push(json!({"round": r + 1, "candidates": cands.len(), "tried": tried.len(), "kept": kept, "errors": errors, "stale": stales, "gain_ticks": gain,
                         "start": {"frame": start.frame, "tick": start.tick}, "end": {"frame": best.end.frame, "tick": best.end.tick},
                         "route": best.path.display().to_string(), "seconds": t0.elapsed().as_secs_f64(), "deadline": timed_out,
                         "tests": tried}));
