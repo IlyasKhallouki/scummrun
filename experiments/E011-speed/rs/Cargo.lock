@@ -104,6 +104,7 @@ dependencies = [
  "fmi-plan",
  "fmi-play",
  "fmi-reading",
+ "fmi-shorten",
  "scumm-ir",
  "serde_json",
 ]

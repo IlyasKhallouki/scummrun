@@ -18,6 +18,8 @@
 //!   fmi guide stats GUIDE.json [--key KEY.json]                                     (guide.py stats)
 //!   fmi read FILE      readings one after another through the readings port, one per line of reader-scope's
 //!                      arguments (E012 resident: read.rs)
+//!   fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
+//!                      E024: a movie's steps, anchors and draw keys (fmi-shorten; shorten.rs)
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
@@ -26,6 +28,7 @@
 //! With several JOB_DIRs (or "-": one per line on stdin) the tries run one after the other in this process, warm.
 
 mod read;
+mod shorten;
 mod wire;
 mod wire_real;
 mod trycheck;
@@ -62,7 +65,8 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
                 [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
        fmi guide map --goal K=V[,K=V] | part1 | end=1 --out GUIDE.json [--wide] [--seed 1] [--start-boot]
        fmi guide stats GUIDE.json [--key KEY.json]
-       fmi read FILE";
+       fmi read FILE
+       fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT";
 
 struct Args {
     pos: Vec<String>,
@@ -167,6 +171,7 @@ fn main() {
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         ("read", Some(_)) => read::cmd_read(&argv[1..]),
+        ("shorten", Some("label")) => shorten::cmd_label(&argv[2..]),
         _ => usage(),
     };
     std::process::exit(code)
