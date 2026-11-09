@@ -5,23 +5,26 @@
 //! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings).
 //!
 //! `fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
-//! [--no-twins] [--no-ego] [--rounds 0] OUT` (items 4, 5, 8, 9; --rounds above 0 is refused: the reductions, item 7,
-//! are stage B): the movie's steps (as `label`, with the twins' draw keys unless
-//! --no-twins), then the forward pass, each step found again in order from boot (fmi-shorten pass.rs; --no-ego: a
-//! step's goal without where ego stands), with --skips under text and cutscene skips from boot (skips.rs); a pass that
-//! reaches the goal (the movie's end reason, with its site, where the stage's replay of the route ends too) is written
-//! as OUT/unverified-NNN.jsonl with its step log (each step's completion, tick and digest from that replay), verified
-//! from boot (movie.rs), and renamed OUT/route-NNN.jsonl only if that passes; a pass that stops is written as
-//! OUT/stopped-NNN.jsonl with its log. OUT/run-NNN.json (and stdout) gets the summary. Exit 0 only with a verified
-//! route; 2 when the run went through without one (stopped, or verify failed); 1 on an error.
+//! [--no-twins] [--no-ego] [--no-fallbacks] [--rounds 0] OUT` (items 4-6, 8, 9): the movie's steps (as
+//! `label`, with the twins' draw keys unless --no-twins), then the forward pass, each step found again in order from
+//! boot (fmi-shorten pass.rs; --no-ego: a step's goal without where ego stands), a step the scan does not complete by
+//! the fallbacks (refind.rs, unless --no-fallbacks), with --skips under text and cutscene skips from boot (skips.rs);
+//! a pass that reaches the goal (the movie's end reason, with its site, where the stage's replay of the route ends
+//! too) is written as OUT/unverified-NNN.jsonl with its step log (each step's completion, tick and digest from that
+//! replay), verified from boot (movie.rs), and renamed OUT/route-NNN.jsonl only if that passes; a pass that stops is
+//! written as OUT/stopped-NNN.jsonl with its log; --rounds above 0 is refused (the reductions, item 7, are not built
+//! yet). OUT/run-NNN.json (and stdout) gets the summary. Exit 0 only with a verified route; 2 when the run went through
+//! without one (stopped, or verify failed); 1 on an error.
 
 use fmi_explore::events::event_of;
 use fmi_core::{EngineHost, Event};
 use fmi_engine::{Host, HostCfg};
 use fmi_shorten::chain::{self, Held, Opts};
+use fmi_shorten::refind::{self, RCfg};
 use fmi_shorten::scan::{Cfg, Cost};
 use fmi_shorten::verdict::{End, Goal};
 use fmi_shorten::{draws, label, movie, pass, skips};
+use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{json, Value};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -135,10 +138,91 @@ fn write_json(p: &Path, v: &Value) -> Result<(), String> {
     std::fs::write(p, serde_json::to_string_pretty(v).map_err(|e| e.to_string())?).map_err(|e| format!("{}: {e}", p.display()))
 }
 
+/// What a version of a pass needs of the run: the engines, its settings, its folders, the movie's steps.
+struct Stage<'a> {
+    host: &'a Host,
+    hcfg: &'a HostCfg,
+    out: &'a Path,
+    eng: &'a Path,
+    seed: u32,
+    goal_end: &'a str,
+    meta: Value,
+    origs: &'a BTreeMap<usize, pass::Orig>,
+}
+
+impl Stage<'_> {
+    /// A step of the pass as its step log has it.
+    fn row(&self, s: &pass::StepRun, digests: &BTreeMap<u64, u64>) -> Value {
+        let o = self.origs.get(&s.k);
+        let f = s.found.as_ref();
+        let ins = s.plan.as_ref().map(|p| p.inputs.iter().map(|i| json!({"anchor": i.anchor.json(), "timing": i.timing.name(), "gap": i.gap})).collect::<Vec<_>>());
+        json!({"k": s.k, "rooms": o.map(|o| o.rooms.clone()), "how": s.how.map(|h| h.name()), "inputs": ins,
+               "skips_off": s.plan.as_ref().map(|p| p.skips_off), "skipped": o.map(|o| o.skipped.clone()),
+               "orig": o.map(|o| json!({"from": o.from, "frame": o.frame, "tick": o.tick, "len": o.len()})),
+               "from": s.from, "t": f.map(|f| f.t), "events": f.map(|f| f.events.iter().map(fmi_explore::events::event_json).collect::<Vec<_>>()),
+               "completion": f.map(|f| json!({"frame": f.frame, "tick": f.tick})),
+               "digest": f.and_then(|f| digests.get(&f.frame)).map(|d| format!("{d:016x}")),
+               "scan": s.scan.json(), "relaxed": s.relaxed.as_ref().map(|r| r.json()), "fallbacks": s.fallbacks})
+    }
+
+    /// A version of the pass `p` (item 9): the stage's digests at each completion and its end from its own replay of
+    /// the route (in frame order: a step may complete before the one before it); a pass that reaches the goal (the
+    /// movie's end reason, with its site, where the stage's replay ends too) written as OUT/unverified-NNN.jsonl with
+    /// its step log, verified from boot and renamed OUT/route-NNN.jsonl only if that passes; else OUT/stopped-NNN.jsonl.
+    /// The verified end (None: no verified route), the files' path, the record.
+    fn version(&self, p: &pass::Pass, dropped: &BTreeSet<usize>) -> Result<(Option<End>, PathBuf, Value), String> {
+        let end_frame = p.end.as_ref().map(|f| f.frame);
+        let mut comps: Vec<u64> = p.steps.iter().filter_map(|s| s.found.as_ref().map(|f| f.frame)).filter(|&f| Some(f) != end_frame).collect();
+        comps.sort_unstable();
+        comps.dedup();
+        let last = comps.iter().copied().chain(end_frame).max().unwrap_or(0);
+        // an error here leaves the pass's files written (no end: the stopped route)
+        let (stage, stage_err) = match movie::replay(self.host, &p.route, self.seed, &comps, last + 1000, &self.eng.join("stage")) {
+            Ok(b) => (b, None),
+            Err(x) => (movie::Boot::default(), Some(x)),
+        };
+        let rows: Vec<Value> = p.steps.iter().map(|s| self.row(s, &stage.digests)).collect();
+        let mut meta = self.meta.clone();
+        meta["dropped"] = json!(dropped);
+        let end_json = |e: &End| json!({"frame": e.frame, "tick": e.tick, "reason": e.reason});
+        let rec = json!({"stage": {"end": stage.end.as_ref().map(end_json), "digests": stage.digests.len(), "error": stage_err}});
+        match (&p.end, &stage.end) {
+            // the stage's own replay ends where the pass did, at the goal's site (the review of stage A)
+            (Some(f), Some(e)) if e.frame == f.frame && e.tick == f.tick && e.reason == self.goal_end => {
+                let draft = movie::write(self.out, "unverified", &p.route, &meta, &rows, &end_json(e))?;
+                let alone = |r: &[Event], s: u32, mt: u64, d: &Path| standalone(self.hcfg, r, s, mt, d);
+                let mut v = movie::verify(self.host, &alone, &draft, &self.eng.join("verify")).unwrap_or_else(|x| json!({"ok": false, "error": x}));
+                let ok = v["ok"] == true;
+                let path = if ok { movie::promote(&draft, "route")? } else { draft };
+                eprintln!("{}: {} (end frame {} tick {})", if ok { "route" } else { "unverified" }, path.display(), e.frame, e.tick);
+                v["stage"] = rec["stage"].clone();
+                Ok((ok.then(|| e.clone()), path, v))
+            }
+            _ => {
+                let end = stage.end.as_ref().map(end_json).unwrap_or(Value::Null);
+                let p2 = movie::write(self.out, "stopped", &p.route, &meta, &rows, &end)?;
+                Ok((None, p2, rec))
+            }
+        }
+    }
+}
+
+/// The pass's candidates' costs (G6), every scan's merged.
+fn cost_of(p: &pass::Pass) -> Cost {
+    let mut cost = Cost::default();
+    for s in &p.steps {
+        cost.merge(&s.scan.cost);
+        if let Some(r) = &s.relaxed {
+            cost.merge(&r.cost);
+        }
+    }
+    cost
+}
+
 fn run_in(a: &super::Args) -> Result<bool, String> {
     let t0 = std::time::Instant::now();
     if a.get("rounds").is_some_and(|r| r != "0") {
-        return Err("--rounds: the reductions (plan.md item 7) are stage B, not built: no round can run".into());
+        return Err("--rounds: the reductions (plan.md item 7) are not built: no round can run".into());
     }
     let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
     let movie_path = a.get("movie").ok_or("--movie")?;
@@ -161,7 +245,8 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
     let ch = chain::replay(&host0, &movie, &mut held, &o)?;
     let l = label::labels(&ch);
     let root = |k: fmi_core::Key| held.root.get(&k.text()).copied().unwrap_or(0);
-    let (specs, origs) = pass::specs(&ch, &l, !a.flag("no-ego"), &root)?;
+    let ego = !a.flag("no-ego");
+    let (specs, origs) = pass::specs(&ch, &l, ego, &root)?;
     // the goal: the game's end with the movie's reason (its site with it)
     let Some(Goal::End(goal_end)) = specs.last().map(|s| s.goal.clone()) else {
         return Err("the movie does not end the game: no goal".into());
@@ -179,76 +264,33 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
         (host0.clone(), Vec::new(), Value::Null, Vec::new())
     };
     let hcfg = with_env(&base, &env);
+    // item 6's settings: the input handlers of the movie's sentences and of its dialog lines (label.rs)
+    let dialog: BTreeSet<i32> = l.anchors.iter().zip(&l.ids).filter(|(an, _)| matches!(an, label::Anchor::Dialog { .. })).filter_map(|(_, id)| id.as_ref().map(|x| x.handler)).collect();
+    let rc = RCfg { scan: scan_cfg, skips: a.flag("skips"), leaves: refind::LEAVES, sentence: label::sentence_handlers(&ch), dialog };
     // the forward pass
-    let pcfg = pass::PassCfg { seed, scan: scan_cfg, out: eng.join("pass"), w: fmi_explore::afford::W };
+    let pcfg = pass::PassCfg { seed, scan: scan_cfg, out: eng.join("pass"), w: fmi_explore::afford::W, refind: (!a.flag("no-fallbacks")).then_some(rc) };
     let p = pass::forward(&host, &boot, &specs, &origs, &pcfg)?;
     eprintln!("pass: {:.1} s", p.wall_s);
-    let mut cost = Cost::default();
-    for s in &p.steps {
-        cost.merge(&s.scan.cost);
-        if let Some(r) = &s.relaxed {
-            cost.merge(&r.cost);
-        }
-    }
-    let found = |s: &pass::StepRun| s.scan.found.clone().or_else(|| s.relaxed.as_ref().and_then(|r| r.found.clone()));
-    // the stage's digests at each completion, and its end, from its own replay of the route
-    // (in frame order: a step may complete before the one before it)
-    let end_frame = p.end.as_ref().map(|f| f.frame);
-    let mut comps: Vec<u64> = p.steps.iter().filter_map(|s| found(s).map(|f| f.frame)).filter(|&f| Some(f) != end_frame).collect();
-    comps.sort_unstable();
-    comps.dedup();
-    let last = comps.iter().copied().chain(end_frame).max().unwrap_or(0);
-    // an error here leaves the pass's files written (no end: the stopped route)
-    let (stage, stage_err) = match movie::replay(&host, &p.route, seed, &comps, last + 1000, &eng.join("stage")) {
-        Ok(b) => (b, None),
-        Err(x) => (movie::Boot::default(), Some(x)),
-    };
-    let rows: Vec<Value> = p
-        .steps
-        .iter()
-        .zip(&origs)
-        .zip(&specs)
-        .map(|((s, o), sp)| {
-            let f = found(s);
-            let f = f.as_ref();
-            json!({"k": s.k, "rooms": o.rooms,
-                   "inputs": sp.inputs.iter().map(|i| json!({"anchor": i.anchor.json(), "timing": i.timing.name(), "gap": i.gap})).collect::<Vec<_>>(),
-                   "skipped": o.skipped,
-                   "orig": {"from": o.from, "frame": o.frame, "tick": o.tick, "len": o.len()},
-                   "t": f.map(|f| f.t), "events": f.map(|f| f.events.iter().map(fmi_explore::events::event_json).collect::<Vec<_>>()),
-                   "completion": f.map(|f| json!({"frame": f.frame, "tick": f.tick})),
-                   "digest": f.and_then(|f| stage.digests.get(&f.frame)).map(|d| format!("{d:016x}")),
-                   "scan": s.scan.json(), "relaxed": s.relaxed.as_ref().map(|r| r.json())})
-        })
-        .collect();
-    let meta = json!({"movie": movie_path, "archive": archive, "goal": goal, "goal_end": goal_end, "seed": seed, "skips": a.flag("skips"), "ego": !a.flag("no-ego"),
+    let by_k: BTreeMap<usize, pass::Orig> = specs.iter().zip(&origs).map(|(s, o)| (s.k, o.clone())).collect();
+    let meta = json!({"movie": movie_path, "archive": archive, "goal": goal, "goal_end": goal_end, "seed": seed, "skips": a.flag("skips"), "ego": ego,
                       "env": env, "boot": boot.iter().map(fmi_explore::events::event_json).collect::<Vec<_>>(),
                       "workers": scan_cfg.workers, "chunk": scan_cfg.chunk, "w": pcfg.w});
-    let end_json = |e: &End| json!({"frame": e.frame, "tick": e.tick, "reason": e.reason});
+    let st = Stage { host: &host, hcfg: &hcfg, out: &out, eng: &eng, seed, goal_end: &goal_end, meta, origs: &by_k };
+    let (v, path, vrep) = st.version(&p, &BTreeSet::new())?;
+    let hows: BTreeMap<&str, usize> = p.steps.iter().filter_map(|s| s.how).fold(BTreeMap::new(), |mut m, h| {
+        *m.entry(h.name()).or_default() += 1;
+        m
+    });
     let mut sum = json!({"movie": movie_path, "seed": seed, "skips": skips_report, "label": {"inputs": ch.met.len(), "steps": specs.len(),
                          "seconds": label_s, "end": ch.end.as_ref().map(|s| json!({"frame": s.frame, "tick": s.tick, "reason": s.reason}))},
-                         "pass": {"wall_s": p.wall_s, "steps": p.steps.len(), "stopped": p.stopped, "events": p.route.len(),
-                                  "end": p.end.as_ref().map(|f| json!({"frame": f.frame, "tick": f.tick}))},
-                         "stage": {"end": stage.end.as_ref().map(end_json), "digests": stage.digests.len(), "error": stage_err},
-                         "cost": cost.json()});
-    let mut verified = false;
-    match (&p.end, &stage.end) {
-        // the stage's own replay ends where the pass did, at the goal's site (the review of stage A)
-        (Some(f), Some(e)) if e.frame == f.frame && e.tick == f.tick && e.reason == goal_end => {
-            let draft = movie::write(&out, "unverified", &p.route, &meta, &rows, &end_json(e))?;
-            let alone = |r: &[Event], s: u32, mt: u64, d: &Path| standalone(&hcfg, r, s, mt, d);
-            let v = movie::verify(&host, &alone, &draft, &eng.join("verify")).unwrap_or_else(|x| json!({"ok": false, "error": x}));
-            verified = v["ok"] == true;
-            let path = if verified { movie::promote(&draft, "route")? } else { draft };
-            eprintln!("{}: {}", if verified { "route" } else { "unverified" }, path.display());
-            sum[if verified { "route" } else { "unverified_route" }] = json!(path.display().to_string());
-            sum["verify"] = v;
-        }
-        _ => {
-            let end = stage.end.as_ref().map(end_json).unwrap_or(Value::Null);
-            let p2 = movie::write(&out, "stopped", &p.route, &meta, &rows, &end)?;
-            sum["stopped_route"] = json!(p2.display().to_string());
-        }
+                         "pass": {"wall_s": p.wall_s, "steps": p.steps.len(), "how": hows, "stopped": p.stopped, "events": p.route.len(),
+                                  "end": p.end.as_ref().map(|f| json!({"frame": f.frame, "tick": f.tick})),
+                                  "version": path.display().to_string(), "verify": vrep},
+                         "cost": cost_of(&p).json()});
+    let verified = v.is_some();
+    if let Some(end) = v {
+        sum["route"] = json!(path.display().to_string());
+        sum["end"] = json!({"frame": end.frame, "tick": end.tick, "reason": end.reason});
     }
     sum["wall_s"] = json!(t0.elapsed().as_secs_f64());
     for n in 1..1000 {
@@ -264,7 +306,7 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
 
 pub fn cmd_run(argv: &[String]) -> i32 {
     let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds"];
-    match args(argv, &opts, &["skips", "no-twins", "no-ego"], 1).and_then(|a| run_in(&a)) {
+    match args(argv, &opts, &["skips", "no-twins", "no-ego", "no-fallbacks"], 1).and_then(|a| run_in(&a)) {
         Ok(true) => 0,
         Ok(false) => {
             eprintln!("fmi shorten run: no verified route");

@@ -10,12 +10,17 @@
 //! * **The pass** (`forward`): the engine E from boot with the boot's events (skips from boot: item 8); for each step
 //!   the scan from E's stop, its latest completion allowed the original step's length (from the movie's last input
 //!   before it to its completion) plus afford::W after E's stop; then E_k: a fork of E with the found inputs, run to
-//!   the last one's frame. A step the scan does not complete stops the pass, named with what its t's met (the
-//!   fallbacks, refind.rs, are stage B); so does an engine error of the base's (its scan's producer, E_k), named with
-//!   the error, and the steps found before it are kept (the review of stage A: a crash lost them all).
+//!   the last one's frame. A step the scan does not complete goes to the fallbacks (item 6, refind.rs) when the pass
+//!   has them; one none of them completes stops the pass, named with what its t's met and each fallback's report; so
+//!   does an engine error of the base's (its scan's producer, E_k), named with the error, and the steps found before
+//!   it are kept (the review of stage A: a crash lost them all).
+//! * **A later pass** (`steps_from`, item 7): from an engine at a step's base stop (`resume`: the route's events
+//!   before it from boot), each step placed by the inputs an earlier pass placed it with (`Plan`: a fallback's
+//!   inputs labelled, skips off for its span first when they were), the fallbacks again when those do not complete.
 
 use crate::chain::Chain;
 use crate::label::{Labels, Timing};
+use crate::refind::{self, How, RCfg};
 use crate::scan::{self, Cfg, Found, In, Scan, StepSpec};
 use crate::verdict::{self, Goal};
 use crate::{chain, e2s, Res};
@@ -49,12 +54,26 @@ impl Orig {
 /// value at step k's end a draw gave (its last change, up to k, at a step whose twins mark it: item 3) is judged by
 /// value first, and in the step's relaxed goal as changed from its value in `root` (verdict::conds).
 pub fn specs(ch: &Chain, l: &Labels, ego: bool, root: &dyn Fn(Key) -> Val) -> Res<(Vec<StepSpec>, Vec<Orig>)> {
+    specs_without(ch, l, ego, root, &BTreeSet::new())
+}
+
+/// `specs` without the steps `dropped` (item 7): a later step's keep(k) holds only the keys the steps kept up to it
+/// changed, at the movie's values at its end.
+pub fn specs_without(ch: &Chain, l: &Labels, ego: bool, root: &dyn Fn(Key) -> Val, dropped: &BTreeSet<usize>) -> Res<(Vec<StepSpec>, Vec<Orig>)> {
     let mut specs = Vec::new();
     let mut origs = Vec::new();
     let mut from = ch.first.frame;
     // per key: whether its last change was a draw's
     let mut drawn: BTreeMap<Key, bool> = BTreeMap::new();
-    for s in &ch.steps {
+    // the keys the steps kept so far changed
+    let mut cum: BTreeSet<Key> = BTreeSet::new();
+    for s0 in &ch.steps {
+        if dropped.contains(&s0.k) && s0.goal.is_none() {
+            from = s0.last;
+            continue;
+        }
+        cum.extend(s0.changed.iter().copied());
+        let s = &chain::Step { keep: s0.keep.iter().filter(|(k, _)| cum.contains(k)).copied().collect(), ..s0.clone() };
         let marks: BTreeSet<Key> = s.twin.iter().flat_map(|t| t.draw.iter().copied()).collect();
         for &k in s.changed.iter().chain(marks.iter()) {
             drawn.insert(k, marks.contains(&k));
@@ -112,17 +131,43 @@ pub struct PassCfg {
     pub out: PathBuf,
     /// the frames a step may take beyond its original length (afford::W)
     pub w: u64,
+    /// the fallbacks (item 6); None: a step the scan does not complete stops the pass
+    pub refind: Option<RCfg>,
+}
+
+/// How an earlier pass placed a step (item 7's later passes): its inputs as placed, whether skips were off for its
+/// span.
+#[derive(Clone, Debug)]
+pub struct Plan {
+    pub inputs: Vec<In>,
+    pub skips_off: bool,
+    pub how: How,
 }
 
 /// One step of the pass.
 #[derive(Clone, Debug)]
 pub struct StepRun {
     pub k: usize,
+    /// E_{k-1}'s stop, the step's first t
+    pub from: u64,
     pub scan: Scan,
     /// the scan with the relaxed goal, when the first found nothing
     pub relaxed: Option<Scan>,
     /// E_k's stop: the found inputs' last frame
     pub next: Option<u64>,
+    /// how it was found, and the completion (None: not found)
+    pub how: Option<How>,
+    pub found: Option<Found>,
+    /// the fallbacks' reports, in order
+    pub fallbacks: Vec<Value>,
+    /// its inputs as placed and whether skips were off for its span (a later pass's `Plan`)
+    pub plan: Option<Plan>,
+}
+
+impl StepRun {
+    fn new(k: usize, from: u64) -> StepRun {
+        StepRun { k, from, scan: Scan::default(), relaxed: None, next: None, how: None, found: None, fallbacks: Vec::new(), plan: None }
+    }
 }
 
 /// The pass: the route (the boot's events and every found input), each step's scan, the end, or the step it stopped
@@ -141,13 +186,30 @@ pub struct Pass {
 pub fn forward(host: &dyn EngineHost, boot: &[Event], specs: &[StepSpec], origs: &[Orig], cfg: &PassCfg) -> Res<Pass> {
     let t0 = Instant::now();
     let mut pass = Pass { boot: boot.to_vec(), route: boot.to_vec(), ..Default::default() };
-    let (mut e, mut sched) = chain::boot(host, boot, cfg.seed, &cfg.out)?;
+    let e = resume(host, boot, 0, cfg.seed, &cfg.out)?;
+    steps_from(e, specs, origs, &BTreeMap::new(), cfg, &mut pass)?;
+    pass.wall_s = t0.elapsed().as_secs_f64();
+    Ok(pass)
+}
+
+/// The engine from boot with `events` (the boot's and a route's), stopped at frame `at` (at least where the boot and
+/// the events' last frame leave it): E_{k-1} again for a later pass (item 7).
+pub fn resume(host: &dyn EngineHost, events: &[Event], at: u64, seed: u32, out: &std::path::Path) -> Res<Box<dyn Engine>> {
+    let (mut e, mut sched) = chain::boot(host, events, seed, out)?;
     // the boot's events past BOOT_FRAME are given before any scan: the bridge takes no event before one it holds
     sched.upto(&mut e, u64::MAX)?;
-    if let Some(f) = boot.iter().map(|x| x.frame).max().filter(|&f| f > e.status().frame) {
+    if let Some(f) = events.iter().map(|x| x.frame).max().into_iter().chain([at]).max().filter(|&f| f > e.status().frame) {
         e.run(&RunSpec { frame: Some(f), ..Default::default() }).map_err(e2s)?;
     }
-    for (spec, orig) in specs.iter().zip(origs) {
+    Ok(e)
+}
+
+/// The steps `specs` found in order from `e` (module docstring), into `pass` (its route, its steps, its end or where
+/// it stopped); a step in `plans` is placed by its plan first. `e` is quit.
+pub fn steps_from(mut e: Box<dyn Engine>, specs: &[StepSpec], origs: &[Orig], plans: &BTreeMap<usize, Plan>, cfg: &PassCfg, pass: &mut Pass) -> Res<()> {
+    for (spec0, orig) in specs.iter().zip(origs) {
+        let plan = plans.get(&spec0.k);
+        let spec = &StepSpec { inputs: plan.map_or_else(|| spec0.inputs.clone(), |p| p.inputs.clone()), ..spec0.clone() };
         let limit = e.status().frame + orig.len() + cfg.w;
         let show = |what: &str, sc: &Scan| {
             eprintln!(
@@ -163,47 +225,106 @@ pub fn forward(host: &dyn EngineHost, boot: &[Event], specs: &[StepSpec], origs:
             eprintln!("step {}: {x}", spec.k);
             pass.stopped = Some(json!({"k": spec.k, "why": format!("engine error: {x}")}));
         };
-        let sc = match scan::scan(&mut e, spec, limit, &cfg.scan) {
-            Ok(x) => x,
-            Err(x) => {
-                error(&mut pass, x);
-                e.quit();
-                break;
-            }
-        };
-        show("", &sc);
-        // the draw keys judged as changed from the root when no t gives the movie's values
-        let mut relaxed = None;
-        if let (None, Some(g)) = (&sc.found, &spec.relaxed) {
-            match scan::scan(&mut e, &StepSpec { goal: g.clone(), ..spec.clone() }, limit, &cfg.scan) {
-                Ok(r) => {
-                    show(", relaxed", &r);
-                    relaxed = Some(r);
-                }
-                Err(x) => {
-                    error(&mut pass, x);
-                    pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: None });
-                    e.quit();
-                    break;
+        let mut run = StepRun::new(spec.k, e.status().frame);
+        // the step before's completion: where a fallback starts (refind.rs)
+        let after = pass.steps.last().and_then(|s| s.found.as_ref()).map_or(0, |f| f.frame);
+        // a step an earlier pass found with skips off for its span: so first
+        if let (Some(p), Some(rc)) = (plan, &cfg.refind) {
+            if p.skips_off {
+                match refind::skips_off(&mut e, spec, after, limit, rc) {
+                    Ok((f, rep)) => {
+                        eprintln!("step {} from {}, skips off: {}", spec.k, e.status().frame, f.as_ref().map(|f| format!("t {} completion {} tick {}", f.t, f.frame, f.tick)).unwrap_or("none".into()));
+                        run.fallbacks.push(rep);
+                        if f.is_some() {
+                            run.how = Some(How::SkipsOff);
+                            run.plan = Some(p.clone());
+                        }
+                        run.found = f;
+                    }
+                    Err(x) => {
+                        error(pass, x);
+                        pass.steps.push(run);
+                        e.quit();
+                        return Ok(());
+                    }
                 }
             }
         }
-        let Some(f) = sc.found.clone().or_else(|| relaxed.as_ref().and_then(|r| r.found.clone())) else {
-            pass.stopped = Some(json!({"k": spec.k, "why": "no t completes within the original step's length plus W",
+        if run.found.is_none() {
+            run.scan = match scan::scan(&mut e, spec, limit, &cfg.scan) {
+                Ok(x) => x,
+                Err(x) => {
+                    error(pass, x);
+                    pass.steps.push(run);
+                    e.quit();
+                    return Ok(());
+                }
+            };
+            show("", &run.scan);
+            run.found = run.scan.found.clone();
+            run.how = run.found.as_ref().map(|_| How::Scan);
+        }
+        // the draw keys judged as changed from the root when no t gives the movie's values
+        if let (None, Some(g)) = (&run.found, &spec.relaxed) {
+            match scan::scan(&mut e, &StepSpec { goal: g.clone(), ..spec.clone() }, limit, &cfg.scan) {
+                Ok(r) => {
+                    show(", relaxed", &r);
+                    run.found = r.found.clone();
+                    run.how = run.found.as_ref().map(|_| How::Relaxed);
+                    run.relaxed = Some(r);
+                }
+                Err(x) => {
+                    error(pass, x);
+                    pass.steps.push(run);
+                    e.quit();
+                    return Ok(());
+                }
+            }
+        }
+        if run.found.is_some() && run.plan.is_none() {
+            run.plan = Some(Plan { inputs: spec.inputs.clone(), skips_off: false, how: run.how.unwrap_or(How::Scan) });
+        }
+        // item 6: the fallbacks
+        if let (None, Some(rc)) = (&run.found, &cfg.refind) {
+            match refind::refind(&mut e, spec, orig.len(), after, limit, rc) {
+                Ok((r, reps)) => {
+                    for v in &reps {
+                        eprintln!("step {} fallback {}: {}", spec.k, v["how"].as_str().unwrap_or(""),
+                                  v["found"].as_object().map(|f| format!("t {} completion {} tick {}", f["t"], f["frame"], f["tick"])).unwrap_or("none".into()));
+                    }
+                    run.fallbacks.extend(reps);
+                    if let Some(r) = r {
+                        run.how = Some(r.how);
+                        run.plan = Some(Plan { inputs: r.inputs, skips_off: r.skips_off, how: r.how });
+                        run.found = Some(r.found);
+                    }
+                }
+                Err(x) => {
+                    error(pass, x);
+                    pass.steps.push(run);
+                    e.quit();
+                    return Ok(());
+                }
+            }
+        }
+        let Some(f) = run.found.clone() else {
+            pass.stopped = Some(json!({"k": spec.k, "why": "no t completes within the original step's length plus W, nor a fallback",
                                        "anchors": spec.inputs.iter().map(|i| i.anchor.json()).collect::<Vec<_>>(),
                                        "timing": spec.inputs.iter().map(|i| i.timing.name()).collect::<Vec<_>>(),
-                                       "scan": sc.json(), "relaxed": relaxed.as_ref().map(Scan::json)}));
-            pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: None });
+                                       "scan": run.scan.json(), "relaxed": run.relaxed.as_ref().map(Scan::json),
+                                       "fallbacks": run.fallbacks}));
+            pass.steps.push(run);
             e.quit();
-            break;
+            return Ok(());
         };
         pass.route.extend(f.events.iter().cloned());
+        pass.route.sort_by_key(|x| x.frame);
         let last = f.events.last().map(|x| x.frame).unwrap_or(f.t);
         if matches!(spec.goal, Goal::End(_)) {
             pass.end = Some(f);
-            pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: None });
+            pass.steps.push(run);
             e.quit();
-            break;
+            return Ok(());
         }
         // E_k: the found inputs from E's stop, run to the last one's frame
         let ek = |e: &mut Box<dyn Engine>| -> EResult<Box<dyn Engine>> {
@@ -218,20 +339,20 @@ pub fn forward(host: &dyn EngineHost, boot: &[Event], specs: &[StepSpec], origs:
             Ok(n) => {
                 e.quit();
                 e = n;
-                pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: Some(last) });
+                run.next = Some(last);
+                pass.steps.push(run);
             }
             Err(x) => {
                 // the step was found: its inputs stay in the route, the pass stops after it
-                error(&mut pass, format!("E_k: {x}"));
-                pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: None });
+                error(pass, format!("E_k: {x}"));
+                pass.steps.push(run);
                 e.quit();
-                break;
+                return Ok(());
             }
         }
     }
-    pass.route.sort_by_key(|x| x.frame);
-    pass.wall_s = t0.elapsed().as_secs_f64();
-    Ok(pass)
+    e.quit();
+    Ok(())
 }
 
 /// The boot's events of a pass: none, or with skips the Skips event at the segment's start frame (item 8).

@@ -361,7 +361,7 @@ fn a_forward_pass_and_its_route_verified() {
     ];
     let dir = std::env::temp_dir().join(format!("fmi-shorten-g3-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    let cfg = pass::PassCfg { seed: 1, scan: Cfg { workers: 2, chunk: 4 }, out: dir.join("e"), w: 50 };
+    let cfg = pass::PassCfg { seed: 1, scan: Cfg { workers: 2, chunk: 4 }, out: dir.join("e"), w: 50, refind: None };
     let p = pass::forward(&host, &[], &specs, &origs, &cfg).unwrap();
     assert!(p.stopped.is_none());
     let end = p.end.clone().expect("the end");
