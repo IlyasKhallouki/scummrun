@@ -1,7 +1,9 @@
 //! G3 (plan.md, "Gates"), fmi-shorten's scan, pass and verify on a fake engine: the earliest completion when t=5
-//! fails, t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order; ties go
-//! to the earliest t; a reduction is kept only for an earlier verified end (verdict::earlier, stage B's rule); a
-//! forward pass of two steps; a route verified from its files, and a movie without its step log failing.
+//! fails, t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order, nor (the
+//! bound by (tick, frame, t)) one at a later frame with a lower tick; ties go to the earliest t; a candidate's engine
+//! error and the goal reached while a candidate waits for an inner input; a reduction is kept only for an earlier
+//! verified end (verdict::earlier, stage B's rule); a forward pass of two steps; a route verified from its files, and a
+//! movie without its step log failing.
 
 use fmi_core::*;
 use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
@@ -30,6 +32,9 @@ struct Fake {
     log: Vec<InputRecord>,
     /// frames whose click fails the engine (its process gone)
     crash: Arc<Vec<u64>>,
+    /// frames whose taken click makes every frame after it one tick long (a skip), and the ticks a frame takes
+    fast: Arc<Vec<u64>>,
+    pace: u64,
 }
 
 fn fake(rule: &[(u64, u64)]) -> Fake {
@@ -41,6 +46,8 @@ fn fake(rule: &[(u64, u64)]) -> Fake {
         rule: Arc::new(rule.iter().copied().collect()),
         log: Vec::new(),
         crash: Arc::new(Vec::new()),
+        fast: Arc::new(Vec::new()),
+        pace: 6,
     }
 }
 
@@ -52,7 +59,7 @@ impl Fake {
 
     fn step(&mut self) -> Result<(), Box<Status>> {
         self.st.frame += 1;
-        self.st.tick += 6;
+        self.st.tick += self.pace;
         let f = self.st.frame;
         let now: Vec<Event> = self.pending.iter().filter(|e| e.frame == f).cloned().collect();
         self.pending.retain(|e| e.frame != f);
@@ -63,6 +70,9 @@ impl Fake {
                 if taken {
                     let var = if self.vars[V_DONE] == 1 { V_END } else { V_DONE };
                     self.due = Some((f + self.rule[&f], var));
+                    if self.fast.contains(&f) {
+                        self.pace = 1;
+                    }
                 }
                 self.log.push(InputRecord {
                     frame: f, input: vec![e.what.clone()], stat: 0, verdict: if taken { Verdict::Taken } else { Verdict::Ignored },
@@ -264,6 +274,16 @@ fn pruning_at_best_less_one_never_loses_an_earlier_end() {
     for (workers, chunk) in [(1, 1), (4, 2), (8, 16)] {
         let f = scan_with(&rule, Cfg { workers, chunk }).found.expect("found");
         assert_eq!((f.t, f.frame), (9, 25), "workers {workers} chunk {chunk}");
+    }
+    // frames of different lengths: t = 6 completes at frame 17, tick 102; t = 8's click makes the frames after it one
+    // tick long, and completes at frame 39 with tick 84: the earlier end by the objective, though at a later frame
+    for (workers, chunk) in [(1, 1), (2, 3), (8, 16)] {
+        let mut f = fake(&[(7, 10), (9, 30)]);
+        f.fast = Arc::new(vec![9]);
+        let mut e: Box<dyn Engine> = Box::new(f);
+        e.run(&RunSpec { frame: Some(2), ..Default::default() }).unwrap();
+        let f = scan::scan(&mut e, &spec(), 200, &Cfg { workers, chunk }).unwrap().found.expect("found");
+        assert_eq!((f.t, f.frame, f.tick), (8, 39, 84), "workers {workers} chunk {chunk}");
     }
     // nothing within the limit: none, every t tried
     let s = scan_with(&[(150, 100)], Cfg { workers: 4, chunk: 8 });

@@ -2,8 +2,9 @@
 //!
 //! * **Click** (`click`): the input log's record of the click's frame says Taken, with the identity the movie's input
 //!   had (label.rs `Identity`: the hit at the frame before, the handler's arguments, the sentences and walks).
-//! * **Step** (`Goal::Keep`): keep(k) as the bridge's conditions (`conds`), a run with RunSpec.until and max_frame =
-//!   the best completion so far less one (`step`); the completion is the stop where they hold. A draw key (the twins
+//! * **Step** (`Goal::Keep`): keep(k) as the bridge's conditions (`conds`), a run with RunSpec.until and max_frame
+//!   (`step`; the scan's bound gives it: the best's frame, then on while the candidate's tick is below the best's,
+//!   scan.rs); the completion is the stop where they hold. A draw key (the twins
 //!   of item 3) is judged as changed from its root value, not by value (`changed`). With them, where the movie's step
 //!   left ego (`ego_at`, pass.rs).
 //! * **Last step** (`Goal::End`): the game's end with the same end reason, its script site with it

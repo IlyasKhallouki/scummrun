@@ -2,15 +2,18 @@
 //!
 //! * **The forks**: from the base engine E_{k-1} (stopped at the previous step's last input, or at the boot), a child
 //!   at every frame t from its stop on: the stop itself by a fork, the later frames by a producer fork's fork_each in
-//!   chunks of `Cfg::chunk`, while t can still complete before the best so far. `Cfg::workers` threads take the
-//!   children. Whether a step can start at t is not monotone in t: every t is tried, no bisection, no sampling.
+//!   chunks of `Cfg::chunk`, while t can still complete before the best so far (`Bound`). `Cfg::workers` threads take
+//!   the children. Whether a step can start at t is not monotone in t: every t is tried, no bisection, no sampling.
 //! * **A candidate** (`attempt`): at its stop t the step's first anchor re-placed (label::place_hit: the offer,
 //!   afford::offer_cfg; a walk's room point less xstart, checked with `at`), the click at t + 1 and its verdict
 //!   (verdict::click). Then each inner input by its timing class (label.rs): "next" at the first frame up to its gap
 //!   after the last taken input where it is taken with its identity (each try a fork), "idle" at the first idle stop
-//!   after the last taken input. Then the step's verdict (verdict::step), max_frame the best completion so far less
-//!   one: the best's own frame for a t below the best's, so that ties go to the earliest t whatever order the workers
-//!   finish in.
+//!   after the last taken input. Then the step's verdict (verdict::step) while it can still come first (`Bound`).
+//! * **The bound** (`Bound`): by the objective, (tick, frame, t), so that ties go to the earliest t whatever order the
+//!   workers finish in. A candidate runs to the best's frame (item 4's max_frame, at the best's own frame since the
+//!   key breaks a tie), and past it only while its tick is below the best's: frames are not all as long (a skipped
+//!   cutscene's are shorter), and a completion at a later frame with a lower tick was lost to a prune by frame (the
+//!   review of stage A).
 //! * **The result**: the earliest completion by (tick, frame, t), its inputs at their frames; with counts of what
 //!   each t met and the candidates' costs (G6).
 //! * **A candidate's engine error** (its process gone, a bridge error) is that t's outcome, counted with its message
@@ -257,13 +260,37 @@ impl Scan {
     }
 }
 
-/// The latest completion frame a candidate at t may have: the best's frame for a t below the best's (ties go to the
-/// earliest t), the frame before it otherwise; `limit` while none is found.
-fn max_for(t: u64, best: &Option<Found>, limit: u64) -> u64 {
-    match best {
-        None => limit,
-        Some(b) if t < b.t => b.frame,
-        Some(b) => b.frame.saturating_sub(1),
+/// A candidate's bound (module docstring): its completion at most at `limit`, and before the best so far.
+struct Bound<'a> {
+    t: u64,
+    /// the tick at t's stop
+    tick: u64,
+    limit: u64,
+    best: &'a Mutex<Option<Found>>,
+}
+
+impl Bound<'_> {
+    fn best(&self) -> Option<(u64, u64, u64)> {
+        self.best.lock().unwrap().as_ref().map(Found::key)
+    }
+
+    /// Whether a completion at `frame`, its tick at least `tick`, can still come before the best.
+    fn open(&self, tick: u64, frame: u64) -> bool {
+        frame <= self.limit && self.best().is_none_or(|b| (tick, frame, self.t) < b)
+    }
+
+    /// The frame a run from a stop at (`frame`, `tick`) may go to: the limit while no best is found; the best's frame
+    /// before it; past it, the frames the ticks left before the best's take at this candidate's pace (at least one).
+    fn cap(&self, frame: u64, tick: u64) -> u64 {
+        let c = match self.best() {
+            None => self.limit,
+            Some((_, bf, _)) if frame < bf => bf,
+            Some((bt, _, _)) => {
+                let pace = (tick.saturating_sub(self.tick) / frame.saturating_sub(self.t).max(1)).max(1);
+                frame + (bt.saturating_sub(tick) / pace).max(1)
+            }
+        };
+        c.min(self.limit)
     }
 }
 
@@ -356,13 +383,15 @@ fn produce(
         if err.lock().unwrap().is_some() {
             break;
         }
-        let next = p.status().frame + 1;
-        // a click at t + 1 completes at t + 1 at the earliest
-        let cap = max_for(next, &best.lock().unwrap(), limit).saturating_sub(1);
-        if next > cap {
+        let (pf, ptk) = (p.status().frame, p.status().tick);
+        let next = pf + 1;
+        // a click at t + 1 completes at t + 1 at the earliest, its tick at least the producer's
+        let b = Bound { t: next, tick: ptk, limit, best };
+        let last_t = b.cap(pf, ptk).saturating_sub(1);
+        if !b.open(ptk, next + 1) || next > last_t {
             break;
         }
-        let n = (cap - next + 1).min(cfg.chunk.max(1) as u64) as u32;
+        let n = (last_t - next + 1).min(cfg.chunk.max(1) as u64) as u32;
         match p.fork_each(n) {
             Ok((_, kids)) => {
                 for k in kids {
@@ -406,12 +435,12 @@ pub fn attempt(
     limit: u64,
     asked: &AtomicUsize,
 ) -> EResult<(Outcome, u64)> {
-    let maxf = || max_for(t, &best.lock().unwrap(), limit);
-    if t + 1 > maxf() {
+    let b = Bound { t, tick: x.status().tick, limit, best };
+    if !b.open(b.tick, t + 1) {
         x.quit();
         return Ok((Outcome::Pruned, 0));
     }
-    let mut r = play(&mut x, t, spec, &maxf);
+    let mut r = play(&mut x, t, spec, &b);
     if let Ok(Outcome::Late(m)) = &mut r {
         if asked.fetch_add(1, Ordering::Relaxed) < MISS_ASKED {
             *m = verdict::misses(&mut x, &spec.goal).unwrap_or_default();
@@ -439,7 +468,7 @@ fn ended_in(spec: &StepSpec, st: &Status, t: u64, events: Vec<Event>) -> Outcome
 }
 
 /// The candidate's inputs and its verdict on `x`.
-fn play(x: &mut Box<dyn Engine>, t: u64, spec: &StepSpec, maxf: &dyn Fn() -> u64) -> EResult<Outcome> {
+fn play(x: &mut Box<dyn Engine>, t: u64, spec: &StepSpec, b: &Bound) -> EResult<Outcome> {
     let first = &spec.inputs[0];
     let Some((inp, hit)) = label::place_hit(x, &first.anchor, &first.orig)? else { return Ok(Outcome::NoPoint) };
     let mut events = vec![Event { frame: t + 1, what: inp.clone() }];
@@ -452,7 +481,7 @@ fn play(x: &mut Box<dyn Engine>, t: u64, spec: &StepSpec, maxf: &dyn Fn() -> u64
     }
     let mut last = t + 1;
     for (i, inn) in spec.inputs.iter().enumerate().skip(1) {
-        match inner(x, inn, last, maxf)? {
+        match inner(x, inn, last, b)? {
             Inner::Taken(ev) => {
                 last = ev.frame;
                 events.push(ev);
@@ -467,11 +496,18 @@ fn play(x: &mut Box<dyn Engine>, t: u64, spec: &StepSpec, maxf: &dyn Fn() -> u64
             Inner::EndedBefore(st) => return Ok(ended_in(spec, &st, t, events)),
         }
     }
-    Ok(match verdict::step(x, &spec.goal, maxf())? {
-        Run::Done(st) => Outcome::Done(Found { t, events, frame: st.frame, tick: st.tick }),
-        Run::Late(_) => Outcome::Late(Vec::new()),
-        Run::Ended(r) => Outcome::Ended(r),
-    })
+    // the verdict to the bound's cap, again from there while the bound is open
+    loop {
+        let (f, tk) = (x.status().frame, x.status().tick);
+        if !b.open(tk, f + 1) {
+            return Ok(Outcome::Late(Vec::new()));
+        }
+        match verdict::step(x, &spec.goal, b.cap(f, tk))? {
+            Run::Done(st) => return Ok(Outcome::Done(Found { t, events, frame: st.frame, tick: st.tick })),
+            Run::Late(_) => {}
+            Run::Ended(r) => return Ok(Outcome::Ended(r)),
+        }
+    }
 }
 
 enum Inner {
@@ -487,19 +523,22 @@ enum Inner {
 
 /// An inner input placed by its timing class after the last taken input at `last` (`x` stopped there); `x` goes on
 /// from the stop of its frame.
-fn inner(x: &mut Box<dyn Engine>, inn: &In, last: u64, maxf: &dyn Fn() -> u64) -> EResult<Inner> {
+fn inner(x: &mut Box<dyn Engine>, inn: &In, last: u64, b: &Bound) -> EResult<Inner> {
     match inn.timing {
         Timing::Next => {
             let mut why = Inner::NoPoint;
             for g in 1..=inn.gap.max(1) {
                 let s = last + g - 1;
-                if s + 1 > maxf() {
+                if s + 1 > b.limit {
                     return Ok(Inner::Late);
                 }
                 match run_to(x, s) {
                     Ok(()) => {}
                     Err(EngineError::Ended(st)) => return Ok(Inner::EndedBefore(st)),
                     Err(e) => return Err(e),
+                }
+                if !b.open(x.status().tick, s + 1) {
+                    return Ok(Inner::Late);
                 }
                 let mut y = x.fork()?;
                 let Some((inp, hit)) = label::place_hit(&mut y, &inn.anchor, &inn.orig)? else {
@@ -525,16 +564,21 @@ fn inner(x: &mut Box<dyn Engine>, inn: &In, last: u64, maxf: &dyn Fn() -> u64) -
             Ok(why)
         }
         Timing::Idle => {
-            let m = maxf();
-            if x.status().frame + 1 >= m {
-                return Ok(Inner::Late);
-            }
-            let st = match x.run(&RunSpec { idle: true, max_frame: Some(m - 1), ..Default::default() }) {
-                Ok(st) => st,
-                Err(EngineError::Ended(st)) => return Ok(Inner::EndedBefore(st)),
-                Err(e) => return Err(e),
+            // the idle stop s, with the click at s + 1 still within the bound
+            let st = loop {
+                let (f, tk) = (x.status().frame, x.status().tick);
+                if !b.open(tk, f + 2) {
+                    return Ok(Inner::Late);
+                }
+                let cap = b.cap(f, tk).saturating_sub(1).max(f + 1);
+                match x.run(&RunSpec { idle: true, max_frame: Some(cap), ..Default::default() }) {
+                    Ok(st) if st.reason == "idle" => break st,
+                    Ok(_) => {}
+                    Err(EngineError::Ended(st)) => return Ok(Inner::EndedBefore(st)),
+                    Err(e) => return Err(e),
+                }
             };
-            if st.reason != "idle" {
+            if !b.open(st.tick, st.frame + 1) {
                 return Ok(Inner::Late);
             }
             let s = st.frame;
