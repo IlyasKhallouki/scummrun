@@ -118,6 +118,15 @@ pub fn read_queue_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_QUEUE").is_ok_and(|v| v == "1"))
 }
 
+/// E022 amendment (28)'s switch `FMI_READ_STRING_SUMMARY=1`: a start of a global script that reads a string's
+/// characters in a loop (`scope::loops_over_strings`) is summarized as the inventory hook's: not run, its writes
+/// guessed. FoA's IQ points (script 145, 154 characters, each an unknown) made the path limit cut every run that gives
+/// points, and with them the light's record the engine takes the first time. Unset: as before.
+pub fn read_string_summary_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_STRING_SUMMARY").is_ok_and(|v| v == "1"))
+}
+
 /// E022 amendment (26)'s switch `FMI_READ_RENAME=1`: a fact read by a test that only picks object names
 /// (`machine::rename_test`) is read as one of its values, with no fork and nothing assumed: both arms leave the same
 /// state. The dark room's local 208 tests the dark class (25) of eight objects only to rename them, so the light's

@@ -1120,6 +1120,10 @@ impl Builder<'_> {
             // E022's FMI_READ_QUEUE runs held sentences: its store is its own (unset: as before)
             writeln!(t, "read_queue 1").unwrap();
         }
+        if crate::builder::read_string_summary_switch() {
+            // E022's FMI_READ_STRING_SUMMARY summarizes string loops: its store is its own (unset: as before)
+            writeln!(t, "read_string_summary 1").unwrap();
+        }
         t
     }
 

@@ -1664,7 +1664,10 @@ impl Hooks for ReaderHooks {
         Ok({
             if n != 0 && m.game.id(UnitKey::Global(n)).is_some() {
                 let hook = lazily(m, |m| m.read(p, Fact::Var(VAR_INVENTORY_SCRIPT), o))?;
-                if hook == Val::Int(n) || (read_inventory_summary_on() && scope::enumerates_inventory(m.game, n)) {
+                if hook == Val::Int(n)
+                    || (read_inventory_summary_on() && scope::enumerates_inventory(m.game, n))
+                    || (crate::builder::read_string_summary_switch() && scope::loops_over_strings(m.game, n))
+                {
                     let (head, cite) = call_at(p, ci);
                     if recursive != Some(true) {
                         m.h_stop_script(p, o, n, &cite, &head)?;

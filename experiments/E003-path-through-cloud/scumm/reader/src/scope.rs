@@ -374,6 +374,29 @@ pub fn enumerates_inventory(game: &Game, n: i32) -> bool {
     game.ins(u).iter().any(|x| matches!(x.st, Some(Stmt::Assign(a)) if has(game, a.rhs)))
 }
 
+/// E022 amendment (28): whether global script `n` reads a string's characters (an assignment reads GetStringChar) in a
+/// loop (a jump back): each character is an unknown, so running the script forks at every turn of the loop, past the
+/// path limit (FoA's IQ points, script 145, over 154 characters); `FMI_READ_STRING_SUMMARY=1` summarizes a start of
+/// it as the inventory hook's (machine.rs `eng_script`).
+pub fn loops_over_strings(game: &Game, n: i32) -> bool {
+    fn has(game: &Game, e: scumm_ir::ExprId) -> bool {
+        use scumm_ir::Expr;
+        match game.ast.expr(e) {
+            Expr::Getter { name, args } => name == known::GET_STRING_CHAR || game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::BinOp { a, b, .. } | Expr::Cmp { a, b, .. } => has(game, a) || has(game, b),
+            Expr::Neg(x) | Expr::Not(x) | Expr::Truth(x) => has(game, x),
+            Expr::Concat(args) | Expr::List(args) => game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::Embed(a) => has(game, a.rhs),
+            _ => false,
+        }
+    }
+    let Some(u) = game.id(UnitKey::Global(n)) else { return false };
+    let ins = game.ins(u);
+    let reads = ins.iter().any(|x| matches!(x.st, Some(Stmt::Assign(a)) if has(game, a.rhs)));
+    let back = ins.iter().enumerate().any(|(i, x)| x.target.is_some_and(|t| (t as usize) <= i));
+    reads && back
+}
+
 /// reader.py `made_verbs`: {verb: the VerbOps sub-op names any script gives it} for every verb some script creates
 /// with New (a constant number).
 pub fn made_verbs(game: &Game) -> BTreeMap<i32, BTreeSet<String>> {
