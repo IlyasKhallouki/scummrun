@@ -6,7 +6,8 @@
 //! reduction is kept only for an earlier verified end (verdict::earlier; reduce.rs: a step the game does not need
 //! dropped and kept once its end verifies, a drop that loses the end not kept, nor one whose version does not verify; a
 //! test's engine error fails that test alone, the rounds going on; an input's drop whose step's plan changed stale); a
-//! forward pass of two steps; a route verified from its files, and a movie without its step log failing.
+//! forward pass of two steps; a route verified from its files, a movie without its step log failing, and a step
+//! completed after the end recorded and reported unchecked.
 
 use fmi_core::*;
 use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
@@ -690,5 +691,42 @@ fn an_input_drop_whose_plan_changed_is_stale() {
     assert_eq!(best.plans()[&1].inputs.len(), 1);
     let (nb, rec) = reduce::attempt(&input(1), &best, &cx).unwrap();
     assert!(nb.is_none() && rec["result"] == "stale", "{rec}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_step_completed_after_the_end_is_recorded_and_reported_unchecked() {
+    // the forward pass's route (a_forward_pass_and_its_route_verified): the end at frame 16; a step whose completion,
+    // found on its own fork, is at 20 has no digest: its step log line says so and verify reports it, still ok
+    let rule: Vec<(u64, u64)> = [(7, 3), (30, 3)].into_iter().chain((12..40).map(|f| (f, 4))).collect();
+    let host = FakeHost(rule);
+    let specs = vec![spec(), StepSpec { k: 1, inputs: vec![door_click()], goal: Goal::End("restart@1:2:3:0004".into()), relaxed: None }];
+    let origs = vec![
+        pass::Orig { from: 2, frame: 40, tick: 240, rooms: vec![1], inputs: 1, skipped: vec![] },
+        pass::Orig { from: 30, frame: 60, tick: 360, rooms: vec![1], inputs: 1, skipped: vec![] },
+    ];
+    let dir = std::env::temp_dir().join(format!("fmi-shorten-g3a-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let cfg = pass::PassCfg { seed: 1, scan: Cfg { workers: 2, chunk: 4 }, out: dir.join("e"), w: 50, refind: None };
+    let p = pass::forward(&host, &[], &specs, &origs, &cfg).unwrap();
+    let stage = movie::replay(&host, &p.route, 1, &[10, 20], 100, &dir.join("stage")).unwrap();
+    assert_eq!((stage.end.as_ref().map(|e| e.frame), stage.digests.len()), (Some(16), 1));
+    let rows = vec![
+        serde_json::json!({"k": 0, "completion": {"frame": 10, "tick": 60}, "digest": format!("{:016x}", stage.digests[&10])}),
+        serde_json::json!({"k": 5, "completion": {"frame": 20, "tick": 120}, "digest": null}),
+        serde_json::json!({"k": 1, "completion": {"frame": 16, "tick": 96}, "digest": null}),
+    ];
+    let endv = serde_json::json!({"frame": 16, "tick": 96, "reason": "restart@1:2:3:0004"});
+    let meta = serde_json::json!({"seed": 1, "goal_end": "restart@1:2:3:0004"});
+    let r = movie::write(&dir, "unverified", &p.route, &meta, &rows, &endv).unwrap();
+    let log: Vec<serde_json::Value> = std::fs::read_to_string(movie::steps_path(&r)).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    let after: Vec<bool> = log[1..4].iter().map(|v| v["after_end"] == true).collect();
+    assert_eq!(after, vec![false, true, false]);
+    let alone = |route: &[Event], seed: u32, _max: u64, d: &Path| -> Result<Option<End>, String> {
+        Ok(movie::replay(&host, route, seed, &[], 100, d)?.end)
+    };
+    let v = movie::verify(&host, &alone, &r, &dir.join("v")).unwrap();
+    assert_eq!(v["ok"], true, "{v}");
+    assert_eq!(v["unchecked"], serde_json::json!([{"k": 5, "frame": 20, "why": "after the end"}]), "{v}");
     let _ = std::fs::remove_dir_all(&dir);
 }
