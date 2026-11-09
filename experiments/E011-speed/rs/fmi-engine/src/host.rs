@@ -422,6 +422,11 @@ impl Host {
         if std::env::var("FMI_TEMP_SAVES").is_ok_and(|v| v == "1") {
             cmd.env("SPEEDRUN_TEMP_SAVES", "1");
         }
+        // E024 (FMI_MEM_FILES=1, patch 0010): the files the scripts write (roomOps 13, 14) kept in the engine's memory,
+        // so the forks of one boot (a scan's candidates) never share the save folder's file
+        if std::env::var("FMI_MEM_FILES").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_MEM_FILES", "1");
+        }
         if !sorted.is_empty() {
             let movie = out.join("prefix.jsonl");
             let text: String = sorted.iter().map(|e| event_line(e) + "\n").collect();
