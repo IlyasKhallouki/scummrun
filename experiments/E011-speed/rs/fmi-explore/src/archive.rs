@@ -2126,6 +2126,15 @@ impl Archive {
                 ((self.continue_key(i, free), !f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
             })
             .collect();
+        // E022 amendment (28) (`FMI_SELECT_FURTHEST=N`): only the candidates whose entries hold the most of the guide's
+        // atoms set, or within N of it: the run's tries stay at its furthest point (after a restart, the cells tried
+        // least were the early rooms' under the new model, and the dark room got none). play10: N = 1 keeps 19 cells,
+        // 18 of them in the dark room
+        if let Some(tol) = std::env::var("FMI_SELECT_FURTHEST").ok().and_then(|v| v.parse::<i64>().ok()) {
+            if let Some(best) = cands.iter().map(|(_, i)| self.front_order(*i).0).min() {
+                cands.retain(|(_, i)| self.front_order(*i).0 <= best + tol);
+            }
+        }
         cands.sort_by(|a, b| a.0.cmp(&b.0));
         cands.into_iter().take(b).map(|(_, i)| i).collect()
     }
