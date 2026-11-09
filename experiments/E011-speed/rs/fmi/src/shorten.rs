@@ -164,9 +164,13 @@ fn run_in(a: &super::Args) -> Result<(), String> {
     }
     let found = |s: &pass::StepRun| s.scan.found.clone().or_else(|| s.relaxed.as_ref().and_then(|r| r.found.clone()));
     // the stage's digests at each completion, and its end, from its own replay of the route
-    let comps: Vec<u64> = p.steps.iter().filter_map(|s| found(s).map(|f| f.frame)).collect();
-    let last = comps.iter().copied().max().unwrap_or(0);
-    let stage = movie::replay(&host, &p.route, seed, &comps[..comps.len().saturating_sub(p.end.is_some() as usize)], last + 1000, &eng.join("stage"))?;
+    // (in frame order: a step may complete before the one before it)
+    let end_frame = p.end.as_ref().map(|f| f.frame);
+    let mut comps: Vec<u64> = p.steps.iter().filter_map(|s| found(s).map(|f| f.frame)).filter(|&f| Some(f) != end_frame).collect();
+    comps.sort_unstable();
+    comps.dedup();
+    let last = comps.iter().copied().chain(end_frame).max().unwrap_or(0);
+    let stage = movie::replay(&host, &p.route, seed, &comps, last + 1000, &eng.join("stage"))?;
     let rows: Vec<Value> = p
         .steps
         .iter()
