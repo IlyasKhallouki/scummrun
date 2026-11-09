@@ -81,3 +81,7 @@ path = "src/bin/ladder_fixture.rs"
 [[bin]]
 name = "e016"
 path = "src/bin/e016/main.rs"
+
+[[bin]]
+name = "e024"
+path = "src/bin/e024/main.rs"
