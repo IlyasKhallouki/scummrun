@@ -50,3 +50,6 @@ ALLON="$ALLON FMI_READ_MERGE=1 FMI_READ_B_ARGS=1 FMI_READ_INV_B=1 FMI_READ_RENAM
 ALLON="$ALLON FMI_REFINE_CHECKS=1 FMI_REALIZE_QUEUED=1 FMI_READ_B_SWAP=1 FMI_READ_QUEUE=1 FMI_READ_STRING_SUMMARY=1"
 ALLON="$ALLON FMI_READ_SWITCHES=value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost,wait_both"
 export ALLON
+# amendment (28): the run's tries at its furthest point (within 1 guide atom of the most held)
+ALLON="$ALLON FMI_SELECT_FURTHEST=1"
+export ALLON
