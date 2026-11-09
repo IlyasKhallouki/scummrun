@@ -3,9 +3,9 @@
 # where they are; reader-scope and the taskcore CLI are built in their own folders.
 [workspace]
 resolver = "2"
-members = ["fmi-core", "fmi-engine", "fmi-reading", "fmi-plan", "fmi-play", "fmi-explore", "fmi", "fmi-checks"]
+members = ["fmi-core", "fmi-engine", "fmi-reading", "fmi-plan", "fmi-play", "fmi-explore", "fmi-shorten", "fmi", "fmi-checks"]
 # fmi-checks turns on fmi-play's test doubles: built alone (-p fmi-checks), never with the fmi binary
-default-members = ["fmi-core", "fmi-engine", "fmi-reading", "fmi-plan", "fmi-play", "fmi-explore", "fmi"]
+default-members = ["fmi-core", "fmi-engine", "fmi-reading", "fmi-plan", "fmi-play", "fmi-explore", "fmi-shorten", "fmi"]
 
 [profile.release]
 opt-level = 3
