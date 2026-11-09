@@ -8,4 +8,5 @@ description = "E024: the system shortens its own route (experiments/E024-shorten
 [dependencies]
 fmi-core = { path = "../fmi-core" }
 fmi-explore = { path = "../fmi-explore" }
+fmi-reading = { path = "../fmi-reading" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }

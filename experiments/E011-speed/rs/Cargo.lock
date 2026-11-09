@@ -187,6 +187,7 @@ version = "0.1.0"
 dependencies = [
  "fmi-core",
  "fmi-explore",
+ "fmi-reading",
  "serde_json",
 ]
 
