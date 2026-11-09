@@ -98,7 +98,7 @@ for j in range(nframes + HOLD):
     y0 = H * S
     d.text((20, y0 + 12), "Indiana Jones and the Fate of Atlantis (demo)", font=small, fill=(170, 170, 180))
     d.text((20, y0 + 40), f"clicks {ci:>2} / {len(clicks)}    skip keys {si:>2} / {len(skips)}", font=mid, fill=(235, 235, 240))
-    d.text((20, y0 + 80), "route found and shortened by fmi, no hand input; seed 1", font=small, fill=(120, 120, 130))
+    d.text((20, y0 + 80), "route found and shortened by scummrun, no hand input; seed 1", font=small, fill=(120, 120, 130))
     done = j >= nframes - 1
     t = clock(nframes - 1 if done else j)
     tw = d.textlength(t, font=big)
