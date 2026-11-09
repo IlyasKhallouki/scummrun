@@ -107,8 +107,10 @@ impl HostCfg {
             extra_env.push(("SPEEDRUN_REPORT_RESTART".to_string(), "1".to_string()));
         }
         // E014: the decision point without verb ids (SPEEDRUN_IDLE=handler) and the end's site (SPEEDRUN_END_SITE=1),
-        // passed to every engine when set in this process's environment (an engine with the E014 patch)
-        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE"] {
+        // passed to every engine when set in this process's environment (an engine with the E014 patch).
+        // E024 (plan.md Part 2, item 8): the segment's start frame (SPEEDRUN_START_FRAME, patch 0001) and var 19's
+        // required value (SPEEDRUN_TIMER_NEXT), so skips run from boot; extra_env goes on after TIMER_NEXT=any (spawn)
+        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE", "SPEEDRUN_START_FRAME", "SPEEDRUN_TIMER_NEXT"] {
             if let Some(v) = std::env::var(k).ok().filter(|v| !v.is_empty()) {
                 extra_env.push((k.to_string(), v));
             }
