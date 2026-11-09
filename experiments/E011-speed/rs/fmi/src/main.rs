@@ -21,8 +21,9 @@
 //!   fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
 //!                      E024: a movie's steps, anchors and draw keys (fmi-shorten; shorten.rs)
 //!   fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
-//!                   [--no-twins] [--no-ego] [--rounds 0] OUT
-//!                      E024: the movie's steps found again from boot (the forward pass), its route verified
+//!                   [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT
+//!                      E024: the movie's steps found again from boot (the forward pass, its fallbacks), its route
+//!                      verified, then the reductions (R rounds)
 //!   fmi shorten verify ROUTE [--ends] OUT
 //!                      E024: a route checked from boot from its files (item 9)
 //!   fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT
@@ -75,7 +76,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi read FILE
        fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
        fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N] [--no-twins]
-                       [--no-ego] [--rounds 0] OUT
+                       [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT
        fmi shorten verify ROUTE [--ends] OUT
        fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT";
 

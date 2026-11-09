@@ -457,6 +457,17 @@ pub fn attempt(
     })
 }
 
+/// One candidate at `x`'s stop with no best but `limit` (item 7's cheap replay); `x` is left where it stopped.
+pub fn once(x: &mut Box<dyn Engine>, spec: &StepSpec, limit: u64) -> EResult<Outcome> {
+    let best = Mutex::new(None);
+    let t = x.status().frame;
+    let b = Bound { t, tick: x.status().tick, limit, best: &best };
+    if !b.open(b.tick, t + 1) {
+        return Ok(Outcome::Late(Vec::new()));
+    }
+    play(x, t, spec, &b)
+}
+
 /// The outcome of the game's end in a candidate that placed `events`, in an input's frame or while it waited for the
 /// next input: the step's completion when the step is the goal's and the end has its reason (with the site), the
 /// inputs not placed yet not needed; else an end (the review of stage A: an end in a wait ended the pass).

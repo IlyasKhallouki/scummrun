@@ -5,15 +5,16 @@
 //! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings).
 //!
 //! `fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
-//! [--no-twins] [--no-ego] [--no-fallbacks] [--rounds 0] OUT` (items 4-6, 8, 9): the movie's steps (as
+//! [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT` (items 4-9): the movie's steps (as
 //! `label`, with the twins' draw keys unless --no-twins), then the forward pass, each step found again in order from
 //! boot (fmi-shorten pass.rs; --no-ego: a step's goal without where ego stands), a step the scan does not complete by
 //! the fallbacks (refind.rs, unless --no-fallbacks), with --skips under text and cutscene skips from boot (skips.rs);
 //! a pass that reaches the goal (the movie's end reason, with its site, where the stage's replay of the route ends
 //! too) is written as OUT/unverified-NNN.jsonl with its step log (each step's completion, tick and digest from that
 //! replay), verified from boot (movie.rs), and renamed OUT/route-NNN.jsonl only if that passes; a pass that stops is
-//! written as OUT/stopped-NNN.jsonl with its log; --rounds above 0 is refused (the reductions, item 7, are not built
-//! yet). OUT/run-NNN.json (and stdout) gets the summary. Exit 0 only with a verified route; 2 when the run went through
+//! written as OUT/stopped-NNN.jsonl with its log. With --rounds R (R > 0) the reductions (reduce.rs) from the verified
+//! route, at most R rounds and --wall seconds (7200) from the start, each kept drop a new verified version.
+//! OUT/run-NNN.json (and stdout) gets the summary. Exit 0 only with a verified route; 2 when the run went through
 //! without one (stopped, or verify failed); 1 on an error.
 
 use fmi_explore::events::event_of;
@@ -23,7 +24,7 @@ use fmi_shorten::chain::{self, Held, Opts};
 use fmi_shorten::refind::{self, RCfg};
 use fmi_shorten::scan::{Cfg, Cost};
 use fmi_shorten::verdict::{End, Goal};
-use fmi_shorten::{draws, label, movie, pass, skips};
+use fmi_shorten::{draws, label, movie, pass, reduce, skips};
 use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{json, Value};
 use std::io::Write;
@@ -219,11 +220,11 @@ fn cost_of(p: &pass::Pass) -> Cost {
     cost
 }
 
+/// The wall time the stage may take (plan.md's stop rule: 2 hours).
+const WALL_S: u64 = 7200;
+
 fn run_in(a: &super::Args) -> Result<bool, String> {
     let t0 = std::time::Instant::now();
-    if a.get("rounds").is_some_and(|r| r != "0") {
-        return Err("--rounds: the reductions (plan.md item 7) are not built: no round can run".into());
-    }
     let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
     let movie_path = a.get("movie").ok_or("--movie")?;
     let movie = read_movie(Path::new(movie_path))?;
@@ -235,6 +236,8 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
     let mut held = Held::load(Path::new(archive))?;
     let num = |k: &str, d: u64| a.get(k).map(|v| v.parse::<u64>().map_err(|e| format!("--{k}: {e}"))).unwrap_or(Ok(d));
     let seed = num("seed", 1)? as u32;
+    let rounds = num("rounds", 0)? as usize;
+    let wall = num("wall", WALL_S)?;
     let scan_cfg = Cfg { workers: num("workers", 8)? as usize, chunk: num("chunk", 16)? as u32 };
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let eng = out.join("engines");
@@ -287,10 +290,24 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
                                   "end": p.end.as_ref().map(|f| json!({"frame": f.frame, "tick": f.tick})),
                                   "version": path.display().to_string(), "verify": vrep},
                          "cost": cost_of(&p).json()});
-    let verified = v.is_some();
-    if let Some(end) = v {
+    let mut verified = v.is_some();
+    // item 7: the reductions, from the verified forward pass
+    if let (Some(end), true) = (v.clone(), rounds > 0) {
+        let make = |d: &BTreeSet<usize>| pass::specs_without(&ch, &l, ego, &root, d);
+        let ver = |p: &pass::Pass, d: &BTreeSet<usize>| st.version(p, d);
+        let cx = reduce::Ctx { host: &host, boot: &boot, specs: &make, cfg: &pcfg, out: &eng, version: &ver };
+        let best = reduce::Best { pass: p, end, path: path.clone(), dropped: BTreeSet::new() };
+        let deadline = t0 + std::time::Duration::from_secs(wall);
+        let (best, recs) = reduce::rounds(best, &by_k, rounds, deadline, &cx)?;
+        sum["rounds"] = json!(recs);
+        sum["dropped"] = json!(best.dropped);
+        sum["route"] = json!(best.path.display().to_string());
+        sum["end"] = json!({"frame": best.end.frame, "tick": best.end.tick, "reason": best.end.reason});
+    } else if let Some(end) = v {
         sum["route"] = json!(path.display().to_string());
         sum["end"] = json!({"frame": end.frame, "tick": end.tick, "reason": end.reason});
+    } else {
+        verified = false;
     }
     sum["wall_s"] = json!(t0.elapsed().as_secs_f64());
     for n in 1..1000 {
@@ -305,7 +322,7 @@ fn run_in(a: &super::Args) -> Result<bool, String> {
 }
 
 pub fn cmd_run(argv: &[String]) -> i32 {
-    let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds"];
+    let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds", "wall"];
     match args(argv, &opts, &["skips", "no-twins", "no-ego", "no-fallbacks"], 1).and_then(|a| run_in(&a)) {
         Ok(true) => 0,
         Ok(false) => {
@@ -401,3 +418,4 @@ pub fn cmd_trace(argv: &[String]) -> i32 {
         }
     }
 }
+

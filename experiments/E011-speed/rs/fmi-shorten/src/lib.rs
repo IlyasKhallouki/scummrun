@@ -10,6 +10,7 @@
 //! * `scan`: item 5, a step found again at every frame from the steps before it.
 //! * `pass`: the forward pass, every step found again in order from boot.
 //! * `refind`: item 6, the fallbacks for a step the scan does not complete.
+//! * `reduce`: item 7, drops from the verified route, kept for an earlier verified end.
 //! * `skips`: item 8, the bridge's skips from boot.
 //! * `movie`: item 9, a route's files and its check from boot.
 
@@ -18,6 +19,7 @@ pub mod draws;
 pub mod label;
 pub mod movie;
 pub mod pass;
+pub mod reduce;
 pub mod refind;
 pub mod scan;
 pub mod skips;

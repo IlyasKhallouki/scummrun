@@ -2,13 +2,16 @@
 //! fails, t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order, nor (the
 //! bound by (tick, frame, t)) one at a later frame with a lower tick; ties go to the earliest t; a candidate's engine
 //! error and the goal reached while a candidate waits for an inner input; a reduction is kept only for an earlier
-//! verified end (verdict::earlier, stage B's rule); a forward pass of two steps; a route verified from its files, and a
-//! movie without its step log failing.
+//! verified end (verdict::earlier; reduce.rs: a step the game does not need dropped and kept once its end verifies, a
+//! drop that loses the end not kept, nor one whose version does not verify); a forward pass of two steps; a route
+//! verified from its files, and a movie without its step log failing.
 
 use fmi_core::*;
 use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
 use fmi_shorten::scan::{self, Cfg, In, StepSpec};
 use fmi_shorten::verdict::{self, End, Goal};
+use fmi_shorten::reduce::{self, Best, Cand, Drop};
+use fmi_shorten::refind::RCfg;
 use fmi_shorten::{movie, pass};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -17,6 +20,10 @@ use std::sync::Arc;
 const DOOR: i32 = 51;
 const V_DONE: usize = 40;
 const V_END: usize = 41;
+/// A window, taken whenever nothing is pending, setting V_WIN `WIN_DELAY` frames later: a step the game does not need.
+const WINDOW: i32 = 52;
+const V_WIN: usize = 42;
+const WIN_DELAY: u64 = 20;
 
 /// The fake game: a door on the screen. A click on it at frame f is taken when the rule has f, and sets V_DONE (the
 /// step's progress) the rule's delay later; any other click is ignored. A taken click on the door while V_DONE is set
@@ -53,7 +60,13 @@ fn fake(rule: &[(u64, u64)]) -> Fake {
 
 impl Fake {
     fn hit(&self, x: i32, y: i32) -> At {
-        let obj = if (100..140).contains(&x) && (50..90).contains(&y) { DOOR } else { 0 };
+        let obj = if (100..140).contains(&x) && (50..90).contains(&y) {
+            DOOR
+        } else if (200..240).contains(&x) && (50..90).contains(&y) {
+            WINDOW
+        } else {
+            0
+        };
         At { x, y, zone: 0, main: Some((x, y, obj, 0)), verb_slot: 0 }
     }
 
@@ -65,8 +78,12 @@ impl Fake {
         self.pending.retain(|e| e.frame != f);
         for e in now {
             if let Input::Click(x, y) = e.what {
-                let on_door = self.hit(x, y).main.is_some_and(|m| m.2 == DOOR);
-                let taken = on_door && self.due.is_none() && self.rule.contains_key(&f);
+                let on = self.hit(x, y).main.map_or(0, |m| m.2);
+                let on_window = on == WINDOW && self.due.is_none();
+                if on_window {
+                    self.due = Some((f + WIN_DELAY, V_WIN));
+                }
+                let taken = on == DOOR && self.due.is_none() && self.rule.contains_key(&f);
                 if taken {
                     let var = if self.vars[V_DONE] == 1 { V_END } else { V_DONE };
                     self.due = Some((f + self.rule[&f], var));
@@ -75,7 +92,7 @@ impl Fake {
                     }
                 }
                 self.log.push(InputRecord {
-                    frame: f, input: vec![e.what.clone()], stat: 0, verdict: if taken { Verdict::Taken } else { Verdict::Ignored },
+                    frame: f, input: vec![e.what.clone()], stat: 0, verdict: if taken || on_window { Verdict::Taken } else { Verdict::Ignored },
                     area: 2, value: 0, mode: 1, slot: 0, zone: 0, key_match: false, handler: 4, writes: vec![], reads: vec![],
                     ops: vec![], ops_dropped: 0, touches_dropped: 0,
                 });
@@ -149,7 +166,10 @@ impl Engine for Fake {
             room: self.st.room,
             ego: Some(1),
             vars: self.vars.clone(),
-            room_objects: Some(vec![RoomObject { id: DOOR, x: 100, y: 50, w: 40, h: 40, ..Default::default() }]),
+            room_objects: Some(vec![
+                RoomObject { id: DOOR, x: 100, y: 50, w: 40, h: 40, ..Default::default() },
+                RoomObject { id: WINDOW, x: 200, y: 50, w: 40, h: 40, ..Default::default() },
+            ]),
             ..Default::default()
         })
     }
@@ -402,5 +422,75 @@ fn a_forward_pass_and_its_route_verified() {
     let bad = vec![serde_json::json!({"k": 0, "completion": {"frame": 10, "tick": 60}, "digest": "0000000000000001"})];
     let r3 = movie::write(&dir, "unverified", &p.route, &meta, &bad, &endv).unwrap();
     assert_eq!(movie::verify(&host, &alone, &r3, &dir.join("v3")).unwrap()["ok"], false);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_drop_is_kept_only_for_an_earlier_verified_end() {
+    // step 0: the window (V_WIN 20 frames later), a step the game does not need; step 1: the door (V_DONE); step 2,
+    // the goal: the door again ends the game. The door is taken at any frame from 3 on, three frames to V_DONE and to
+    // the end
+    let rule: Vec<(u64, u64)> = (3..400).map(|f| (f, 3)).collect();
+    let host = FakeHost(rule);
+    let win = {
+        let want = Identity { hit: HitId::Object(WINDOW, 0), verdict: "taken".into(), area: 2, value: 0, mode: 1, handler: 4, sentences: vec![], walks: vec![] };
+        In { anchor: Anchor::Object { id: WINDOW, actor: 0 }, timing: Timing::Idle, gap: 0, want, orig: Input::Click(0, 0) }
+    };
+    let all = vec![
+        StepSpec { k: 0, inputs: vec![win], goal: Goal::Keep(verdict::conds(&[(Key::var(V_WIN as u64), 1)], &|_| None).unwrap()), relaxed: None },
+        StepSpec { k: 1, ..spec() },
+        StepSpec { k: 2, inputs: vec![door_click()], goal: Goal::End("restart@1:2:3:0004".into()), relaxed: None },
+    ];
+    let orig = |from, frame| pass::Orig { from, frame, tick: frame * 6, rooms: vec![1], inputs: 1, skipped: vec![] };
+    let origs = vec![orig(2, 40), orig(40, 60), orig(60, 80)];
+    let dir = std::env::temp_dir().join(format!("fmi-shorten-g3r-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let rc = RCfg { scan: Cfg { workers: 2, chunk: 4 }, skips: false, leaves: 10, sentence: Default::default(), dialog: Default::default() };
+    let cfg = pass::PassCfg { seed: 1, scan: Cfg { workers: 2, chunk: 4 }, out: dir.join("e"), w: 50, refind: Some(rc) };
+    let p = pass::forward(&host, &[], &all, &origs, &cfg).unwrap();
+    let f = p.end.clone().expect("the end");
+    // the window at 3, V_WIN at 23; the door at 4 is refused (V_WIN pending), taken at 24, V_DONE at 27; the door at
+    // 28, the end at 31
+    assert_eq!((f.frame, f.tick), (31, 186), "{f:?} {:?}", p.route);
+    let goal = "restart@1:2:3:0004";
+    let best = Best { pass: p.clone(), end: End { tick: f.tick, frame: f.frame, reason: goal.into() }, path: dir.join("route-001.jsonl"), dropped: Default::default() };
+    let specs = |d: &std::collections::BTreeSet<usize>| -> Result<(Vec<StepSpec>, Vec<pass::Orig>), String> {
+        Ok(all.iter().cloned().zip(origs.iter().cloned()).filter(|(s, _)| !d.contains(&s.k)).unzip())
+    };
+    // a version: the stage's replay from boot, verified unless `refuse`
+    let version = |refuse: bool| {
+        let host = &host;
+        let dir = dir.clone();
+        move |p: &pass::Pass, _d: &std::collections::BTreeSet<usize>| -> Result<(Option<End>, std::path::PathBuf, serde_json::Value), String> {
+            let b = movie::replay(host, &p.route, 1, &[], 1000, &dir.join("stage"))?;
+            Ok((b.end.filter(|_| !refuse), dir.join("route-002.jsonl"), serde_json::json!({})))
+        }
+    };
+    let by_k: std::collections::BTreeMap<usize, pass::Orig> = all.iter().zip(&origs).map(|(s, o)| (s.k, o.clone())).collect();
+    let cands = reduce::candidates(&best, &by_k);
+    assert!(cands.iter().any(|c| c.what == Drop::Steps(vec![0])) && cands.iter().any(|c| c.what == Drop::Steps(vec![1])));
+    let ok = version(false);
+    let cx = reduce::Ctx { host: &host, boot: &[], specs: &specs, cfg: &cfg, out: &dir, version: &ok };
+    // the window dropped: the door at 3, V_DONE at 6, the door at 7, the end at 10; kept, verified
+    let c0 = Cand { what: Drop::Steps(vec![0]), kind: "step", waste: 0 };
+    let (nb, rec) = reduce::attempt(&c0, &best, &cx).unwrap();
+    let nb = nb.expect("kept");
+    assert_eq!((nb.end.frame, nb.end.tick, rec["result"].as_str()), (10, 60, Some("kept")));
+    // the door's first click dropped: the second sets V_DONE, the game does not end; the cheap replay says so
+    let c1 = Cand { what: Drop::Steps(vec![1]), kind: "step", waste: 0 };
+    let (nb1, rec) = reduce::attempt(&c1, &best, &cx).unwrap();
+    assert!(nb1.is_none() && rec["result"] == "cheap replay failed", "{rec}");
+    // earlier, but its version not verified: not kept
+    let no = version(true);
+    let cx2 = reduce::Ctx { version: &no, ..cx };
+    let (nb2, rec) = reduce::attempt(&c0, &best, &cx2).unwrap();
+    assert!(nb2.is_none() && rec["result"] == "not verified", "{rec}");
+    // the rounds: the window's drop kept in round 1, round 2 gains nothing and stops
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let (b, recs) = reduce::rounds(best, &by_k, 3, deadline, &cx).unwrap();
+    assert_eq!((b.end.tick, b.dropped.iter().copied().collect::<Vec<_>>()), (60, vec![0]));
+    assert_eq!(recs.len(), 2);
+    assert_eq!(recs[0]["kept"], 1);
+    assert_eq!(recs[1]["gain_ticks"], 0);
     let _ = std::fs::remove_dir_all(&dir);
 }
