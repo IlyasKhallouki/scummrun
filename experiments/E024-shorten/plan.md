@@ -45,6 +45,26 @@ Can the system shorten its own route to the demo's end to under 4:00 of game tim
   - The step runs on an engine forked from the try's root and played to P0, instead of the end engine (tryjob.rs:1366-1383). Checkpoints after P0 are not committed.
   - If the state at P0 differs from the attempt's (the check in engine_at, :1484), it falls back to the end engine.
 
+#### Part 1 as built (amendment 2, 2026-11-09; merge 2c7e305, reviewed: ship)
+
+- **P0 counts only windows that gave up** (mech.rs:242, :250): those that ended at the frame bound, at READY_END or on a refused input. With every empty window counted, j08932 got P0 = 18322 and lost its 18324 and 18802 entries. In that try the 18802 window ended because a precondition closed, so the game had moved on by itself. A delay-fork "refuted" end does not count, which falls back to the old behaviour.
+- **G1** (each try re-run with the switches it originally ran with; with the switches off the re-runs match the archive's window records in every field but wall_s):
+
+  | Measure | Plan | Off | On |
+  |---|---|---|---|
+  | j08920, first empty window ends | near 11059 | 14364 | 11059 |
+  | j08920, P0 | 10764 | – | 10764, reached again |
+  | j08920, kept entries | ≤ 10800 | 17971–18036 | 10772, 10787, 10837, 10837 (two miss, by 37 frames) |
+  | j08758, dialog entry | ≤ 2600 | 9772 | 2574 |
+  | Windows that chose a try | unchanged | – | j08920 3/3, j08932 2/2 |
+
+  - Monkey Island kitchen: 8 of 8 entries verified both ways. Smoke: 23 entries identical both ways. Part 1 never fired in either, so these checks show only that nothing else changed.
+- **Open:**
+  - The 4 entries from afford at P0 on a fork replayed from the root differ from a replay from boot on var:56 (−1 against 0). var:56 is the sound-result variable, E020 amendment (4)'s open mismatch. The run's checks skip it (FMI_SKIP_SOUNDRESULT), but `fmi check verify-new` does not. Afford at the root and the attempt's own entries verify.
+  - A reach extension at 11059 that the old path never needed made j08920 cost 247–718 s, against 28.5 s.
+  - "The same empty window 2 times" now fires after about 600 frames, not 7,200. The attempt no longer sees anything the game reaches by itself between those. Repeating only on a changed state (A2) stays out of scope.
+  - Two fmi-play tests in tests/realize.rs already failed before E024 (28a91e0 changed realize.rs without them). refuse_check.rs and e013_report.rs do not know the new end reason yet.
+
 ### Part 2: `fmi shorten` (new crate `fmi-shorten`, subcommand of `fmi`)
 
 It runs as the run's last stage once a goal entry exists (driver.rs:664 stops at the first goal entry today), and as a subcommand on an existing archive. The inputs are a movie from boot, the run's archive folder (its stage atoms, idle keys and readings) and a goal: the game's end at its site, or the archive's goal facts. Each output is a new `route-NNN.jsonl`; earlier versions are never overwritten.
