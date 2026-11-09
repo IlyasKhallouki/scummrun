@@ -753,11 +753,18 @@ fn inventory(e: &mut Box<dyn Engine>, o: &Obs, of: &Offer, v: i32, a: i32, b: Op
         }
     };
     let want = (v, a, b.unwrap_or(0));
+    // E022 amendment (27): with b in the inventory too, the first verb choice's whole grid of a's and b's slots (the
+    // dark room's wand and beads: 60 candidates reached the fourth slot of a); a slot is not its own B
+    let pair = thirds.len() > 1;
+    let cap = if pair { cfg.max_candidates.max(cfg.max_slots * cfg.max_slots + cfg.max_slots) } else { cfg.max_candidates };
     for c in &choices {
         let slots: Vec<Point> = ordered.iter().filter(|p| Some(**p) != *c).take(cfg.max_slots).copied().collect();
         for s in &slots {
             for t in &thirds {
-                if rec.candidates >= cfg.max_candidates {
+                if pair && *t == Some(*s) {
+                    continue;
+                }
+                if rec.candidates >= cap {
                     return Ok(None);
                 }
                 rec.candidates += 1;
