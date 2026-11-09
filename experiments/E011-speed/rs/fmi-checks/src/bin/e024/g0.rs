@@ -136,7 +136,9 @@ pub fn run(argv: &[String]) -> Res<()> {
         settings(Some(1), Some(v));
         let d = boot(&out.join("d"), &skips_at(1), maxf, seed)?;
         eprintln!("d {}", d.out);
-        let failed = d.v19.is_none();
+        // the start fails the rule only by var 19 (amendment 1): the bridge's check at the segment start, or another
+        // value at the first control; any other end is no reason to move the start
+        let failed = d.out["trace"]["error"]["code"] == "timer_next" || d.v19.is_some_and(|x| x != v);
         doc["d"] = d.out;
         doc["timer_next"] = json!(v);
         // the host passes TIMER_NEXT on: any other value fails the check at the segment start
