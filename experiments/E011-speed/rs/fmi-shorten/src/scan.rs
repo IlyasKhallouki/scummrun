@@ -148,32 +148,53 @@ impl Counts {
 pub const BUDGET_MS: f64 = 3.0;
 pub const BUDGET_MS_PER_FRAME: f64 = 0.15;
 
-/// The candidates' costs (G6): those that stopped at the first click (no point, refused, another identity), and
-/// those whose first click was taken (wall ms and frames run).
+/// The candidates' costs (G6): those whose first click the game refused (or took with another identity), those
+/// whose first anchor no point gave (no click: not G6's refused candidate, the review of stage A), as (n, ms, max ms);
+/// and those whose first click was taken (wall ms and frames run).
 #[derive(Clone, Debug, Default)]
 pub struct Cost {
     pub refused: (usize, f64, f64),
     /// refused candidates over BUDGET_MS
     pub refused_over: usize,
+    pub no_point: (usize, f64, f64),
     pub accepted: Vec<(f64, u64)>,
 }
 
+/// Where a candidate stopped, for its cost.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Stopped {
+    NoPoint,
+    Click,
+    Taken,
+}
+
+fn add3(b: &mut (usize, f64, f64), ms: f64) {
+    b.0 += 1;
+    b.1 += ms;
+    b.2 = b.2.max(ms);
+}
+
+fn merge3(b: &mut (usize, f64, f64), o: &(usize, f64, f64)) {
+    b.0 += o.0;
+    b.1 += o.1;
+    b.2 = b.2.max(o.2);
+}
+
 impl Cost {
-    fn add(&mut self, ms: f64, frames: u64, at_click: bool) {
-        if at_click {
-            self.refused.0 += 1;
-            self.refused.1 += ms;
-            self.refused.2 = self.refused.2.max(ms);
-            self.refused_over += (ms > BUDGET_MS) as usize;
-        } else {
-            self.accepted.push((ms, frames));
+    fn add(&mut self, ms: f64, frames: u64, at: Stopped) {
+        match at {
+            Stopped::NoPoint => add3(&mut self.no_point, ms),
+            Stopped::Click => {
+                add3(&mut self.refused, ms);
+                self.refused_over += (ms > BUDGET_MS) as usize;
+            }
+            Stopped::Taken => self.accepted.push((ms, frames)),
         }
     }
     pub fn merge(&mut self, o: &Cost) {
-        self.refused.0 += o.refused.0;
-        self.refused.1 += o.refused.1;
-        self.refused.2 = self.refused.2.max(o.refused.2);
+        merge3(&mut self.refused, &o.refused);
         self.refused_over += o.refused_over;
+        merge3(&mut self.no_point, &o.no_point);
         self.accepted.extend(o.accepted.iter().copied());
     }
     /// The accepted candidates' least-squares line ms = a + b * frames.
@@ -193,11 +214,13 @@ impl Cost {
     }
     pub fn json(&self) -> Value {
         let (n, sum, max) = self.refused;
+        let (pn, psum, pmax) = self.no_point;
         let frames: u64 = self.accepted.iter().map(|a| a.1).sum();
         let ms: f64 = self.accepted.iter().map(|a| a.0).sum();
         // G6's budget for an accepted candidate: BUDGET_MS plus BUDGET_MS_PER_FRAME a frame run
         let over = self.accepted.iter().filter(|&&(ms, f)| ms > BUDGET_MS + BUDGET_MS_PER_FRAME * f as f64).count();
         json!({"refused": {"n": n, "mean_ms": if n > 0 { sum / n as f64 } else { 0.0 }, "max_ms": max, "over_budget": self.refused_over},
+               "no_point": {"n": pn, "mean_ms": if pn > 0 { psum / pn as f64 } else { 0.0 }, "max_ms": pmax},
                "accepted": {"n": self.accepted.len(), "ms": ms, "frames": frames, "over_budget": over,
                             "fit": self.fit().map(|(a, b)| json!({"ms": a, "ms_per_frame": b}))}})
     }
@@ -268,11 +291,15 @@ pub fn scan(base: &mut Box<dyn Engine>, spec: &StepSpec, limit: u64, cfg: &Cfg) 
                 let s = Instant::now();
                 let (o, frames) = attempt(child, t, spec, &best, limit, &asked).unwrap_or_else(|e| (Outcome::Error(e.to_string()), 0));
                 let ms = s.elapsed().as_secs_f64() * 1e3;
-                let at_click = matches!(o, Outcome::NoPoint | Outcome::Refused | Outcome::Other);
+                let at = match o {
+                    Outcome::NoPoint => Stopped::NoPoint,
+                    Outcome::Refused | Outcome::Other => Stopped::Click,
+                    _ => Stopped::Taken,
+                };
                 let mut g = tally.lock().unwrap();
                 g.0.add(&o);
                 if !matches!(o, Outcome::Pruned | Outcome::Error(_)) {
-                    g.1.add(ms, frames, at_click);
+                    g.1.add(ms, frames, at);
                 }
                 match &o {
                     Outcome::Late(m) => {

@@ -245,6 +245,9 @@ fn the_earliest_completion_when_t5_fails_t6_works_t7_fails() {
         // t = 2..=5 and 7.. refused at the click (the producer stops at the best less one)
         assert!(s.counts.refused >= 5, "{:?}", s.counts);
         assert_eq!(s.counts.done, 1);
+        // G6's refused bucket holds the candidates that clicked; one with no point never clicks
+        assert_eq!(s.cost.refused.0, s.counts.refused + s.counts.other);
+        assert_eq!(s.cost.no_point.0, s.counts.no_point);
     }
 }
 
