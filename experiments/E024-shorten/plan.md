@@ -199,6 +199,48 @@ It runs as the run's last stage once a goal entry exists (driver.rs:664 stops at
   - If a step fails every fallback: stop, record the step and its cause, and fix it offline. No hand patches.
   - If the forward pass under skips is over 4:30: stop and break the time down per stretch from steps.jsonl before adding any mechanism.
 
+## Amendment 3 and result (2026-11-09; stages A and B, merge df71d3f, both reviewed)
+
+- **Changes made after measuring:**
+  - A step's goal includes ego standing where the movie's step left it (`ego_at`; `--no-ego` turns it off). Without it, a walk was accepted mid-sentence and the next step had no point at any t.
+  - A twin-marked key is judged by value first. The relaxed goal ("changed from the root") is scanned only when no t gives the movie's values. With the relaxed goal first, step 9 passed with another dialog state and step 18 failed at every t.
+  - The scan's bound is (tick, frame, t), not frame alone, because a skipped cutscene's frames are shorter.
+  - Patch 0010 (FMI_MEM_FILES): the files the scripts write are kept in each engine's memory. Without it, a scan's forks shared the save folder's file and one read a torn file.
+  - The fallbacks start from the previous step's completion, not its last input. From the last input, the cave's offer came before the cave, and skips off replayed the dive scene (the pass ended at 18,514 before this change, 14,152 after). realize, the offer trials and the dialog search judge by the relaxed goal.
+  - Drops are ordered by the ticks each step adds to the route. The cheap replay stops at the first t whose first click is taken. This rejected 106 of 110 drops in about 0.1 s each, so some drops never got a full scan.
+  - The movie is labelled on the seed it was recorded on, and the pass runs on `--seed`.
+- **The run** (the plan's command, `--skips`, binary at 584e092, E024's env.sh):
+  - Forward pass: tick 14,152, frame 2,671, in 79 s. Prediction about 15,600.
+    - 34 steps were found by the scan and step 24 by the relaxed goal.
+    - Step 20 (the voyage) needed skips off. Step 25 (the cave's exit after its draw) needed an offer trial.
+  - Round 1: 110 drops tested; 3 kept (step 34, one input of step 33, one of step 21); 546 ticks gained. Round 2 gained 0, so the stage stopped. 282 s in all.
+  - **Seed 1: tick 13,606 (3:46.8), frame 2,580, 92 clicks, the same end `restart@1:582:48:0067`.** Prediction about 13,200 (range 3:05 to 4:30).
+    - Verified from boot by both launches (33 of 33 digests).
+    - The reviewer rebuilt HEAD and re-ran the stage: routes 001-004 were byte-identical. It verified twice more, once with svm-e024 and once with E022's svm-e021.
+    - The route is the boot event plus the step logs' events; no click was written by hand.
+    - Files: run/seed1-route-004.jsonl and its .steps.jsonl.
+  - Seed 2: 18,964 after the forward pass, 18,682 after the rounds, verified from boot (run/seed2-route-003.jsonl).
+  - Seed 3 stops at step 18, the quiz's last line. Its quiz draw differs from seed 1's, bit 443 is never set, and realize, 31 offer trials, the dialog search (43 leaves) and skips off all find nothing.
+- **Per stretch, seed 1 (ticks):** boot 944, steps 0-3 1,008, 4-8 1,872, the book (9-13) 2,700, the quiz (14-19) 312, the voyage (20, skips off) 1,808, the suit (21-23) 504, the dives (24) 1,062, the cave exit (25) 822, to the end (26-36) 2,574.
+- **Gates:**
+
+  | Gate | Threshold | Measured | Verdict |
+  |---|---|---|---|
+  | G0 | (a) 992/3458, (b) ≤ 1,200 ticks, (c) equal v19 | 992/3458; 477/944; 6 and 6 | pass |
+  | G2 | 100%, keep(k), twin marks | 97/97 placed, same hit, same identity; keep 36/36; the twins mark the book and room 82's entry | pass |
+  | G3 | fake engines | 9 + 7 tests | pass |
+  | G4 | ≤ 5,600 frames without skips | stops at step 25: at the offer's stop the right exit has no clickable point, and none of 88 trials completes | not met |
+  | G5 | ≤ 9,000 ticks through the book | 6,524 | pass |
+  | G6 | refused ≤ 3 ms; accepted 3 ms + 0.15 ms/frame; pass ≤ 10 min; Part I ≤ 2 h | mean 2.6-3.2 ms, max 8.9-11.9 ms; fixed part 13.5-16 ms, 0.034-0.040 ms/frame; 79-93 s; reduction rounds grow with the square of the step count, about 3.3 h a round for Part I | the pass passes, the rest fails |
+  | G7 | no game numbers; the kitchen anchored and reached | none; 85/85 anchored, none raw; the pass stops at step 5 of 12, where clicks made while ego walks have no point at 1,680 of 1,761 t's | grep and anchors pass, the goal not met |
+- **Success:** met on seed 1, and seed 2 reaches the end. Not met in full, because seed 3 does not reach the end.
+- **Open (from the review, none of which makes a route wrong):**
+  - The driver's stage always passes `--goal end`, so on a goal-fact archive it records an error.
+  - One engine error in a fallback trial or a reduction test stops the pass or every round. The scan already counts it as that t's outcome.
+  - Steps 33 and 35 record completions after the end (frame 2,595 against 2,580), so their digests go unchecked.
+  - The dialog search can keep a later tick at the same frame, and input-drop indexes can go stale after another drop is kept.
+- **Next:** walking (E025). The kitchen's step 5 and G4's cave exit both stop on walking: clicks made while ego walks, and an exit off screen until ego walks. Research is under way.
+
 ## Out of scope
 
 - **Later additions, only if needed:**
