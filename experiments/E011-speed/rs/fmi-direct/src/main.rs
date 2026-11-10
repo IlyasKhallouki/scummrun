@@ -17,8 +17,9 @@
 //!   it. A stop is where ego stands still and the bridge is idle, or, BUSY frames after the inputs, where the game
 //!   takes a click all the same (user input on, no cutscene): a scene whose actors talk on has no idle frame.
 //! * **The game's own moves.** Each stop is also run with no input for WAITS frames. Where that changes a key of the
-//!   world that fewer than MOTION_TRIES stops of that room and level saw change, the inputs are tried again from
-//!   there (a door a timer opens is open only then; a room's own motion is tried a few times, not at every stop).
+//!   world that fewer than MOTION_TRIES stops of that level, room and walk box saw change, the inputs are tried again
+//!   from there (a door a timer opens is open only then, and ego must stand near it; a room's own motion is tried a
+//!   few times from each part of the room, not at every stop).
 //! * **After an input.** Where a trial's stop differs from the expanded stop's in a key of the world that no wait
 //!   in that room has moved (the room's motion), the trial is run PROBE frames on with no input. The stop reached there is one more stop to
 //!   keep (an effect that lands after the first stop: a count the game raises when its actor has landed). And where a
@@ -70,7 +71,8 @@ const WAITS: [u64; 3] = [50, 200, 800];
 /// windows one round follows.
 const PROBE: u64 = 60;
 const MAX_WINDOWS: usize = 3;
-/// Stops of a room and level whose waits a key may change before its change stops calling for the inputs again.
+/// Stops of a level, room and walk box whose waits a key may change before its change stops calling for the inputs
+/// again.
 const MOTION_TRIES: u32 = 3;
 /// Pixels of the camera's bucket: a fifth of the screen, so a walk across part of it shows.
 const CAM_BUCKET: i32 = 64;
@@ -155,8 +157,9 @@ struct Search {
     policy: Policy,
     /// the world keys a run with no input changed somewhere: left out of the cells
     ambient: HashSet<Key>,
-    /// per level, room and key: the stops expanded there whose waits changed it; and per room the keys any did
-    motion: HashMap<(u32, i32, Key), u32>,
+    /// per level, room, walk box and key: the stops expanded there whose waits changed it; and per room the keys
+    /// any did
+    motion: HashMap<(u32, i32, i32, Key), u32>,
     room_motion: HashSet<(i32, Key)>,
     rooms: Vec<i32>,
     /// the highest level of a kept stop
@@ -395,6 +398,7 @@ struct Out {
     clocks: HashSet<Key>,
     ambient: HashSet<Key>,
     room: i32,
+    walkbox: i32,
     /// the trials' wall seconds by phase (the fork, the inputs, the run to the stop, the stop's reading, the quit), and
     /// the frames they ran
     phase: [f64; 5],
@@ -614,7 +618,7 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&Ha
 
 /// What `explore` reads of the search: the rooms' motion at the batch's start.
 struct Snap {
-    motion: HashMap<(u32, i32, Key), u32>,
+    motion: HashMap<(u32, i32, i32, Key), u32>,
     /// per room, the keys a wait has moved at any stop
     room_motion: HashSet<(i32, Key)>,
 }
@@ -624,11 +628,11 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
-    let mut out = Out { room: r0.room, ..Default::default() };
+    let mut out = Out { room: r0.room, walkbox: r0.walkbox, ..Default::default() };
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     // the game's own moves: no input for a while. What they move is the stop's own motion; a variable that takes two
     // values or more over them is a clock
-    let known = |k: Key| snap.motion.get(&(level, r0.room, k)).is_some_and(|&c| c >= MOTION_TRIES);
+    let known = |k: Key| snap.motion.get(&(level, r0.room, r0.walkbox, k)).is_some_and(|&c| c >= MOTION_TRIES);
     let mut waited: Vec<(u64, Box<dyn Engine>)> = Vec::new();
     let mut values: HashMap<Key, Vec<Val>> = HashMap::new();
     for n in WAITS {
@@ -718,7 +722,7 @@ impl Search {
         let room0 = out.room;
         let level0 = self.nodes[id].level;
         for &k in &out.ambient {
-            *self.motion.entry((level0, room0, k)).or_default() += 1;
+            *self.motion.entry((level0, room0, out.walkbox, k)).or_default() += 1;
             self.room_motion.insert((room0, k));
         }
         self.policy.iface_vars.extend(out.iface_vars.iter().copied());
