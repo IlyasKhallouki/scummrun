@@ -22,9 +22,10 @@
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
 //!   interface's own (those the input script writes, and those a fifth of a stop's inputs change), those that change
 //!   with no input (clocks), and those seen with more than VAR_CAP values (counters without end).
-//! * **Levels.** A stop's level is the number of objects ego has owned on the way to it (and did not own at the
-//!   boot). Something is new to a stop when no kept stop of its level or a higher one holds it: with one more object
-//!   in hand, every room, input and position counts again. The highest level is expanded first.
+//! * **Lines and levels.** A stop's line is what ego has gained and lost on the way to it: the objects it has owned
+//!   (and did not own at the boot) and those of them it owns no more. Its level is their count. Something is new to
+//!   a stop when no kept stop of its line holds it: with an object gained or used up, every room, input and position
+//!   counts again. The highest level is expanded first.
 //! * **Kept.** Within its level a stop goes to the first queue it fits: (0) a world atom other than a variable's
 //!   that is new; (1) an interface or a thing on the screen new in that room; (2) a walk box or camera bucket new in
 //!   that room; (3) a variable's value that is new; (4) an atom of the guide's keys new in that room; (5) any other
@@ -83,19 +84,19 @@ struct Node {
     events: Vec<Event>,
     frame: u64,
     depth: u32,
-    /// the objects ego has owned on the way here and did not own at the boot, ascending; the level is their count
+    /// the objects ego has owned on the way here and did not own at the boot, ascending
     ever: Vec<u32>,
+    /// the stop's level and line (the module's text)
+    level: u32,
+    line: u64,
+    room: i32,
 }
 
-/// Whether `k` is new at `level`: no kept stop of that level or a higher one holds it. Marks it held at `level`.
-fn fresh<K: Hash + Eq>(m: &mut HashMap<K, u32>, k: K, level: u32) -> bool {
-    match m.get(&k) {
-        Some(&l) if l >= level => false,
-        _ => {
-            m.insert(k, level);
-            true
-        }
-    }
+/// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
+fn line_of(ever: &[u32], owned: &[u32]) -> u64 {
+    let mut h = DefaultHasher::new();
+    (ever, owned).hash(&mut h);
+    h.finish()
 }
 
 /// Which variables are world (the module's text, "The world").
@@ -131,14 +132,14 @@ struct Search {
     /// per level, the queues
     queues: Vec<[VecDeque<usize>; QUEUES]>,
     live: HashMap<usize, Box<dyn Engine>>,
-    /// what kept stops hold, each with the highest level of a stop that holds it (`fresh`)
-    seen: HashMap<(Key, Val), u32>,
-    seen_at: HashMap<(i32, Key, Val), u32>,
-    sees: HashMap<(i32, i32), u32>,
-    ifaces: HashMap<(i32, u64), u32>,
-    boxes: HashMap<(i32, i32), u32>,
-    cams: HashMap<(i32, i32), u32>,
-    cells: HashMap<u64, u32>,
+    /// what the kept stops of each line hold (the first field is the line)
+    seen: HashSet<(u64, Key, Val)>,
+    seen_at: HashSet<(u64, i32, Key, Val)>,
+    sees: HashSet<(u64, i32, i32)>,
+    ifaces: HashSet<(u64, i32, u64)>,
+    boxes: HashSet<(u64, i32, i32)>,
+    cams: HashSet<(u64, i32, i32)>,
+    cells: HashSet<(u64, u64)>,
     /// the objects ego owns at the boot
     root_owned: HashSet<u32>,
     var_vals: HashMap<Key, Vec<Val>>,
@@ -213,6 +214,8 @@ struct Res {
     cam: i32,
     /// what the interface shows (`iface`)
     iface: u64,
+    /// the world's and the variables' atoms that differ from the expanded stop's (set by `explore`)
+    changed: Vec<(Key, Val)>,
 }
 
 fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
@@ -236,6 +239,7 @@ fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
         walkbox: st.walkbox.unwrap_or(-1),
         cam: st.xstart.div_euclid(CAM_BUCKET),
         iface: iface(o),
+        changed: Vec::new(),
         facts,
         st,
     }
@@ -582,6 +586,9 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
         }
         b.quit();
     }
+    for r in out.results.iter_mut() {
+        r.changed = r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) || d.0.kind() == K_VAR).map(|d| (d.0, d.2)).collect();
+    }
     Ok(out)
 }
 
@@ -619,7 +626,7 @@ impl Search {
     /// engine for: (the node, its events past the parent's, its frame).
     fn commit(&mut self, id: usize, out: Out) -> Vec<(usize, Vec<Event>, u64)> {
         let room0 = out.room;
-        let level0 = self.nodes[id].ever.len() as u32;
+        let level0 = self.nodes[id].level;
         for &k in &out.ambient {
             *self.motion.entry((level0, room0, k)).or_default() += 1;
         }
@@ -639,25 +646,32 @@ impl Search {
         }
         let results = out.results;
         let (movie, depth, ever0) = (self.nodes[id].events.clone(), self.nodes[id].depth, self.nodes[id].ever.clone());
+        let (line0, room00) = (self.nodes[id].line, self.nodes[id].room);
         let mut keep: Vec<(usize, usize, usize, usize)> = Vec::new(); // (result, node, level, queue)
         for (i, r) in results.iter().enumerate() {
             let world = self.policy.world_of(&r.facts);
             let mut novel: Vec<String> = Vec::new();
             let mut class = QUEUES;
             let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
+            let owned: Vec<u32> = r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect();
             let mut ever = ever0.clone();
-            for p in r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego) {
-                let o = p.0.a() as u32;
-                if !self.root_owned.contains(&o) {
-                    if let Err(at) = ever.binary_search(&o) {
-                        ever.insert(at, o);
-                    }
+            for &o in &owned {
+                if let Err(at) = ever.binary_search(&o) {
+                    ever.insert(at, o);
                 }
             }
-            let level = ever.len() as u32;
-            for &(k, val) in &world {
+            let level = (2 * ever.len() - owned.len()) as u32;
+            let line = line_of(&ever, &owned);
+            // in the expanded stop's line and room only what changed can be new; elsewhere every atom may be
+            let atoms: Vec<(Key, Val)> = if line == line0 && r.room == room00 {
+                r.changed.iter().filter(|p| self.policy.world(p.0)).copied().collect()
+            } else {
+                world.clone()
+            };
+            for &(k, val) in &atoms {
+                let guide = self.policy.guide.contains(&k);
                 if k.kind() == K_VAR {
-                    if fresh(&mut self.seen, (k, val), level) {
+                    if self.seen.insert((line, k, val)) {
                         novel.push(format!("{k}={val}"));
                         class = class.min(3);
                         let vals = self.var_vals.entry(k).or_default();
@@ -668,35 +682,38 @@ impl Search {
                             self.policy.capped.insert(k);
                         }
                     }
+                    if self.seen_at.insert((line, r.room, k, val)) {
+                        class = class.min(4);
+                    }
                     continue;
                 }
-                if fresh(&mut self.seen, (k, val), level) {
+                if self.seen.insert((line, k, val)) {
                     novel.push(format!("{k}={val}"));
                     class = 0;
                 }
-                if fresh(&mut self.seen_at, (r.room, k, val), level) {
-                    class = class.min(if self.policy.guide.contains(&k) { 4 } else { 5 });
+                if self.seen_at.insert((line, r.room, k, val)) {
+                    class = class.min(if guide { 4 } else { 5 });
                 }
             }
             for &t in &r.vis {
-                if fresh(&mut self.sees, (r.room, t), level) {
+                if self.sees.insert((line, r.room, t)) {
                     novel.push(format!("sees={t}"));
                     class = class.min(1);
                 }
             }
-            if fresh(&mut self.ifaces, (r.room, r.iface), level) {
+            if self.ifaces.insert((line, r.room, r.iface)) {
                 novel.push("iface".into());
                 class = class.min(1);
             }
-            if fresh(&mut self.boxes, (r.room, r.walkbox), level) {
+            if self.boxes.insert((line, r.room, r.walkbox)) {
                 novel.push(format!("box={}", r.walkbox));
                 class = class.min(2);
             }
-            if fresh(&mut self.cams, (r.room, r.cam), level) {
+            if self.cams.insert((line, r.room, r.cam)) {
                 novel.push(format!("cam={}", r.cam));
                 class = class.min(2);
             }
-            if fresh(&mut self.cells, cell(r.room, r.iface, &world, &self.ambient), level) {
+            if self.cells.insert((line, cell(r.room, r.iface, &world, &self.ambient))) {
                 class = class.min(5);
             }
             // nothing new, alone or together: dropped
@@ -732,13 +749,13 @@ impl Search {
                 novel.truncate(12);
                 novel.push(format!("+{}", n - 12));
             }
-            let line = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
-                "class": class, "how": r.name, "novel": novel, "t": (secs * 10.0).round() / 10.0,
+            let text = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
+                "owned": owned.len(), "class": class, "how": r.name, "novel": novel, "t": (secs * 10.0).round() / 10.0,
                 "events": events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
             if let Some(f) = self.log.as_mut() {
-                let _ = writeln!(f, "{line}");
+                let _ = writeln!(f, "{text}");
             }
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever });
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             keep.push((i, nid, level as usize, class));
@@ -977,24 +994,22 @@ fn main() {
     let r = read(String::new(), Vec::new(), &o, st.clone());
     let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
     s.root_owned = r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).collect();
-    for p in r.facts.iter().filter(|p| world_kind(p.0)) {
-        s.seen.insert(*p, 0);
-        s.seen_at.insert((r.room, p.0, p.1), 0);
-    }
-    for p in r.facts.iter().filter(|p| p.0.kind() == K_VAR) {
-        s.seen.insert(*p, 0);
+    let line = line_of(&[], &[]);
+    for p in r.facts.iter().filter(|p| world_kind(p.0) || p.0.kind() == K_VAR) {
+        s.seen.insert((line, p.0, p.1));
+        s.seen_at.insert((line, r.room, p.0, p.1));
     }
     for &t in &r.vis {
-        s.sees.insert((r.room, t), 0);
+        s.sees.insert((line, r.room, t));
     }
-    s.ifaces.insert((r.room, r.iface), 0);
-    s.boxes.insert((r.room, r.walkbox), 0);
-    s.cams.insert((r.room, r.cam), 0);
+    s.ifaces.insert((line, r.room, r.iface));
+    s.boxes.insert((line, r.room, r.walkbox));
+    s.cams.insert((line, r.room, r.cam));
     s.rooms.push(r.room);
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new() });
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room });
     s.queues.push(Default::default());
     s.queues[0][0].push_back(0);
     s.live.insert(0, e);
@@ -1012,7 +1027,7 @@ fn main() {
             let first = s.queues.iter_mut().rev().find_map(|q| q[..FIRST_QUEUES].iter_mut().find_map(|c| c.pop_front()));
             let Some(id) = first.or_else(|| s.queues.iter_mut().rev().find_map(|q| q[FIRST_QUEUES..].iter_mut().find_map(|c| c.pop_front()))) else { break };
             let n = &s.nodes[id];
-            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.ever.len() as u32))));
+            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level))));
         }
         if batch.is_empty() {
             break;
