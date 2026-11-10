@@ -492,3 +492,260 @@ Order of work:
 - That the 8 b3 class changes come from REFINE_WIDEN. G8 tests it.
 - E016's 7 unexplained b3 field differences.
 - The labels of probe lines B and C.
+
+## Amendment 1 (2026-11-10): after G3
+
+File:line references in this amendment are at 0df2ab4 (branch `e026`), not 3cb3b33. The sources are G3's outputs (`results/g3/`) and three investigations under `~/.cache/fast-mi-e026/build/`. None of the investigations' code is committed.
+- **A**, `inv-demo-needs/`: what the demo needs from wait_both's passing paths.
+- **B**, `inv-mi-blowup/`: why room 28 is slow under wait_both.
+- **C**, `inv-other-levers/`: other levers on K1's room-28 cost.
+
+### G3's result
+
+- **(a) passed.** b3's j00006, cold and alone under wait_queued, read in 62.2 s (228,924 records, the same as with `FMI_READ_SWITCHES` unset). It was not bounded.
+- **(b) failed.** The demo's room-48 try (job-28025) was run twice each way, and each way reproduced byte for byte:
+
+  | | wait_both | wait_queued |
+  |---|---|---|
+  | Reading records | 24,649 | 19,520 |
+  | Plan 0 | 28 steps | 34 steps |
+  | Attempt | 2 inputs, then a 3,600-frame empty window to frame 22,871 | 9 inputs, frames 19,204-19,374 |
+  | Kept entries | 5 | 12, none the same |
+  | Stop | "no plan" | "no plan" |
+
+  - Both had the same 21 targets and the same target (`state:582=1`).
+  - wait_queued's counts: 376 WaitFor ops also passed on a path holding a sentence, and 3,614 only yielded.
+- By G3's rule, wait_queued is wrong as C1. It stays in the code, off (dbdc575).
+
+### What the investigations found
+
+**A. What the demo needs (job-28025, room 48; tables in `inv-demo-needs/out/`).**
+- The readings at the try's base (frame 19,203):
+
+  | | Records | Actions | Actions that pass a WaitFor op |
+  |---|---|---|---|
+  | wait_both | 24,649 | 21,631 | 5,089 |
+  | wait_queued | 19,520 | 17,046 | 380, all at script 2's 0x464 |
+  | both off | 18,918 | 16,656 | 0 |
+
+- wait_queued's reading is wait_both's minus the passes on paths that hold no sentence.
+  - All 16,542 of wait_both's pass-free actions have exact twins under wait_queued.
+  - Of wait_both's passing actions, 380 have exact twins and 4,683 are absent.
+- **wait_both's plans used passes that hold no sentence.** All of them are at the top level of the sentence script (script 2): 0x372 (a WaitForActor after a walk, 3-4 steps in every plan), 0x464 and 0x3A1.
+  - A pass skips the resume event, so the plans are shorter: plan 0 is 28 steps at cost 45, against 34 steps at cost 46 under wait_queued.
+- **Both such passes the engine played were wrong.**
+  - `#152` (0x372) deviated at frame 19,207: ego walked, and the resume `#981` matched 59 frames later.
+  - `#984` (0x464) was refuted: "the wait did not block".
+  - None of wait_both's 5 kept entries depends on a pass holding.
+- With both switches off the try stops at frame 19,271 on "no plan", with 3 entries.
+- **So the demo needs the passes that hold a sentence.** A blocking record would drop the held sentence, which lives on the path (E022 (27)). On this job the demo needs none of the other passes, but the planner prefers them.
+- Monkey Island's room 28 holds no sentence at any wait. Under wait_queued: 568 sentences held, 0 passes on a path holding one.
+- **Top level against nested calls.**
+  - On the demo, 5,078 of the 5,089 passing actions pass at the run's top level. The other 11 pass at obj:582@0x62, a WaitForMessage inside the sentence script's run.
+  - In room 28, 71,474 of the 107,025 passing actions pass inside a call that another script started in the same run.
+
+**B. Why room 28 is slow under wait_both (K1's j00001, scope [28], read by reader-scope alone at 3 threads).**
+
+| Run | Records | Wall | Peak RSS |
+|---|---|---|---|
+| wait_both off | 31,926 | 17.8 s | 326 MB |
+| wait_both | 162,826 | 189.3-341.7 s over five runs (A, B; load 3-7) | 1,885-2,295 MB |
+
+- 107,025 of 143,951 actions pass at least one wait.
+- The cost comes from object 322's verbs 8 and 10, which start the dialog script local 220 in the same run. Every passed WaitForMessage after that multiplies the paths.
+- **How the records grow.**
+  - Along a chain of passed waits, the records add up. Across slots in one round, they multiply.
+  - No loop re-enters a wait.
+  - There are 32,939 distinct effects, against 11,048 with wait_both off. The same dialog continuation is read again for each prefix, verb, rerun and pass.
+- `pass2_reuse` (lossless) gave the same reading and no gain (309.8 s).
+- **The decided WaitForMessage.** These engine facts decide the op after a talk:
+  - The op passes only when VAR_HAVE_MSG is 0 (script_v5.cpp:3316-3319).
+  - A print or printEgo text for any actor except 252-254 goes to text slot 0 (script_v5.cpp:3475-3487, :3596-3598).
+  - That slot calls actorTalk, which sets VAR_HAVE_MSG to 0xFF (actor.cpp:3541-3542). The only exception is a talking actor that is not in the current room (:3502-3518).
+  - Within a frame nothing clears VAR_HAVE_MSG in v5. stopTalk writes it only for DIG and CMI (actor.cpp:3597-3601), and the per-frame copy runs before the scripts (scumm.cpp:3383-3384).
+  - The reader's frame costs already rest on this (costs.rs:55-56).
+
+  B's scratch patch (`talk-rule.diff`) on j00001:
+
+  | Variant | Records | Wall | CPU s | Peak RSS |
+  |---|---|---|---|---|
+  | Any talker (an upper bound) | 86,907 | 65.8 s | 189.1 | 594 MB |
+  | Sound rule, today's start row | 162,697 | – | – | – |
+  | Sound rule, the dump's actor rooms in the start row | 86,916 | 40.8 s | 118.0 | 623 MB |
+  | That start row, rule off (run back to back) | 162,826 | 219.3 s | 643.2 | – |
+
+  - Today's start row holds no actor rooms: every actor's room is NOT_KNOWN (table.rs:148-152). So the sound rule decides almost nothing.
+  - The dump lists the visible actors in the current room (speedrun_state.cpp:629-640). j00001's dump lists actors 1 and 3.
+  - On the demo's room-48 reading, the rule and its upper bound both give a byte-identical reading (packed sha1 f776e50d). The reading has 4,624 talks, and the rule blocked no WaitForMessage after any of them.
+- **The rule does not fix j00006.**
+  - j00006 starts in room 33, where actor 3's room is not known. Local 204 writes 28 or 0 when room 28 is entered, so paths that do not hold 28 keep both branches.
+  - With the dump's actor rooms, the rule hit an 8-minute cap in pass 2: 48,483 pass-2 records and 1,281 CPU s, against 53,342 records and 1,134 CPU s with the rule off.
+  - Even its upper bound read j00006 in 115.4 s (382,691 records), against 59-69 s and 228,924 records with wait_both off.
+
+**C. Other levers on K1's room-28 cost (K1's archive; `inv-other-levers/k1-room28.tsv`).**
+- **Where K1's 2,659.3 s went.**
+  - 1,500.2 s were spent at the bound (j00001, 12, 13, 14 and 16).
+  - 1,159.1 s were spent waiting at the share gate (j00013 152 s, j00014 414 s, j00016 594 s; see Corrections).
+  - All six tries kept 0 entries.
+  - In the killed tail, j00017 waited 600 s at the gate and then read in 276.4 s.
+- **Records are deterministic, but whether a reading hits the bound is not.** j00001's reading took 189.3-341.7 s depending on load.
+- **Skipping room-28 tries would lose the kitchen.** Every measured entry into room 41 came from a model try on a room-28 entry whose reading finished: E012's goal entry 150, and E016's 341 and 344.
+- **Levers:**
+
+  | Lever | Kind | Saves in K1 | Taken |
+  |---|---|---|---|
+  | Defer a try whose scope's share gate is held | scheduling, lossless | 1,159.1 s, plus 2,087 s in the killed tail | not now (see below) |
+  | Check the stopped set before the gate (bound.rs:120) | lossless | 0 s, plus 908 s in the tail | no |
+  | Let a bounded model try fall back to `readings_any` | adds work | 0 s, and costs 113.6-694.6 s per try | no |
+  | Lower `FMI_READ_BOUND`, or set `FMI_READ_BOUND_BG` ≥ 1 | a tuned cap (D9), or more load | up to 1,350 s at a 30 s bound, but loses readings like j00017's (276.4 s) | no |
+  | Skip room-28 model tries | loses the kitchen | – | no |
+
+### C1', the decided WaitForMessage (replaces C1)
+
+- **The rule** (reader switch `wait_talk`, used with `wait_both`):
+  - It applies in wait_both's `None` arm (reader machine.rs:2426-2449).
+  - A WaitForMessage op there only yields, with no passing path, when the path ran a talk earlier in the same frame (the path's settle round, `Path::round`; the build checks that a round never spans two frames).
+  - A talk is a print or printEgo with a text, by one of:
+    - actor 255;
+    - an actor whose room the path holds without a fork (its write, its single precondition value, a pin or a one-value domain), equal to the room the path holds.
+  - Texts by actors 252-254 are not talks: they go to other slots.
+  - The rule does not apply if the path wrote VAR_HAVE_MSG after the talk.
+  - Every other WaitFor op is handled as wait_both handles it now.
+- **The start row** (same switch). The try's start row gets `actorroom:a = room` for each actor in the entry checkpoint's `actors` list (visible and in the current room). Actors not listed stay NOT_KNOWN.
+- **Why it is lossless (D9).**
+  - The rule removes only passing paths the engine cannot take. After such a talk in the same frame, VAR_HAVE_MSG is 0xFF, and the op passes only at 0 (B's engine facts).
+  - The start row adds only facts the dump shows of the start state.
+  - So every engine path that wait_both reads is still read.
+  - It is also a subset of wait_both's passing paths, so Lemma W holds too.
+- **No game numbers.** Actors 252-255 and VAR_HAVE_MSG belong to the engine (the reader's `domains::ENGINE`, domains.rs:28), not to a game.
+- **Switch and keys.**
+  - Off by default.
+  - When on, it is in the memo's key and in the reading cache's key, through `--switches` and the start row's facts.
+  - On in E026's env.sh for both games when G3' allows: `FMI_READ_SWITCHES=value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost,wait_both,wait_talk`.
+- **Tests.**
+  - A print by actor 255 followed by a WaitForMessage in the same frame: the op only yields.
+  - A printEgo by an actor the path holds in the room: the op only yields.
+  - Both paths are kept when the actor's room is not known, when the talk was in an earlier frame, when VAR_HAVE_MSG is written in between, or for actor 252.
+  - With the switch off, room 33's reading is byte-identical.
+- **Not explained.**
+  - A's static scan counts 11 demo actions that pass obj:582@0x62: a WaitForMessage right after a printEgo, with no yield between them (the printEgo follows a cutscene op).
+  - B's scratch rule left them undecided, even in its upper bound. Why is not checked.
+  - The built rule's tests include that shape.
+  - job-28025's checkpoint has no actor list, so on that job the sound rule decides ego's talk only where the path holds ego's room.
+
+### Candidates against G3'
+
+| Candidate | D9 | (a) demo try as under wait_both | (b) j00006 ≤ 90 s | (c) room 28 under the bound |
+|---|---|---|---|---|
+| wait_both (ON now) | – | itself | no: unfinished at 1,500 s (A) | no: bounded 5 times in K1; 189.3-341.7 s alone |
+| wait_queued (C1) | Lemma W subset | no: G3(b) | yes: 62.2 s | yes: j00001 in 20.8 s (A) |
+| Both off | – | no: "no plan" at frame 19,271, 3 entries (A) | yes: 59.1-69.3 s (G2, `FMI_READ_SWITCHES` unset) | yes: j00001 in 17.8 s (B) |
+| `pass2_reuse` | lossless | not run | not run | no: 309.8 s (B) |
+| **C1'** | lossless | the reading is byte-identical (B); the try was not run | **no: 8-min cap in pass 2 (B)** | j00001 in 40.8 s (B); 6 starts not run |
+
+- **No candidate measured meets all three thresholds.**
+- **C1' is chosen** because it is the only candidate that keeps the demo's reading and brings room 28 under the bound, and it loses nothing. On (b), the evidence is against it.
+- **Not measured, so not chosen: passes only at the top level** (dropping the passes inside a nested call).
+  - It is a Lemma W subset.
+  - Inside a nested call, the engine runs the rest of the called script before the caller's rest. Block-and-resume runs them in the opposite order (A). So it can drop engine paths that wait_both reads.
+  - It touches 71,474 of room 28's 107,025 passing actions, and the demo's 11 at obj:582@0x62.
+
+### G3' (replaces G3)
+
+| | What | Threshold |
+|---|---|---|
+| (a) | The demo's job-28025 by `fmi try`, cold, under ON with C1' and under ON without it, twice each | The same attempt events and kept entries both ways (compared as in G3), and each way reproduces. Reported: records, the count of WaitForMessage ops decided after a talk, and A's test of need (every record a wait_both window matched, and every pass the engine confirmed, has a twin under C1') |
+| (b) | b3's j00006, cold and alone, under ON with C1' | ≤ 90 s, not bounded |
+| (c) | K1's room-28 model tries, one per distinct start: j00001, 12, 13, 14, 16, 17, 18 (entries 15, 53, 38, 39, 239, 244, 267), each by `fmi try` on its job.json, cold and alone, under ON with C1' | Each reading ends under the 300 s bound. Reported: each reading's wall and records |
+
+- **How it runs.** Each timed part needs quiet_ok, as G3 did, and runs under the heavy lock with MemoryMax=5G.
+- **The start rows.** All 7 starts' dumps list actors 1 and 3 in room 28 (checked for this amendment on K1's entries).
+- **Prediction** (estimates; the measured inputs are in brackets):
+  - (a) passes [the reading was byte-identical in B's runs].
+  - (b) misses and the reading is bounded [the 8-min cap in pass 2; the upper bound needed 115.4 s].
+  - (c) j00001 reads in about 41 s [40.8 s at load 3-5]. The other 6 read under the bound, but they have not been measured.
+- **Stop rule.**
+  - If (a) differs: stop, and report which records C1' dropped and whether a played step used one (A's test).
+  - If a reading in (c) is bounded: stop, and measure that start.
+  - If (b) alone misses: C1' still goes on. It is lossless, and (a) and (c) are what it was chosen for. The next section applies.
+
+### If (b) misses: room 28 in the run, and b3
+
+- **The run's room-28 readings.**
+  - Under `FMI_SCOPE_GROW=room`, a room's reading is that room alone (grow.rs:24-29). All 22 of K1's jobs had one-room scopes, 13 of them [28].
+  - These readings start in room 28 with the dump's actors, which is j00001's case. They are read under C1'.
+  - A reading that still reaches the bound stops there (C2) and keeps 0 entries, and no reading stands in, as today.
+  - The bound stays at 300 s. No cap is added.
+- **Cost in G9's and G10's terms** (estimates from K1's measured terms):
+  - **Under C1'.** Taking j00001's 40.8 s, K1's room-28 tries would spend at most about 330 s reading and waiting at the gate, against 2,659.3 s. That is five fresh readings, plus queued tries that each wait at most one reading.
+  - **K1's other terms stay:** free tries 3,731.7 s (C4's) and room-33 tries 127.4 s. K1's mean over its 18 tries would then be about 233 s, so C1' alone does not meet G9's 30 s mean.
+  - **A reading still at the bound** costs one worker 300-310 s and keeps nothing.
+    - One such reading fails G9's "no reading at the bound".
+    - At W = 3, G10's T_K1 ≤ 17.1 min is 3,078 worker-seconds, and one bounded reading uses about 10% of it.
+    - It adds about 5 s to a 55-try mean.
+- **b3's j00006.**
+  - Its kind of scope (several rooms, starting outside room 28) comes from b3's fixed job list, not from the run's scopes. The exception is an entry whose room is outside the guide's ring, which reads the whole ring (grow.rs:32-35).
+  - If bounded, it fails b3's "no reading at the bound" (D11) at G8 and G13. By the stop rule, Run 1 then does not start.
+  - G9 and G10 measure the run's own readings, so they still run.
+  - What remains on j00006 needs research before any rule. Even B's upper bound reads 382,691 records, against 228,924 with wait_both off, so most of the remaining passes are not WaitForMessage's.
+  - Nothing is capped in the meantime.
+- **The share gate.**
+  - With C1', the reading ahead in the gate is j00001's kind, so a queued try waits about 41 s, not 300 s (estimate).
+  - C's deferral stays the measured, lossless next lever.
+  - G9 reports each try's wait at the gate, from the log's times, as C measured it.
+
+### C2b: a stopped reading stops with `shared_runs` too (no switch)
+
+- **The defect** (from Stage 2's review). It is latent, because ON's `FMI_READ_SWITCHES` does not hold `shared_runs`.
+  - A worker can wait in `SharedRuns::look` (reader shared.rs:62-65) for another worker's run of the same key, and while it waits it never sees the stop flag.
+  - If that run's owner unwinds at `look_stop` (scumm machine.rs:1495) before `fill` (reader machine.rs:3059), the key stays Running, and the pool never joins.
+- **The fix.**
+  - The owner holds a guard while its run is made. On unwind, the guard fills the key with no run (`State::Done(None)`).
+  - The waiter then takes `Look::Alone`, runs the click itself, and stops at its own `look_stop` within 4,096 steps.
+  - A stopped reading's files are never used (bound.rs:198-200), so no result changes.
+- **Gate.**
+  - A test where an owner unwinds while another thread waits on its key: the waiter returns.
+  - A stopped reading with `shared_runs` on joins, at 0 and 3 threads.
+  - With `shared_runs` on, room 33's reading, not stopped, is byte-identical before and after the fix.
+
+### Corrections the build found
+
+- **The "151-594 s past the bound" was a queue, not runaway readings.**
+  - j00013, j00014 and j00016 waited 152, 414 and 594 s at the share gate (`FMI_READ_SHARE`) before their own 300 s readings (C). The gate's lock is held through `read_fresh` (tryjob.rs:940-957), including the bounder's 300 s.
+  - G2 measured the try itself ending 0.3 s past a 30 s bound, with and without C2. C2 cut how long the reading threads live after the try from 10.4 s to 1.1 s (29.8 to 0.9 CPU s).
+  - So in Problem's K1 table, the "1,159.1 s past it" is time waiting at the gate. In C2's prediction row and in G2's threshold, "151-594 s" becomes "10.4 s of reading threads after the try".
+- **The key-fact baseline is 5 on one chain, not 9.**
+  - E012's kitchen holds 9 key facts across the archive: #1, #8, #15, #16, #19, #20, #21, #45 and #51.
+  - At most 5 are on one chain (G1): entry 78, with #15, #16, #19, #21 and #51.
+  - The "Now" for the prediction row "E001 key facts on the best verified chain" is 5.
+- **P0 in the score.**
+  - `ladder --score` counts P0, the root, as a rung: E012's kitchen scores 2 of 15 on entry 150's chain.
+  - Rung counts for P1-P14 subtract it: the kitchen holds 1 of 14.
+  - watch.sh and Run 1's reports give P1-P14.
+- **Stage 1 review notes, to fix before K1a:**
+  - watch.sh:63/:72: a failing ladder resets the no-progress clock. `held` takes the last seen value, the key facts are then appended to it again, and so it no longer equals `seen`.
+  - ladder.rs:285: a null room.
+
+### R3: decided (D11)
+
+- **The reference.** b3 compares against a reference recorded once on the E026 build with every switch on (G13's build).
+- **The rules.**
+  - Each class change from E013's reference is listed with its switch.
+  - New entries verify from boot with 0 differences.
+  - No reading reaches the bound, the reference's own included.
+- **G8** runs before every switch is on. It lists each class change from E013's with its switch (the 8 tries without REFINE_WIDEN still run), and applies the other rules.
+- **G13** records the reference.
+- "Report b3 both ways" is dropped.
+
+### What changes in the plan above
+
+- **Order of work, item 2:** C2, C2b and C1', then C3, C4 and C5. The gates are G2, G3', G4 and G5.
+- **C1's section** stays as history. C1' replaces it.
+- **Prediction table:**
+  - "j00006 reading (C1)": the central is now bounded (B), and the range is ≥ 115 s (the rule's upper bound) up to bounded.
+  - "A bounded try's time past its bound (C2)": Now is 10.4 s of reading threads after the try (G2's base), and the central is ≤ 2 s (G2: 1.1 s).
+- **Unconfirmed inputs:**
+  - "Whether every passing path the demo needs holds a sentence" is answered on room 48: no. The planner uses the passes that hold no sentence, but the two it played were wrong (A).
+  - New: whether K1's other 6 room-28 starts read under the bound with C1'.
+  - New: why B's rule left obj:582@0x62 undecided.
+  - New: what the remaining passes on j00006 are.
