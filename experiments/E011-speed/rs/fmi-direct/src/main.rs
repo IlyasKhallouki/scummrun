@@ -19,9 +19,14 @@
 //! * **The game's own moves.** Each stop is also run with no input for WAITS frames. Where that changes a key of the
 //!   world that fewer than MOTION_TRIES stops of that room and level saw change, the inputs are tried again from
 //!   there (a door a timer opens is open only then; a room's own motion is tried a few times, not at every stop).
+//! * **After an input.** Where a trial's stop differs from the expanded stop's in a key of the world that no wait
+//!   in that room has moved (the room's motion), the trial is run PROBE frames on with no input. The stop reached there is one more stop to
+//!   keep (an effect that lands after the first stop: a count the game raises when its actor has landed). And where a
+//!   key the input changed is back at its old value there, the first stop is a window that closes by itself: the
+//!   inputs are tried from it, whether it holds anything new or not (the first MAX_WINDOWS windows of a stop).
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
-//!   interface's own (those the input script writes, and those a fifth of a stop's inputs change), those that change
-//!   with no input (clocks), and those seen with more than VAR_CAP values (counters without end).
+//!   interface's own (those the input script writes, and those a fifth of a stop's inputs change), the clocks (those
+//!   that take two values or more over one stop's waits), and those seen with more than VAR_CAP values.
 //! * **Lines and levels.** A stop's line is what ego has gained and lost on the way to it: the objects it has owned
 //!   (and did not own at the boot) and those of them it owns no more. Its level is their count. Something is new to
 //!   a stop when no kept stop of its line holds it: with an object gained or used up, every room, input and position
@@ -61,6 +66,10 @@ const LEAD: u64 = 3;
 const BUSY: u64 = 300;
 /// The game's own moves: frames run with no input, each one trial of a stop.
 const WAITS: [u64; 3] = [50, 200, 800];
+/// Frames a trial that changed the world is run on with no input (the module's text, "After an input"), and the
+/// windows one round follows.
+const PROBE: u64 = 60;
+const MAX_WINDOWS: usize = 3;
 /// Stops of a room and level whose waits a key may change before its change stops calling for the inputs again.
 const MOTION_TRIES: u32 = 3;
 /// Pixels of the camera's bucket: a fifth of the screen, so a walk across part of it shows.
@@ -146,8 +155,9 @@ struct Search {
     policy: Policy,
     /// the world keys a run with no input changed somewhere: left out of the cells
     ambient: HashSet<Key>,
-    /// per level, room and key: the stops expanded there whose waits changed it
+    /// per level, room and key: the stops expanded there whose waits changed it; and per room the keys any did
     motion: HashMap<(u32, i32, Key), u32>,
+    room_motion: HashSet<(i32, Key)>,
     rooms: Vec<i32>,
     /// the highest level of a kept stop
     top: u32,
@@ -286,13 +296,17 @@ fn takes_click(st: &Status) -> bool {
 /// On to a stop where ego stands still and the bridge is idle, or, from frame `busy` on, the game takes a click; or
 /// `end`.
 fn settle(b: &mut Box<dyn Engine>, end: u64, busy: u64, ego: i32) -> EResult<Played> {
+    // the frames at which the engine's own tests said ego stands, and a click would count (the status's fields may
+    // say otherwise: the moving flags hold a pose's bits, the gate has more to it than the status shows)
+    let (mut stood, mut gate): (Option<u64>, Option<u64>) = (None, None);
+    let mut same = 0;
     loop {
         let st = b.status().clone();
-        if st.frame >= end {
+        if st.frame >= end || same > 8 {
             return Ok(Played::NotIdle);
         }
-        let ready = st.idle.is_some() || (st.frame >= busy && takes_click(&st));
-        if ready && st.mv.unwrap_or(0) == 0 {
+        let ready = st.idle.is_some() || (st.frame >= busy && (takes_click(&st) || gate == Some(st.frame)));
+        if ready && (st.mv.unwrap_or(0) == 0 || stood == Some(st.frame)) {
             return Ok(Played::Stop(st));
         }
         let spec = if ready {
@@ -305,8 +319,17 @@ fn settle(b: &mut Box<dyn Engine>, end: u64, busy: u64, ego: i32) -> EResult<Pla
             // past `busy` and no click taken yet: on to the first frame that is idle or takes one
             RunSpec { idle: true, control: true, max_frame: Some(end), ..Default::default() }
         };
-        if let Err(s) = go(b, spec)? {
-            return Ok(Played::Ended(s));
+        match go(b, spec)? {
+            Err(s) => return Ok(Played::Ended(s)),
+            Ok(s) => {
+                if ready && s.reason == "until" {
+                    stood = Some(s.frame);
+                } else if s.reason == "control" {
+                    gate = Some(s.frame);
+                }
+                // a run that stopped where it started must have told something new, or the loop ends
+                same = if s.frame == st.frame { same + 1 } else { 0 };
+            }
         }
     }
 }
@@ -357,6 +380,8 @@ struct Out {
     refused: u64,
     not_idle: u64,
     mids: u64,
+    /// stops that were windows
+    windows: u64,
     /// clicks not tried: slots known to pick another verb or to do nothing
     skipped: u64,
     offer: Value,
@@ -372,6 +397,13 @@ struct Out {
     frames: u64,
 }
 
+/// A line on stderr when DIRECT_TRACE is set (a measurement aid).
+fn trace(text: &str) {
+    if std::env::var_os("DIRECT_TRACE").is_some() {
+        eprintln!("TRACE {text}");
+    }
+}
+
 /// A point where the pointer is over no verb, object or actor, by the engine's hit test at this stop.
 fn park_point(e: &mut Box<dyn Engine>) -> EResult<Option<(i32, i32)>> {
     let (w, h) = (afford::SCREEN_W, afford::SCREEN_H);
@@ -381,7 +413,7 @@ fn park_point(e: &mut Box<dyn Engine>) -> EResult<Option<(i32, i32)>> {
 }
 
 /// The click sequences from the engine's stop (the module's text, "Inputs"), each a trial; `pre` names the round.
-fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResult<()> {
+fn clicks(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&HashSet<Key>>, cfg: &Cfg, out: &mut Out) -> EResult<()> {
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0);
@@ -390,7 +422,9 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     let first = out.results.len();
     let mut seen_mid: HashSet<u64> = HashSet::from([r0.mid()]);
-    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: Vec::new(), iface: r0.iface }];
+    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface }];
+    // the stops that are windows (the module's text, "After an input"): their engines, names and events
+    let mut windows: Vec<(Box<dyn Engine>, String, Vec<Event>)> = Vec::new();
     // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
     // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
     // verb), or gave that stop again (it does nothing)
@@ -500,6 +534,31 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                                 continue;
                             }
                         } else {
+                            // the input changed the world past the round's own motion: PROBE frames on with no input
+                            let touched: Vec<(Key, Val)> = match motion {
+                                Some(m) => r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) && !m.contains(&d.0)).map(|d| (d.0, d.1)).collect(),
+                                None => Vec::new(),
+                            };
+                            let mut window = false;
+                            if !touched.is_empty() && r.room == r0.room {
+                                let mut pb = b.fork()?;
+                                out.trials += 1;
+                                let at = pb.status().frame;
+                                if go(&mut pb, RunSpec { frame: Some(at + PROBE), ..Default::default() })?.is_ok() {
+                                    if let Played::Stop(st2) = calm(&mut pb, at + PROBE, cfg.horizon, ego)? {
+                                        let ob2 = pb.obs(&NAMES)?;
+                                        let r2 = read(format!("{}~", r.name), r.events.clone(), &ob2, st2);
+                                        window = touched.iter().any(|&(k, old)| r2.facts.val(k) == old);
+                                        out.results.push(r2);
+                                    }
+                                }
+                                pb.quit();
+                            }
+                            if window && windows.len() < MAX_WINDOWS {
+                                windows.push((b, format!("{}>", r.name), r.events.clone()));
+                                out.results.push(r);
+                                continue;
+                            }
                             out.results.push(r);
                         }
                     }
@@ -524,6 +583,14 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
             x.quit();
         }
     }
+    // the windows: the inputs from each, with no window found inside one
+    for (mut b, name, events) in windows {
+        out.windows += 1;
+        trace(&format!("    window {name} ({} trials so far)", out.trials));
+        let r = clicks(&mut b, &name, &events, None, cfg, out);
+        b.quit();
+        r?;
+    }
     // a variable a fifth of the round's stops changed echoes the input
     let made = &out.results[first..];
     if made.len() >= 10 {
@@ -544,6 +611,8 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
 /// What `explore` reads of the search: the rooms' motion at the batch's start.
 struct Snap {
     motion: HashMap<(u32, i32, Key), u32>,
+    /// per room, the keys a wait has moved at any stop
+    room_motion: HashSet<(i32, Key)>,
 }
 
 /// Every input of the stop tried, at the stop and after the game's own moves. Reads the engine and `snap` only.
@@ -553,10 +622,11 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
     let mut out = Out { room: r0.room, ..Default::default() };
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
-    clicks(e, "", cfg, &mut out)?;
-    // the game's own moves: no input for a while; where a key moved that few stops of this room and level saw move,
-    // the inputs again from there
+    // the game's own moves: no input for a while. What they move is the stop's own motion; a variable that takes two
+    // values or more over them is a clock
     let known = |k: Key| snap.motion.get(&(level, r0.room, k)).is_some_and(|&c| c >= MOTION_TRIES);
+    let mut waited: Vec<(u64, Box<dyn Engine>)> = Vec::new();
+    let mut values: HashMap<Key, Vec<Val>> = HashMap::new();
     for n in WAITS {
         let mut b = e.fork()?;
         out.trials += 1;
@@ -567,9 +637,12 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
                     let ob = b.obs(&NAMES)?;
                     let r = read(format!("wait{n}"), Vec::new(), &ob, st);
                     let mut moved = false;
-                    for (k, _, _) in r0.facts.diff(&r.facts) {
+                    for (k, _, now) in r0.facts.diff(&r.facts) {
                         if k.kind() == K_VAR {
-                            out.clocks.insert(k);
+                            let v = values.entry(k).or_default();
+                            if !v.contains(&now) {
+                                v.push(now);
+                            }
                         } else if world_kind(k) {
                             out.ambient.insert(k);
                             moved |= !known(k);
@@ -577,7 +650,8 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
                     }
                     out.results.push(r);
                     if moved {
-                        clicks(&mut b, &format!("wait{n}+"), cfg, &mut out)?;
+                        waited.push((n, b));
+                        continue;
                     }
                 }
                 Played::Ended(st) => out.ends.push(format!("wait{n} {}", st.reason)),
@@ -585,6 +659,18 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
             },
         }
         b.quit();
+    }
+    out.clocks.extend(values.into_iter().filter(|x| x.1.len() >= 2).map(|x| x.0));
+    let mut motion = out.ambient.clone();
+    motion.extend(snap.room_motion.iter().filter(|x| x.0 == r0.room).map(|x| x.1));
+    trace(&format!("  room {} waits done, {} moved", r0.room, waited.len()));
+    clicks(e, "", &[], Some(&motion), cfg, &mut out)?;
+    trace(&format!("  room {} round done: {} trials, {} windows", r0.room, out.trials, out.windows));
+    // where the world moved by itself (and few stops of this room and level saw that): the inputs again from there
+    for (n, mut b) in waited {
+        let r = clicks(&mut b, &format!("wait{n}+"), &[], None, cfg, &mut out);
+        b.quit();
+        r?;
     }
     for r in out.results.iter_mut() {
         r.changed = r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) || d.0.kind() == K_VAR).map(|d| (d.0, d.2)).collect();
@@ -629,6 +715,7 @@ impl Search {
         let level0 = self.nodes[id].level;
         for &k in &out.ambient {
             *self.motion.entry((level0, room0, k)).or_default() += 1;
+            self.room_motion.insert((room0, k));
         }
         self.policy.iface_vars.extend(out.iface_vars.iter().copied());
         self.policy.clocks.extend(out.clocks.iter().copied());
@@ -761,7 +848,7 @@ impl Search {
             keep.push((i, nid, level as usize, class));
         }
         if let Some(f) = self.offers.as_mut() {
-            let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "skipped": out.skipped, "mids": out.mids,
+            let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "skipped": out.skipped, "mids": out.mids, "windows": out.windows,
                 "stops": results.len(), "kept": keep.len(), "refused": out.refused, "not_idle": out.not_idle}));
         }
         let mut make = Vec::new();
@@ -829,6 +916,19 @@ fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
     let ego = base.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     let of = afford::offer_cfg(&mut e, &o, false, true).expect("offer");
     println!("stop: frame {frame} room {} offer {}", e.status().room, of.json());
+    println!("  ego {:?} xstart {} room width {}", o.ego_pos, e.status().xstart, e.status().room_w);
+    for r in o.room_objects.as_deref().unwrap_or(&[]) {
+        println!("  object {} state {} at ({}, {}) size {}x{} walk {:?}", r.id, r.state, r.x, r.y, r.w, r.h, r.walk);
+    }
+    for a in &o.actors {
+        println!("  actor {} at ({}, {}) moving {}", a.id, a.x, a.y, a.moving);
+    }
+    println!("  targets: {}", of.targets.iter().map(|p| format!("{}@({},{})", p.hit.name(), p.x, p.y)).collect::<Vec<_>>().join(" "));
+    if let Ok(bx) = e.boxes() {
+        for (i, w) in bx.boxes.iter().enumerate() {
+            println!("  box {i} flags {:#x} {:?} {:?} {:?} {:?}", w.flags, w.ul, w.ur, w.lr, w.ll);
+        }
+    }
     let mut points: Vec<Point> = of.targets.clone();
     let (top, h) = e.status().screen.map(|s| (s.0, s.1)).unwrap_or((0, afford::SCREEN_H));
     let grid: Vec<(i32, i32)> = FLOOR_Y.iter().flat_map(|&k| FLOOR_X.iter().map(move |&x| (x, (top + (h - top) * k / 8).min(h - 2)))).collect();
@@ -944,6 +1044,61 @@ fn main() {
         e.quit();
         return;
     }
+    if a.first().map(String::as_str) == Some("seq") {
+        // `direct seq NODES ID OUT KEYS STEP...`: a measurement tool. The kept stop's movie from boot, then each STEP
+        // "X,Y,N": a click at (X, Y) on the next frame and N frames run (N = "s": to where ego stands and the bridge
+        // is idle); after each step, and every 5 frames for 120 more after the last, the KEYS' values.
+        let text = std::fs::read_to_string(&a[1]).expect("NODES");
+        let id: u64 = a[2].parse().expect("ID");
+        let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
+        let events: Vec<Event> = line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect();
+        let frame = line["frame"].as_u64().unwrap();
+        let out = PathBuf::from(&a[3]);
+        std::fs::create_dir_all(&out).expect("OUT");
+        let host = Host::new(HostCfg::from_env()).expect("the host");
+        let mut e = host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(&out) }).expect("the boot");
+        let keys: Vec<Key> = a[4].split(',').map(Key::parse).collect();
+        let ego = e.facts().expect("facts").val(Key::pack(K_EGO, 0, 0, 0)) as i32;
+        let say = |e: &mut Box<dyn Engine>, what: &str| {
+            let f = e.facts().expect("facts");
+            let st = e.status().clone();
+            println!("+{:<4} {what:<14} idle {:?} mv {:?} box {:?} {}", st.frame - frame, st.idle, st.mv, st.walkbox,
+                keys.iter().map(|k| format!("{k}={}", f.val(*k))).collect::<Vec<_>>().join(" "));
+        };
+        say(&mut e, "start");
+        for step in &a[5..] {
+            let p: Vec<&str> = step.split(',').collect();
+            let at = e.status().frame;
+            if p[0] == "k" {
+                // "k,ON,N": the skips (text and cutscenes) set on or off
+                let on = p[1] == "1";
+                e.inputs(&[Event { frame: at + 1, what: Input::Skips { text: on, cutscenes: on, spare: None } }]).expect("skips");
+                let _ = go(&mut e, RunSpec { frame: Some(at + p[2].parse::<u64>().unwrap()), ..Default::default() });
+                say(&mut e, step);
+                continue;
+            }
+            let (x, y): (i32, i32) = (p[0].parse().unwrap(), p[1].parse().unwrap());
+            if x >= 0 {
+                e.inputs(&[Event { frame: at + 1, what: Input::Click(x, y) }]).expect("inputs");
+            }
+            if p[2] == "s" {
+                let _ = go(&mut e, RunSpec { frame: Some(at + 2), ..Default::default() });
+                let _ = settle(&mut e, at + 2000, at + 300, ego);
+            } else {
+                let _ = go(&mut e, RunSpec { frame: Some(at + p[2].parse::<u64>().unwrap()), ..Default::default() });
+            }
+            say(&mut e, step);
+        }
+        for _ in 0..24 {
+            let at = e.status().frame;
+            if go(&mut e, RunSpec { frame: Some(at + 5), ..Default::default() }).map_or(true, |r| r.is_err()) {
+                break;
+            }
+            say(&mut e, "");
+        }
+        e.quit();
+        return;
+    }
     if a.first().map(String::as_str) == Some("show") {
         return show(&a[1], a[2].parse().expect("ID"), Path::new(&a[3]), a.get(4).and_then(|x| x.parse().ok()).unwrap_or(6400));
     }
@@ -964,9 +1119,20 @@ fn main() {
     } else {
         vec![Event { frame: 1, what: Input::Skips { text: true, cutscenes: true, spare: None } }]
     };
+    // --from NODES ID (a measurement aid): the search starts at that kept stop of another run, not at the boot
+    let from: Option<(Vec<Event>, u64)> = opt("--from").map(|nodes| {
+        let id: u64 = a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID");
+        let text = std::fs::read_to_string(&nodes).expect("--from NODES");
+        let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
+        (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect(), line["frame"].as_u64().unwrap())
+    });
+    let (root_events, root_frame) = match from {
+        Some((ev, f)) => (ev, Some(f)),
+        None => (root_events, None),
+    };
     let t0 = Instant::now();
     let mut e = host
-        .boot(&BootCfg { seed: 1, events: root_events.clone(), frame: None, dump_locals: false, lean: true, out_dir: eng_dir(&out) })
+        .boot(&BootCfg { seed: 1, events: root_events.clone(), frame: root_frame, dump_locals: false, lean: true, out_dir: eng_dir(&out) })
         .expect("the boot");
     let st = e.status().clone();
     eprintln!("boot: frame {} room {} idle {:?} in {:.1} s", st.frame, st.room, st.idle, t0.elapsed().as_secs_f64());
@@ -1032,7 +1198,7 @@ fn main() {
         if batch.is_empty() {
             break;
         }
-        let snap = Snap { motion: s.motion.clone() };
+        let snap = Snap { motion: s.motion.clone(), room_motion: s.room_motion.clone() };
         // side by side: each stop explored, from the search's state at the batch's start
         let n = batch.len();
         let done: Vec<Mutex<Option<Done>>> = (0..n).map(|_| Mutex::new(None)).collect();
@@ -1051,7 +1217,7 @@ fn main() {
                         None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(&cfg.out) }),
                     };
                     let r = match e {
-                        Ok(mut e) => match explore(&mut e, level, &snap, &cfg) {
+                        Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
                             Ok(out) => Ok((e, out)),
                             Err(x) => {
                                 e.quit();
