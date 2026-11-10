@@ -1053,3 +1053,215 @@ So at a decided wait, VAR_HAVE_MSG ≠ 0 on every engine execution the path stan
   - New: whether play10's 46 shared readings stay byte-identical under C1'' (G3''(a2)).
   - New: the try under C1'' on room 28: kept entries, stops and peak memory; and whether j00001's a02 stop also happens without the rule.
   - New: whether the reader's room change holds ego's room as a fact (j00006's research).
+
+## Amendment 2b (2026-11-10): after Amendment 2's checks
+
+File:line references in this amendment are at 06ff134 (branch `e026`; its code is ab2e871's) unless another tree is named. Engine references are to svm-e024's tree (`third_party/scummvm/engines/scumm/`). The sources are under `~/.cache/fast-mi-e026/build/`:
+- **The gates check**, `wf5/check-gates.md`, with its runs in `chk2-gates/` (three play10 readings: rooms 49, 63 and 82).
+- **The proof check**, `wf5/check-proof.md`, with its runs in `chk2-proof/` (j00001 back to back; j00016 and j00017).
+- **This amendment's scratch**, `amend2b/`: T's `talk-final.diff` plus the changes to C1'' below behind `TALK_MERGE=1` (variant `cl3`; the whole diff is `cl3.diff`), and one VM call (`measure.sh`, `vm-measure.log`, `runs/*/summary.json`).
+- **The PI's decisions D12-D14** (`notes/decisions.md` at 06ff134).
+
+None of the scratch code is committed. The scratch ran in one `vmrun -w 2` call, 14:26-14:54 UTC, beside the other tracks' jobs (load 0.2-5.6). Records compare across calls. CPU seconds and walls compare only within one call: the same reading (sha 9dac3ff3) took 79.7, 83.7 and 129.4 CPU s in three calls (the gates check).
+
+### The checks' verdicts
+
+- **The proof check: sound, with minor problems.** It rebuilt T's diff byte for byte. j00001's reading reproduced (87,491 records, sha 9dac3ff3), and with the switch off it was byte-identical to ab2e871's. The engine facts hold in svm-e024.
+- **The gates check: not sound.**
+  - C1'' changes the demo's readings outside room 48, and G3'' neither compares them nor measures their cost.
+  - Reuse and the share gate are unsound for actor rooms of fact kind.
+  - G3''(a2) cannot run, and (a3) cannot see a change.
+  - No gate fails if a decided wait is wrong in the engine.
+
+Every problem of both checks, and what resolves it:
+
+**The gates check**
+
+| # | Problem | What changes in C1'' | How G3'' covers it (restated below) |
+|---|---|---|---|
+| G-1 | The rule changes the demo's readings in other rooms: room 49 (41,241 → 40,847 records, 187 waits decided), room 63 (7,763 → 7,789, 0 decided: 1,807 pending talks split joins) and room 82 (1,109 decided). G3'' compared only job-28025, where nothing is decided, and the shared readings | **Where the rule reads nothing at a wait, it changes nothing.** No fact read at the talk; marks and pending talks stay out of the join signature, and a merge keeps one only where every merged path holds it; a look before the wait's reads. Measured below (`cl3`) | (a1) rebuilds every demo job that has a job.json on disk and read fresh in play10's own run (54), plus job-28025. (a2) reads each request the rebuilt tries write, with and without wait_talk: byte-identical wherever the rule decided no wait and made no read |
+| G-2 | The prediction "(a2) passes" was very likely wrong: 8 of the 22 shared readings are room 49's, where the rule decides. G3''(a) must ask for byte-identity only where the rule decides nothing, and for engine evidence where it decides | As G-1 | (a2) as above; (e1) and (e2) check the engine where the rule decides |
+| G-3 | No gate measures the demo's cost. The start row alone doubles room 82's reading (10,996 → 21,334 records); with the rule it reads 19,241 (1.75 times today's) | None | (f): every rebuilt demo request, today's wait_both against the start row plus the rule, back to back, with thresholds |
+| G-4 | Reuse and share are unsound for actor rooms of fact kind. `reuse_of` (step.rs:517-523) passes a differing key that is a task key, and room 28's actors 1 and 3 are F9 facts. A reading whose start lists actor 3 is then reused by a try whose dump does not list it; the plan's start holds -1 for it (start.rs:292-302), which no record's precondition holds, so a "no plan" drawn there is not an over-approximation | **Under wait_talk, any differing `actorroom:` key blocks reuse and share, in both games.** `choose_reading` and `choose_reading_r1` (tryjob.rs:427-470, :504) never count an `actorroom:` key as a task key, the E009 keys included (:452); the share gate takes its candidates through `choose_reading` (tryjob.rs:940-947). The archives lose no reuse: every reuse and share had the same listed actors on both sides (K1 8 of 8; play10 7,918 of 7,918 and 46 of 46; T) | (d): tests on both a constant-kind and a fact-kind actor room, an actor listed on either side only, for a cached reading and for the share gate: never taken |
+| G-5 | (a3) cannot see a change in the build's decisions: `reuse_actors.py` compares the archives' listed actors without running `reuse_of`, and approximates 88% of the reuses (reach and refine readings) | None | (a3) is dropped. (d) tests the build's rule. Each G3'' try's log lists the candidates it refused and their differing keys (`first`, step.rs:519-521); the report counts refusals on an `actorroom:` key |
+| G-6 | (a2) cannot run and miscounts: play10 has 47 shared uses of 23 readings, 22 of them registered. None of these readings or requests is on disk | None | (a2) is restated over what is on disk ("What is on disk", below) |
+| G-7 | No gate fails if a decided wait is wrong in the engine | reading.json counts the decided waits by site (`wait_talk: decided at U@O`) | (e1): an engine trace over route-004, movie-c9-run and Monkey Island's recorded chains, 0 passes allowed. (e2): play, 0 engine passes of a decided wait in any G3'' try |
+| G-8 | The cross-reading memo (`FMI_READER_LIB=1`, `--memo-mem`) keys a stored run on the kind, domain and start of its touched keys only (reader memo.rs:1271-1278). The non-fact look (`room_may_decide`) was untracked, so a reading's bytes could depend on what the process read before | **The look is tracked.** It goes through `info` with tracking on (reader machine.rs:712-716): the actor room's kind, domain and start join the stored run's key, and no precondition is added. The actor looks at the talk are tracked the same way | (d): two readings in one process, the actor's room NOT_KNOWN in one and a constant in the other, in both orders: each byte-identical to its cold reading |
+| G-9 | Minor: CPU seconds do not compare across calls; the actor range is 1 to 12, not to NUM_ACTORS; the switch is not in the try's reuse key (`cached_readings_with`, step.rs:703-730, and `choose_reading` never compare switches) | **Under wait_talk, a cached or shared reading is taken only when its reading.json `switches` (reader run/mod.rs:770) equal the try's `FMI_READ_SWITCHES`.** With the switch off nothing changes. The wording is fixed (Corrections) | Each G3'' run also gets its own fresh reading folder and reading cache |
+
+**The proof check**
+
+| # | Problem | Resolution |
+|---|---|---|
+| P-1 | Four of K1's room-28 starts (j00012, 13, 14, 18) were read only with T's `cl`, which lacks the non-fact filter | Read now with `cl2` (the rule as Amendment 2 specified it) and with `cl3` (the rule as amended here): see "Measured". G3''(c1) reads all 7 with the build |
+| P-2 | Wording: the spec masks print's operand with `& 0xFF`; "1 to NUM_ACTORS" | **The mask is the engine's.** `_actorToPrintStrFor` is a byte (scumm.h:1337), so o5_print's assignment (script_v5.cpp:2082) truncates, as o5_printEgo's cast does (:2089). The check's "the engine keeps getVarOrDirectByte's full value" does not hold. A truncated value of 13-251 stops the engine in derefActor's error() (isValidActor needs id < _numActors: actor.cpp:2281-2296). The rule records nothing for 0 or 13-251, so it decides nothing there. **Actors are 1 to 12:** `scope::NUM_ACTORS` is 13, v5's _numActors (scope.rs:15) |
+| P-3 | Wrong cite: script_v5.cpp:1891 is in loadRoomWithEgo's `version <= 4` branch | v5's writes of an actor's room within a run: putActorInRoom (script_v5.cpp:2195-2203); loadRoomWithEgo's putActor (:1875); startScene's putActor (room.cpp:230, under `version >= 5 && a` at :223; room.cpp:261, under `version 5-6`); and Actor::putActor (actor.cpp:1747). :1891 is dropped |
+| P-4 | The scratch differs from the spec: (a) the builder refuses wait_talk only without actor_rooms, and the talk arm also runs under wait_queued alone; (b) the one-frame check `p.round == 0` is a debug_assert; (c) table.rs `kind()` makes start-given actor rooms facts whenever `extra` holds them | Build obligations: (a) the builder refuses wait_talk without wait_both or without actor_rooms, and the talk arm runs only under wait_talk; (b) the check holds in release builds: a talk on a path whose round is not 0 is an error of the reading; (c) no `given_rooms` at all: the kinds are today's. (a2) shows (c): where the rule reads nothing, the reading is byte-identical |
+| P-5 | The demo's byte-identity at job-28025 says nothing about the rule (it decides 0 waits there), and no try has played a decided wait | (e2) plays them: the rebuilt demo tries in rooms 42, 49 and 82, where the rule decides (Measured), and j00001's try (c2) |
+| P-6 | The label check is partial. Of the 162 labels missing under C1'' on j00001, 67 hold no record that passes a WaitForMessage (continuation events), and the actions file has no next events | (d2) completes it on the packed readings, which hold each record's end: every label C1'' lacks must be reached under wait_both only through records that pass a WaitForMessage the rule decides on some path, directly or along a chain of record ends. Threshold 0 |
+| P-7 | A "no plan" at a decided wait rests on the planner's `actorroom:` values, which play never tests (`holds` skips them: start.rs:43-60, :286-288) | Kept, and stated as a limit. Two things bound it. Every reading's start row takes the listed actors from the live dump (observed in the current room); unlisted actors stay NOT_KNOWN and decide nothing until the path writes their room. And (e2) counts every played decided wait the engine passes (0 allowed). A negative drawn at a decided wait that no try plays rests on F9's writes, as F9's other negatives do |
+
+### What changes in C1''
+
+The switch, the rule's conditions and the proof stay as Amendment 2 wrote them. These are added, and they are build obligations with tests in G3''(d).
+
+1. **Where the rule reads nothing at a wait, the reading is byte-identical** to the same request read without wait_talk. Three things give it:
+   - **No fact read at the talk.** The actor is a constant operand, a local, or a variable the path wrote or the table holds as a constant (a tracked look, item 3). Any other actor operand keeps no talk: fewer decisions, both ways kept.
+   - **Marks and pending talks stay out of the join signature** (reader machine.rs `join`, :1471). At a merge (`merge`, :1538) the merged path keeps a mark or a pending talk only when every merged path holds the same one with the same counts of var-3 and unknown writes, as the merge already keeps only the non-fact tests every merged path took. Dropping one only keeps both ways, so it is sound.
+   - **A look before the wait's reads.** The reads of ActorRoom(a) and Room run only when their values on the path (its write, else the table's constant or domain) share a room. Otherwise the wait takes both ways with no read and no fork.
+   - Without these, a pending talk split joins where nothing was decided (room 63: +26 records; job-28025 without the filter: +42), and a read at the wait forked actor rooms where no branch could decide.
+2. **Reuse and share.** Under wait_talk, any differing `actorroom:` key blocks reuse and share (G-4), and the switch list must match (G-9).
+3. **The memo.** Every look the rule makes (the non-fact filter, the actor at the talk, the values before the reads) goes through `info` with tracking on, so the cross-reading memo keys the stored run on those keys' kind, domain and start (G-8).
+4. **The builder** refuses wait_talk without wait_both or without actor_rooms; the talk arm runs only under wait_talk; the one-frame check holds in release builds; no `given_rooms` (P-4).
+5. **Counters** in reading.json: the decided waits by site (`wait_talk: decided at U@O`), the marks met, and the reads at a WaitForMessage. G3''(a2), (e2) and (f) read them.
+6. **One code path:** off by default, on for both games in env.sh, no game numbers (the engine's VAR_HAVE_MSG, VAR_EGO, actors 252-255 and NUM_ACTORS only).
+
+### Measured for this amendment (scratch, one VM call)
+
+- **Variants**, one scratch reader-scope for all, ON's switches, the try's arguments (as chk2-gates' `chk.sh` and T's `read.sh`):
+  - `wb`: wait_both on today's start row;
+  - `wb-ar`: wait_both on the row plus the entry checkpoint's listed actors (C1'''s start row), no rule;
+  - `cl2`: the rule as Amendment 2 specified it, on that row;
+  - `cl3`: the rule as amended here, on that row.
+- **The demo:** the 7 play10 readings on disk whose entry is known ("What is on disk"). Records / read CPU s (one call):
+
+  | Reading | wb | wb-ar | cl2 | cl3 | cl3: waits decided; reads at a wait | cl3 byte-identical to wb-ar |
+  |---|---|---|---|---|---|---|
+  | 42-j08918 | 60,673 / 361.3 | 60,673 / 367.4 | 58,083 / 230.7 | 58,007 / 220.7 | 366; 0 | no: it decides |
+  | 42-j08928 | 63,897 / 776.2 | 63,897 / 770.9 | 61,296 / 496.2 | 61,236 / 505.9 | 366; 0 | no: it decides |
+  | 49-j08916 | 41,241 / 10.0 | 41,241 / 9.9 | 40,847 / 9.9 | 40,866 / 9.8 | 183; 201 | no: it decides |
+  | 49-j08922 | 33,299 / 6.2 | 33,299 / 6.2 | 33,319 / 6.2 | 33,299 / 6.2 | 0; 0 | **yes** (30c9ffaa); cl2 differs |
+  | 49-j08926 | 33,614 / 6.2 | 33,614 / 6.2 | 33,634 / 6.2 | 33,614 / 6.2 | 0; 0 | **yes** (8446322b); cl2 differs |
+  | 63-j08924 | 7,763 / 1.1 | 7,763 / 1.1 | 7,789 / 1.1 | 7,763 / 1.1 | 0; 0 | **yes** (f68f0f00); cl2 differs |
+  | 82-j08930 | 10,996 / 3.0 | 21,334 / 8.8 | 19,241 / 7.7 | 19,187 / 7.9 | 1,106; 1,106 | no: it decides |
+  | All 7 | 251,483 / 1,164.0 | 261,821 / 1,170.5 | 254,209 / 758.0 | 253,972 / 757.8 | | |
+
+  - **Where cl3 decided nothing and read nothing (3 readings), it is byte-identical** to the same row without the rule. cl2 differs on all 3: its pending talks split joins (+20, +20 and +26 records).
+  - **It decides in rooms 42, 49 and 82.** Room 42's decisions are all marks by actor 255 (454 marks: 366 waits decided under cl3 against 454 under cl2, because a merge keeps a mark only where every merged path holds it).
+  - **cl3 keeps no talk whose actor needs a fact read:** 8,018 and 7,035 talks in room 42, where cl2's non-fact filter dropped 7,479 and 6,568 anyway, and 3,473 in room 82, where cl2 kept 4,201 pending talks and cl3 1,117. Room 82 still decides 1,106 waits, against cl2's 1,109.
+  - **Cost, start row plus rule against today's:** summed, 1.010 times the records and 0.651 times the CPU. Room 82 is the most: 1.745 times the records and 2.6 times the CPU (4.9 s more). There the start row alone reads 1.94 times today's records, and the rule takes back part of it.
+  - The demo's room-42 readings are the demo's largest: 125.0-270.7 s read wall under wb at 3 threads, 77.2-175.6 s under cl3.
+- **K1's 7 room-28 starts** (T's inputs, the dump's rooms). Records; cl3's read CPU s in this call:
+
+  | Start (entry) | wait_both (T) | cl (T) | cl2 | cl3 | cl3 ÷ wait_both, records | cl3: decided; reads |
+  |---|---|---|---|---|---|---|
+  | j00001 (15) | 162,827 | 87,491 | 87,491 (proof check) | 84,987 / 75.0 | 0.522 | 6,173; 4,973 |
+  | j00012 (53) | 162,826 | 87,490 | 87,490 | 84,986 / 73.2 | 0.522 | 6,173; 4,973 |
+  | j00013 (38) | 162,829 | 87,493 | 87,493 | 84,989 / 72.1 | 0.522 | 6,173; 4,973 |
+  | j00014 (39) | 162,832 | 87,496 | 87,496 | 84,992 / 73.7 | 0.522 | 6,173; 4,973 |
+  | j00016 (239) | 162,808 | 86,748 | 86,748 (proof check) | 84,244 / 78.4 | 0.517 | 7,284; 4,694 |
+  | j00017 (244) | 162,596 | 86,690 | 86,690 (proof check) | 84,186 / 72.4 | 0.518 | 6,173; 4,590 |
+  | j00018 (267) | 162,815 | 87,479 | 87,479 | 84,975 / 76.8 | 0.522 | 6,173; 4,973 |
+
+  - **P-1:** cl2 on j00012, 13, 14 and 18 reads exactly T's cl record counts.
+  - **cl3 keeps room 28's gain and adds to it:** 0.517-0.522 of wait_both's records, against cl2's 0.533-0.537. In room 28 no talk needs a fact read for its actor. At j00001: 6,189 marks by actor 255, 35,510 pending talks, 4,973 reads at a wait, 6,173 waits decided.
+  - cl3's read wall was 24.8-27.0 s and its peak RSS 643-705 MB, at load 4.0-5.6.
+  - No wait_both reading ran in this call, so cl3 has no CPU ratio of its own. The proof check's within-call ratio for cl2 on j00001 was 0.19 (74.3 against 384.5 CPU s); cl3's 72.1-78.4 CPU s here are the same size (estimate: about 0.2).
+- **Not exercised by the scratch:** the reuse and share rules (G-4, G-9) and the memo's tracking across readings (G-8). These are fmi-side or need one process to read twice; the build's tests (d) check them.
+
+### What is on disk for the demo
+
+- **Job files.** play10's own run (jobs j08752-j08932) left 180 job.json files in `~/.cache/fast-mi-e022/play10/jobs/`, each self-contained (the entry's events and checkpoint, the guide path, the scope). 54 of these jobs read fresh in play10: room 42 6, room 49 16, room 63 22, room 69 8, room 82 1, room 83 1. They also made 54 reach and 11 refine readings. job-28025 (room 48) is `~/.cache/fast-mi-e022/r48-data/job-28025.json`. play9's 4,052 job files (`/var/tmp/fast-mi/e016-archives/play9/jobs/`) cover rooms 49, 63 and 69 only.
+- **Readings.** Only 8 play10 readings are on disk (`play10/readings/`): 42-j08912, 42-j08918, 42-j08928, 49-j08916, 49-j08922, 49-j08926, 63-j08924, 82-j08930. 42-j08912's job is in neither the log nor `jobs/`, so its entry's actors are unknown. The other 7 are this amendment's scratch inputs.
+- **Not on disk:** the 22 registered shared readings and their jobs (j06570-j08080, in the removed `/var/tmp/fast-mi/e017-archives/play10`). A job made up from the log and the entry would not be the job that read them, so they are not rebuilt. The one other shared reading, 63-j08862, was made by j08862, one of the 54.
+- **So G3'' rebuilds the demo from job files.** Each job runs by `fmi try` with a fresh reading folder (`jq '.reading_dir = FRESH | .readings = [] | .readings_room = [] | .readings_any = []'`), its own reading cache, plan cache and pool, as gate3.sh ran job-28025. Each request a try writes (fresh, reach and refine: start rows, slot locals, arguments) is kept and read again by reader-scope. The 22 shared readings are replaced by these 55 jobs' readings; the share gate's choice is the reuse rule, which (d) tests.
+
+### G3'' restated (replaces Amendment 2's G3'' table)
+
+- Each part runs in one vmrun call on the VM. The timed parts (c1) and (f) take `-w 6`, so quiet_ok passes; every reading runs under `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`, with CPU seconds beside wall.
+- ON is E026's env.sh (B's and C's switches merged). "With C1''" adds `wait_talk` to `FMI_READ_SWITCHES`. Every run gets a fresh reading folder and reading cache.
+- The base build is the merged `e026` just before C1'''s commits. It is built on the VM beside the C1'' build.
+
+| | What | Threshold |
+|---|---|---|
+| (a0) | **Switch off.** The C1'' build with wait_talk off against the base build, on the requests the base build's `fmi try` writes: K1's 6 room-33 model tries (G4's) and 7 room-28 starts, job-28025, and (a1)'s 55 jobs' fresh readings | Every pair byte-identical: the packed reading, and the start rows the fmi side writes |
+| (a1) | **Rebuild the demo.** The 55 jobs ("What is on disk") by `fmi try` under ON with C1'', cold, 6 at a time | Every try ends with no guard kill. Reported: each try's stop, kept entries, reading records, the counters, and any reading at the bound |
+| (a2) | **Identity where nothing is decided.** Every request (a1)'s tries wrote, read by reader-scope as written, without and then with wait_talk, back to back | Where the "with" reading decided no wait, met no mark and made no read at a WaitForMessage, the two packed readings are byte-identical: **0 pairs differ** |
+| (a3) | job-28025, as G3 compared it: ON without C1'', with, without, with | The same attempt events and kept entries all four times, and all four readings packed sha f776e50d |
+| (b) | b3's j00006 by `fmi try` on its job.json, without and with C1'' (MemoryMax=16G) | **Reported only** (D12): records, CPU s, wall, whether it is bounded, the passes left by J's groups. A bounded reading is listed as a known limit |
+| (c1) | K1's 7 room-28 starts (j00001, 12, 13, 14, 16, 17, 18): the request the build's `fmi try` writes, read by reader-scope without and then with C1'' for each start (MemoryMax=5G) | With C1'', at every start: records ≤ 0.6 × wait_both's; read CPU s ≤ 0.3 × wait_both's; read wall ≤ 0.3 × wait_both's and ≤ 60 s; not bounded. The start row is today's plus `actorroom:1 = 28` and `actorroom:3 = 28` |
+| (c2) | j00001's whole try by `fmi try`, without and with C1'' (MemoryMax=16G) | Reported: wall, stops, kept entries, the driver's peak RSS (G9's W). Its plays count in (e2) |
+| (d) | `cargo test --locked`, switches off and on | All pass. The new tests are listed below |
+| (d2) | **The label check.** For each (a2) pair and each (c1) start where the rule decided: every label the "with" reading lacks, followed in the "without" reading through its records and their ends (the packed readings) | C1'' adds no label, and **0 labels it lacks** are reached under wait_both by a record that does not pass a WaitForMessage the rule decided on some path, directly or along a chain of record ends |
+| (e1) | **The engine, traced.** Patch 0011 (below) on route-004 and movie-c9-run (the demo), and on Monkey Island's recorded chains: E012's kitchen goal chain (`fmi explore verify` on `e012-archives/kitchen`, entry 150, to frame 18,416), and every new entry of K1's archive (`mi-checks-now/k1/archive`) and of b3's reference (`e013-int/b3f/all-fast`) (`fmi check verify-new`), each replayed from boot | **0 passes of a WaitForMessage after a talk that set VAR_HAVE_MSG in the same frame and the same top-level run**, with no script write of var 3 between them. **0 engine writes of var 3 inside a run** other than actorTalk's 0xFF. route-004 with the log on: 33 of 33 digests, end qf 55,555 (the patch only observes) |
+| (e2) | **The engine, played.** Every attempt of (a1)'s 55 tries and of (c2)'s try with C1'' | **0 play results** "the wait did not block" (fmi-play check.rs:443, strict.rs:1471) or "left the records' path" at a WaitForMessage whose site the try's reading lists as decided |
+| (f) | **The demo's cost.** Every request (a1)'s tries wrote, read twice back to back: today's (the start row without its `actorroom:` keys, ON's switches) and C1'''s (as written, with wait_talk) | Summed over all requests: records ≤ 1.1 × today's, read CPU s ≤ 1.0 × today's. Each request: records ≤ 2.5 × today's, and C1'''s read wall under 300 s (the bound). Reported by room, with the start row's share apart (the request as written, without wait_talk) |
+
+**Patch 0011 (an instrument; off by default; for (e1) only).**
+- `SPEEDRUN_TALK_LOG=PATH` writes one JSON line per event:
+  - each actorTalk (actor.cpp:3474): frame, slot, script, code offset, `_actorToPrintStrFor`, the actor's `_room`, `_currentRoom`, and whether it reached `VAR(VAR_HAVE_MSG) = 0xFF` (:3542) or returned at :3521;
+  - each SO_WAIT_FOR_MESSAGE (script_v5.cpp:3316-3318): frame, slot, script, offset, VAR_HAVE_MSG, passed or blocked;
+  - each write of var 3: by writeVar (a script write), or at an engine site (actorTalk, stopTalk, scumm.cpp:3384's copy, any other `VAR(VAR_HAVE_MSG) =`);
+  - each top-level run's start and end (the bridge's run stack, as `segment` keeps it: script.cpp's executeScript hooks).
+- It observes only, as patch 0004's segment and explain do (Lemma O, E003 trace-validation.md). Its engine is built apart (`/var/tmp/fast-mi/svm-e026t` on the VM); `FMI_ENGINE_BIN` stays svm-e024 for everything else.
+- The chains run through `fmi shorten verify` (the demo's routes), `fmi explore verify` and `fmi check verify-new` (Monkey Island's entries), with `FMI_ENGINE_BIN` a wrapper that sets the log path per launch, as E024's `video/engine-wrap.sh` sets the capture.
+- `fmi-checks talks LOG...` counts, per game and chain: talks (0xFF written, not in the room, 252-254); WaitForMessage ops after a talk in the same top-level run (blocked, passed); engine writes of var 3 by site.
+
+**New tests in (d)** (fake scripts, switch on unless stated).
+- Identity: a talk with no WaitForMessage after it, and a talk whose actor's room cannot equal the room, give the reading without the switch, byte for byte.
+- Joins: two paths, one with a mark and one without, join as without the switch; the merged path keeps no mark and its wait takes both ways. Two paths with the same mark keep it.
+- No read at the talk: a print whose actor is a fact-kind variable keeps no talk and forks nothing.
+- The memo: as in G-8, both orders.
+- Reuse and share: as in G-4, on a constant-kind and a fact-kind actor room; a reading made under other switches is not taken.
+- The builder refuses wait_talk without wait_both, and without actor_rooms.
+- Amendment 2's tests (marks, pending talks, the ends at breakHere, delay, delayVariable, queue_end, var-3 and unknown writes, room writes, systemOps and saveLoadGame; obj:582@0x62's shape; switch off byte-identical).
+
+**Why these thresholds.**
+- (a2) is the problem of G-1 and G-2 made exact: identity is asked exactly where the rule did nothing, and the counters say where that is. (e1), (e2) and (d2) cover where it did something.
+- (e1) tests the proof's engine steps (1-3) on every WaitForMessage the chains execute, in both games, with the engine's own values: a talk that wrote 0xFF, then a wait in the same run. (e2) tests the reader's decisions where the tries play them, the model's actor rooms included (P-7). (d2) tests that the decisions drop nothing else.
+- (f): on the 7 readings, the start row plus the rule read 1.010 times today's records for 0.651 times its CPU, and 1.745 times at most (room 82, where the start row alone reads 1.94 times). The sums fail a rule that adds a tenth to the demo's records, or any CPU in all; they leave room for the rooms not measured (48, 69, 83), since room 42 is 1,137.5 of the sample's 1,164.0 CPU s and the rule cuts it to 0.64 of that. The per-request bound fails a room that blows up, which a sum would hide.
+- (c1) is unchanged: it fails a rule that reduces nothing (the no-fork rule's 0.999 of wait_both's records).
+
+**Prediction** (estimates; measured inputs in brackets).
+- (a0) passes [the scratch reader with the switch off read j00001 byte-identical to ab2e871's: the proof check].
+- (a2) passes [cl3 was byte-identical on 3 of 3 readings where it decided nothing and read nothing; cl2 differed on all 3].
+- (a3) passes [cl2 on job-28025: f776e50d, G3's attempts, 5 kept; nothing is decided there, so cl3 reads it the same].
+- (c1) passes at about 0.52 of the records [cl3: 0.517-0.522] and about 0.2 of the CPU [cl2's within-call 0.19; cl3 has no within-call ratio].
+- (d2) passes [the proof check: C1'' adds no label on j00001; 95 of the 162 missing labels hold passing records, the other 67 are continuation events, not yet followed].
+- (e1) passes [the engine facts were read twice, by T and by the proof check; no trace has run].
+- (e2) passes [no decided wait has been played yet].
+- (f) passes: about 1.01 times the records and 0.65 times the CPU, 1.75 times at most [the 7 readings]. Rooms 48, 69 and 83 are not measured.
+- (b) bounded [J: no measured rule reads j00006 under the bound]; listed as a known limit.
+
+**Cost** (estimates). The 55 tries, 6 at a time; each request read three times, room 42's at 1.3-4.5 min a reading [77.2-270.7 s in the scratch]; the base build, the C1'' build and the patched engine; the replays of (e1). About 3 h of VM wall in all.
+
+**Stop rule.**
+- (a0), (a2) or (a3) differs: stop; C1'' stays off. Report the differing records.
+- (e1), (e2) or (d2) above 0: stop; C1'' stays off. Report the site, the run and the values.
+- (f) misses: stop; C1'' stays off. Report by room whether the start row or the rule costs.
+- (c1) misses at any start: stop; C1'' stays off. Measure which talks that start leaves undecided.
+- (d) fails: fix it first.
+- (b) stops nothing (D12).
+
+### The PI's decisions D12-D14 and the gates
+
+| Decision | What it says (notes/decisions.md) | Effect on the plan |
+|---|---|---|
+| D12 | b3's several-room jobs may reach the bound: j00006's [28, 33, 35, 38] and the [33, 38, 83, 85, 96] jobs. Each that does is listed as a known limit. Nothing is capped; the run's own readings keep the bound and its rules | **G3''(b) stops nothing:** j00006 is reported and listed. **G8 and G13, b3:** all 15 of b3's jobs are several-room (7 of [28, 33, 35, 38] from room 33, 8 of [33, 38, 83, 85, 96] from room 38; J), so "no reading at the bound" no longer applies to b3. Each b3 job whose reading reaches the bound is listed with its scope, records at the stop and wall, and does not fail G8 or G13. b3's other rules stand: new entries verify from boot with 0 differences, each class change from E013's is listed with its switch (a bounded reading's with D12), and the 8 tries without REFINE_WIDEN still run. **Smoke, G9 and G13's K1b keep "no reading at the bound"** (the run's own readings). Amendment 2's "j00006: it stays bounded" no longer holds Run 1; its research (ego's room after a room change) is off Run 1's path |
+| D13 | G5's miss does not hold Run 1. C3 and C4 stay off, C5 is on, and the free tries' cost is measured in Run 1 and fixed in a fix round if it binds | **G5 failed** (K1 j00007 292.5 s alone on the VM, 287.8-296.8 s in review; 97.4% of its frames in the trials' waits; REJOIN saves 0; the budget changes nothing on j00007) **and stops nothing.** G9 and G10 report the free tries' share of K1a's wall apart. A miss of G9's mean try or of G10 that the free tries' share alone explains (the threshold is met with that share left out) is D13's case: reported, it does not hold Run 1. G9's other terms hold it as before |
+| D14 | R1 stays off, G6 unchanged; R2 is on (G7 passed); L1-L4 start on `e026-click` | **G6 stays failed** (along the chain 12 of 14 with R1 off and 13 of 14 with it on; per job 14 of 14) and R1 stays off. G8's and G13's G4 runs with R1 off and R2 on. Track C's stage 2 is L1-L4 (G11, G12) |
+
+### Corrections
+
+- **Amendment 2's "Records and CPU seconds compare across calls"** is wrong for CPU seconds (G-9). Records compare across calls; CPU seconds and walls only within one call.
+- **The spec's wording:** the actor's `& 0xFF` is the engine's own byte (P-2); actors are 1-12 (P-2); the v5 room writes are script_v5.cpp:1875, :2195-2203, room.cpp:230, :261 and actor.cpp:1747 (P-3).
+- **The shared readings:** 47 shared uses of 23 readings, 22 of them registered, not "46 registered shared readings" (G-6).
+- **The proof check's P-2** says the engine keeps print's full operand; scumm.h:1337 makes it a byte.
+
+### What changes in the plan above
+
+- **G3''** is the restated table above. Amendment 2's (a1)-(a3) are replaced by (a0)-(a3); its (b) stops nothing (D12); its (c1), (c2) and (d) stay; (d2), (e1), (e2) and (f) are new.
+- **C1''** gets the changes listed above. Amendment 2's "Reuse and the share gate" is replaced by G-4's rule: under wait_talk an `actorroom:` key is never a task key for reuse or share, and the switch list must match.
+- **G8 and G13, b3:** as D12's row. **G5:** failed, holds nothing (D13). **G6:** failed, R1 off (D14). **G9, G10:** the free tries' share reported apart (D13).
+- **Order of work.** Track A: C2b and C1'' (G3'' as restated, with patch 0011 and `fmi-checks talks`). Track C: L1-L4 (D14). Track B merges as it is. G8 runs on the merged build.
+- **Prediction table.**
+  - "j00006 reading (C1)": a known limit (D12). Now bounded under wait_both (J: unfinished at 30 min); central bounded.
+  - "K1 j00007 (C4)": Now 292.5 s alone on the VM, 57 kept (G5). Central 290 s, 57 kept: C4 is off (estimate, from G5's runs). Range 288-297 s (G5 and its review).
+  - "G4 along the chain (R1)": Now 12 of 14 with R1 off (G6). Central 12 of 14: R1 is off (D14).
+  - "A room-28 reading under C1'', K1's 7 starts": Now 84,186-84,992 records, 24.8-27.0 s read wall on the VM at load 4.0-5.6 (cl3). Central 27 s on the VM (estimate). Range 25-45 s (estimate: cl2 read j00001 in 44.6 s at load 12-17).
+  - New row, "The demo's readings under C1'', against today's wait_both": Now, on 7 play10 readings, 1.010 times the records and 0.651 times the CPU, 1.745 times at most (cl3, one call). Central 1.0 times the records (estimate). Range 0.95-1.1 times (estimate; rooms 48, 69 and 83 not measured).
+- **Unconfirmed inputs.**
+  - Answered: whether the rule decides waits in the demo's other rooms. Yes, in rooms 42, 49 and 82 (Measured).
+  - New: whether any engine run passes a WaitForMessage after a talk that set VAR_HAVE_MSG in the same run ((e1)).
+  - New: the demo's cost under C1'' in rooms 48, 69 and 83, which no scratch reading covered ((f)).
+  - New: how far the rebuilt tries follow play10's. G3'' compares the build with itself both ways, not with play10.
