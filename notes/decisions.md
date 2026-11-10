@@ -135,3 +135,12 @@ And dropping the time for the kitchen." Approved: F1b (a click's record ends whe
 the sentence, which then runs as its own event, as sentence records do today), the start-state bug fix,
 replanning on a task kept in memory instead of rebuilding it from the reading, and bringing the kitchen run's game
 time down. The next Part I run waits until the whole chain finds and plays a plan on a small scope on the laptop.
+
+## D11 (2026-11-10): b3 compares against a reference re-recorded on E026's build
+
+Decided by: Ilyas.
+
+Asked what Monkey Island's b3 check should compare against, now that a demo switch (`FMI_REFINE_WIDEN`) changes try
+stop classes on purpose, Ilyas chose "Re-record": b3's reference is recorded once on the E026 build with every
+switch on, each class change from E013's reference is listed with the switch that causes it, new entries must still
+verify from boot with 0 differences, and no reading may reach the bound (E026 plan.md R3).
