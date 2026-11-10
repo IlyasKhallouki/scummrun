@@ -94,6 +94,10 @@ pub const SCREEN_WIDTH: i32 = 320;
 pub const PATH_LIMIT: usize = 256;
 pub const STEP_LIMIT: u32 = 5000;
 pub const ROUND_LIMIT: u32 = 400;
+/// E026 C2 (experiments/E026-part1/plan.md): the steps between two looks at a reading's stop flag (`Machine::stop`)
+pub const STOP_LOOK: u32 = 4096;
+/// E026 C2: the unwind a stopped run ends with (`Machine::stop`); the reader's pool catches it
+pub const STOPPED: &str = "the reading was stopped";
 /// model.py `TIME_VARS`' keys: VAR_CAMERA_POS_X, VAR_HAVE_MSG, VAR_LAST_SOUND, VAR_TALK_ACTOR
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
 /// path ends left out of the predictions (model.py `INFEASIBLE`; "widened" is E014's FMI_READ_WIDEN's, `widen.rs`)
@@ -298,6 +302,11 @@ pub struct Machine<'g> {
     pub find_objects: Option<Rc<[i32]>>,
     /// F12: the tallest main screen the scripts set (`mouse_range`), worked out once
     screen_h: std::cell::Cell<Option<i32>>,
+    /// E026 C2: the reading's stop flag (the reader's par.rs `Pool::set_abort`): every STOP_LOOK steps a run looks at
+    /// it and, set, ends by an unwind with STOPPED (no panic message); None (the default): never looked at
+    pub stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// the steps since the last look
+    stop_n: u32,
 }
 
 /// F12: the engine's mouse bounds for SCUMM v5 (input.cpp:414-434): the mouse is clipped to the screen,
@@ -429,8 +438,25 @@ impl<'g> Machine<'g> {
             ext: None,
             find_objects: None,
             screen_h: Default::default(),
+            stop: None,
+            stop_n: 0,
         }
         .with_wide()
+    }
+
+    /// E026 C2: every STOP_LOOK steps, the stop flag; set, the run ends by an unwind (a stopped reading's files are never
+    /// used, so what the run leaves half done is dropped)
+    #[inline]
+    fn look_stop(&mut self) {
+        if let Some(f) = &self.stop {
+            self.stop_n += 1;
+            if self.stop_n >= STOP_LOOK {
+                self.stop_n = 0;
+                if f.load(std::sync::atomic::Ordering::Relaxed) {
+                    std::panic::resume_unwind(Box::new(STOPPED));
+                }
+            }
+        }
     }
 
     /// The run's values follow switch value_sets (F12).
@@ -1466,6 +1492,7 @@ impl<'g> Machine<'g> {
             let x = X { u: uid, i: idx };
             let ins = &g.ins(uid)[idx as usize];
             p.steps += 1;
+            self.look_stop();
             let Some(st) = ins.st else {
                 let c = self.cite(x);
                 p.unmodelled.push((rc("unparsed"), c.clone(), rc(g.text(ins))));

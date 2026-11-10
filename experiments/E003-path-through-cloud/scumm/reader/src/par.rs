@@ -116,6 +116,8 @@ struct Shared {
     max_waiting: AtomicU64,
     /// the job the reading waits for (the first not handed on)
     frontier: AtomicU64,
+    /// E026 C2: the reading's stop flag (`Pool::set_abort`), which each worker's machine looks at as it runs a job
+    stop: std::sync::OnceLock<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// What the pool did: for the measurements.
@@ -178,8 +180,12 @@ impl<'a, 'g> Pool<'a, 'g> {
     }
 
     /// The flag that stops the reading: the reading's thread looks at it while it waits for the workers (at least
-    /// every 100 ms) and stops by a panic when it is set. It changes nothing a reading that is not stopped writes.
+    /// every 100 ms) and stops by a panic when it is set; E026 C2: each machine, the workers' and this thread's, looks
+    /// at it every `STOP_LOOK` steps and ends its job by an unwind, so the workers end with the reading. It changes
+    /// nothing a reading that is not stopped writes.
     pub fn set_abort(&mut self, abort: Arc<std::sync::atomic::AtomicBool>) {
+        self.main.m.stop = Some(abort.clone());
+        let _ = self.sh.stop.set(abort.clone());
         self.abort = Some(abort);
     }
 
@@ -295,6 +301,11 @@ impl Machine for Pool<'_, '_> {
             let ready: Vec<JobOut> = {
                 let mut q = self.sh.q.lock().unwrap();
                 loop {
+                    // E026 C2: a stop first (a worker the stop ended has failed with it)
+                    if self.stopped() {
+                        drop(q);
+                        panic!("the reading was stopped");
+                    }
                     // a stop lets go of the queue's lock first, so that the pool's shutdown (`with_pool`) takes it
                     // and the idle workers end (E014 amendment (5)); held, the lock was poisoned and they waited on
                     if let Some(f) = q.failed.clone() {
@@ -312,10 +323,6 @@ impl Machine for Pool<'_, '_> {
                         break ready;
                     }
                     if self.abort.is_some() {
-                        if self.stopped() {
-                            drop(q);
-                            panic!("the reading was stopped");
-                        }
                         q = self.sh.done.wait_timeout(q, std::time::Duration::from_millis(100)).unwrap().0;
                     } else {
                         q = self.sh.done.wait(q).unwrap();
@@ -572,6 +579,10 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                 q = sh.work.wait(q).unwrap();
             }
         };
+        // E026 C2: the machine looks at the reading's stop flag as it runs (set once the reading's thread has it)
+        if rd.m.stop.is_none() {
+            rd.m.stop = sh.stop.get().cloned();
+        }
         let r = panic::catch_unwind(AssertUnwindSafe(|| match task {
             Task::Part(p) => {
                 if p.claim() {
@@ -669,6 +680,7 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
         buffered: AtomicU64::new(0),
         max_waiting: AtomicU64::new(DEFAULT_MAX_WAITING),
         frontier: AtomicU64::new(0),
+        stop: std::sync::OnceLock::new(),
     };
     std::thread::scope(|s| {
         for w in 0..threads {
