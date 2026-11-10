@@ -92,6 +92,8 @@ pub struct FactTable {
     pub havoc_args: Option<std::sync::Arc<crate::args::HavocArgs>>,
     /// the switch wait_both (the Builder's): a WaitFor op whose test no fact holds also passes (machine.rs `wait_both`)
     pub wait_both: bool,
+    /// E026 C1, the switch wait_queued (the Builder's): wait_both's passing path only on a path that holds a sentence
+    pub wait_queued: bool,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
@@ -251,6 +253,7 @@ impl FactTable {
             havoc_rooms: false,
             havoc_args: None,
             wait_both: false,
+            wait_queued: false,
             reach: None,
             memo: None,
             cross: None,

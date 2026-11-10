@@ -456,6 +456,11 @@ pub struct Switches {
     /// A WaitFor op whose test reads engine state no fact holds both blocks and passes in the same run
     /// (experiments/E004-fast-exact/wait-both.md; machine.rs `wait_both`)
     pub wait_both: bool,
+    /// E026 C1 (experiments/E026-part1/plan.md): wait_both's passing path only on a path that holds a sentence (E022
+    /// amendment (27)'s, FMI_READ_QUEUE): a WaitFor op whose test no fact holds also passes there; elsewhere it yields,
+    /// as with both off. WaitForSentence's branches the path decides stay. By Lemma W still an over-approximation
+    /// (machine.rs `wait_both`). With wait_both on as well, wait_both's.
+    pub wait_queued: bool,
     /// With --frame-costs: an event at a WaitFor op that can pass at once costs 0 frames (costs.rs,
     /// experiments/E006-passed-wait/plan.md); the records are the same
     pub wait_pass_cost: bool,
@@ -483,11 +488,12 @@ impl Switches {
                 "havoc_rooms" => s.havoc_rooms = true,
                 "havoc_args" => s.havoc_args = true,
                 "wait_both" => s.wait_both = true,
+                "wait_queued" => s.wait_queued = true,
                 "wait_pass_cost" => s.wait_pass_cost = true,
                 _ if n.starts_with("step_limit=") => {
                     s.step_limit = n["step_limit=".len()..].parse().map_err(|_| format!("reader switch {n}: step_limit=N with N a number"))?
                 }
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, havoc_rooms, havoc_args, wait_both, wait_pass_cost, step_limit=N)")),
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, havoc_rooms, havoc_args, wait_both, wait_queued, wait_pass_cost, step_limit=N)")),
             }
         }
         Ok(s)
@@ -541,6 +547,9 @@ impl Switches {
         }
         if self.wait_both {
             v.push("wait_both");
+        }
+        if self.wait_queued {
+            v.push("wait_queued");
         }
         if self.wait_pass_cost {
             v.push("wait_pass_cost");
@@ -2675,6 +2684,7 @@ impl<'g> Builder<'g> {
         self.havoc_args_analysis();
         assert!(!self.switches.reach_pairs || self.switches.reach, "reach_pairs needs --reach");
         self.table.wait_both = self.switches.wait_both;
+        self.table.wait_queued = self.switches.wait_queued;
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");

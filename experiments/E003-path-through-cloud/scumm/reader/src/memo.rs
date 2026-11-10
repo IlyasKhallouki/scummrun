@@ -1089,6 +1089,10 @@ impl Builder<'_> {
             tb.reach.is_some()
         )
         .unwrap();
+        // E026 C1: named only when on, so the key with it off is as before
+        if tb.wait_queued {
+            writeln!(t, "flags wait_queued").unwrap();
+        }
         match &tb.settled {
             None => writeln!(t, "settled none").unwrap(),
             Some(r) => {

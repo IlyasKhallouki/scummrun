@@ -1433,7 +1433,7 @@ impl Hooks for ReaderHooks {
                 p.assumptions.push(Assumption { cite, cond: cond.into(), side: Side::Bool(false), why: why.into() });
                 return Ok(Vec::new());
             }
-            if st(m).table.as_ref().is_some_and(|t| t.wait_both) {
+            if st(m).table.as_ref().is_some_and(|t| t.wait_both || t.wait_queued) {
                 return wait_both(m, p, o, x, name);
             }
             count(m, "WaitFor ops that yield (their later part is an event)");
@@ -2403,6 +2403,9 @@ fn f1c_end(m: &mut Machine<'_>, p: &mut Path) -> Vec<Path> {
 /// VAR_HAVE_MSG (var 3, which the engine writes every frame, domains::ENGINE), WaitForCamera the camera's current and
 /// target x; no fact of the reading holds them. WaitForSentence reads the sentence queue and whether the sentence
 /// script is in use: where the path decides it (`sentence_wait_known`), it takes that branch alone; else both.
+/// E026 C1, the switch wait_queued (wait_both off): the passing path only where the path holds a sentence
+/// (`SymX::queued`, FMI_READ_QUEUE), which the passing run's end can run (`queue_end`); elsewhere the op yields as with
+/// both off. Every path it adds is one wait_both adds, so by Lemma W the reading still over-approximates.
 fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
     Ok({
         let g = m.game;
@@ -2421,6 +2424,15 @@ fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym)
                 Vec::new()
             }
             None => {
+                if st(m).table.as_ref().is_some_and(|t| t.wait_queued && !t.wait_both) {
+                    if sx(p).queued.is_none() {
+                        count(m, "wait_queued: WaitFor ops that only yield (the path holds no sentence)");
+                        count(m, "WaitFor ops that yield (their later part is an event)");
+                        m.h_done(p, o, "yield", c, Some(ins.offset))?;
+                        return Ok(Vec::new());
+                    }
+                    count(m, "wait_queued: WaitFor ops that also pass (the path holds a sentence)");
+                }
                 let (reason, what) = Machine::h_waits(name);
                 let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
                 let why = format!("?({}: {what})", reason.as_str());

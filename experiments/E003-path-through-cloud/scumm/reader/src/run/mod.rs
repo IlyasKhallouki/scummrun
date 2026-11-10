@@ -1150,6 +1150,14 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let pass_counts: BTreeMap<String, i64> =
         b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
+    // E026 C1: under the switch wait_queued, the machine's counts of its waits and of the sentences paths held
+    if b.switches.wait_queued {
+        let q: BTreeMap<String, i64> = b.rd.counts.0.iter()
+            .filter(|(k, _)| k.starts_with("wait_queued: ") || k.starts_with("FMI_READ_QUEUE: "))
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        r["wait_queued"] = json!(q);
+    }
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
     // the lists of locals the last pass folded (their `args:` numbers rewritten to 0 at its end): golden lines
     // streamed as made (--golden without --keep) still carry their numbers (replay_part1.py read_rust's stream)
