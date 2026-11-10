@@ -49,8 +49,8 @@ LABELS = "purpose=fast-mi"
 IMAGE = ("ubuntu-os-cloud", "ubuntu-2404-lts-amd64")
 DISK_GB = 30
 DISK_DAYS = 7  # planned life of the disk; booked in full at create
-CAP = 30.00
-STOP_AT = 29.50  # the ledger refuses anything past this, leaving room for price drift
+CAP = 80.00
+STOP_AT = 79.50  # the ledger refuses anything past this, leaving room for price drift
 EGRESS_RESERVE = 0.25  # copies back are megabytes; Internet egress is about $0.12 per GB
 REMOTE = "fast-mi"  # the repo copy, in the VM user's home
 
