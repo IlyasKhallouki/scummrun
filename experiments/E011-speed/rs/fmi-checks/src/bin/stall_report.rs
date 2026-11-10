@@ -1,13 +1,16 @@
 //! stall-report: E013's gates C1 and C3 (experiments/E013-robust/plan.md, section C and the amendment "component
 //! `stall`") over an archive's files, read only.
 //!
-//!   stall-report ARCHIVE [--report REPORT.json] [--live STALLS.json] [--json OUT] [--md OUT]
+//!   stall-report ARCHIVE [--report REPORT.json] [--live STALLS.json] [--json OUT] [--md OUT] [--project]
 //!
 //! C1: every committed try's rows sum to its wall; with `--report` (kitchen-report's report.json) each try's wall is
 //! the report's and the rows' total is the report's; the rest row is at most 1% of the seconds, signed and absolute;
 //! the novelty check holds on every line that has E012's records. C3: with `--live`, the driver's stalls.json is the
 //! text this report's table writes. Then the table (fmi explore stalls), the shift's changes and the cells the cell
 //! rule names after each commit (with the cells as they are now). Exit 0 when every check holds, 1 otherwise.
+//! `--project` (E026 plan.md I5, G10): the line 14 x T_K1, T_K1 the wall from the first try's start to the commit of
+//! the first goal entry (the end of the first log line with goal entries): Part I's 14 milestones each costing what
+//! this goal from boot cost, an estimate; within 4 h when T_K1 <= 17.1 min. Not a check: the exit code is unchanged.
 
 use fmi_explore::files;
 use fmi_explore::stall::{self, Class, Stalls};
@@ -23,7 +26,7 @@ fn arg(args: &[String], k: &str) -> Option<PathBuf> {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let Some(arch) = args.get(1).filter(|a| !a.starts_with("--")).map(PathBuf::from) else {
-        eprintln!("usage: stall-report ARCHIVE [--report REPORT.json] [--live STALLS.json] [--json OUT] [--md OUT]");
+        eprintln!("usage: stall-report ARCHIVE [--report REPORT.json] [--live STALLS.json] [--json OUT] [--md OUT] [--project]");
         std::process::exit(2);
     };
     let t0 = Instant::now();
@@ -127,6 +130,13 @@ fn main() {
     md += &format!("- tries the cell rule would have made free ({named_total} of {}; the cells as they are now; [commit, job, the try's class]): {}\n",
                    s.tries.len(), json!(named));
     md += &format!("- cost: the table from the files {build_s:.3} s ({:.2} ms per try), its JSON {:.1} ms\n", 1e3 * build_s / s.tries.len().max(1) as f64, 1e3 * json_s);
+    let projection = if args.iter().any(|a| a == "--project") {
+        let p = project(&arch);
+        md += &format!("\n## Projection (E026 G10)\n\n- {}\n", p["line"].as_str().unwrap_or(""));
+        p
+    } else {
+        Value::Null
+    };
     md += "\n## Checks\n\n";
     let mut ok = true;
     for (name, pass, detail) in &checks {
@@ -138,12 +148,64 @@ fn main() {
         std::fs::write(&p, &md).expect("write the text");
     }
     if let Some(p) = arg(&args, "--json") {
-        let out = json!({"archive": arch.display().to_string(), "table": table,
+        let mut out = json!({"archive": arch.display().to_string(), "table": table,
             "checks": checks.iter().map(|(n, p, d)| json!({"check": n, "pass": p, "detail": d})).collect::<Vec<_>>(),
             "replay": {"shift_on_commits": on_commits, "cell_rule_tries": named, "last20_peaks": peaks},
             "by_stop": by_kind.iter().map(|(k, (n, g, w, p))| json!({"stop": k, "tries": n, "gave": g, "wall": w, "productive": p})).collect::<Vec<_>>(),
             "cost": {"table_s": build_s, "json_s": json_s}});
+        if !projection.is_null() {
+            out["projection"] = projection;
+        }
         files::write_json(&p, &out, Some(1)).expect("write the JSON");
     }
     std::process::exit(if ok { 0 } else { 1 });
+}
+
+/// The milestones of Part I's ladder (rungs-part1.json's P1-P14) and the run's wall (E026 plan.md G10).
+const MILESTONES: f64 = 14.0;
+const RUN_WALL_S: f64 = 4.0 * 3600.0;
+
+/// G10's projection from the archive's log: MILESTONES x T_K1 against RUN_WALL_S.
+fn project(arch: &std::path::Path) -> Value {
+    let lines = files::read_jsonl(&arch.join("log.jsonl")).map(|x| x.0).unwrap_or_default();
+    let t0 = lines.iter().filter_map(|l| l["started"].as_f64()).fold(f64::INFINITY, f64::min);
+    let goal = lines.iter().find(|l| l["goal_entries"].as_array().is_some_and(|g| !g.is_empty()));
+    match goal.and_then(|l| Some((l, l["started"].as_f64()? + l["wall_s"].as_f64()?))) {
+        Some((l, t1)) if t0.is_finite() => {
+            let t = t1 - t0;
+            let x = MILESTONES * t;
+            let entry = l["goal_entries"].as_array().and_then(|g| g.iter().filter_map(|e| e.as_i64()).min());
+            json!({"t_k1_s": t, "goal_entry": entry, "job": l["job"], "projected_s": x, "bound_s": RUN_WALL_S, "within": x <= RUN_WALL_S,
+                   "line": format!("T_K1 {t:.1} s ({:.1} min): goal entry {} ({}), from the first try's start to its commit; {MILESTONES} x T_K1 = {:.2} h, {} the {:.0} h bound (T_K1 <= {:.1} min)",
+                                   t / 60.0, entry.map(|e| e.to_string()).unwrap_or("?".into()), l["job"].as_str().unwrap_or("?"), x / 3600.0,
+                                   if x <= RUN_WALL_S { "within" } else { "over" }, RUN_WALL_S / 3600.0, RUN_WALL_S / MILESTONES / 60.0)})
+        }
+        _ => json!({"t_k1_s": null, "within": false, "line": format!("no goal entry in {} log lines: no projection", lines.len())}),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_projection_is_14_times_the_wall_to_the_first_goal_commit() {
+        let d = std::env::temp_dir().join(format!("stall-report-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let rows = [json!({"job": "j00001", "started": 1000.0, "wall_s": 50.0, "goal_entries": []}),
+                    json!({"job": "j00000", "started": 990.0, "wall_s": 5.0}),
+                    json!({"job": "j00002", "started": 1500.0, "wall_s": 100.0, "goal_entries": [9, 7]}),
+                    json!({"job": "j00003", "started": 1550.0, "wall_s": 10.0, "goal_entries": [11]})];
+        std::fs::write(d.join("log.jsonl"), rows.iter().map(|r| format!("{r}\n")).collect::<String>()).unwrap();
+        let p = project(&d);
+        // from 990 (the first try's start) to 1600 (j00002's end): 610 s; 14 x 610 s within 4 h
+        assert_eq!(p["t_k1_s"], json!(610.0));
+        assert_eq!(p["goal_entry"], json!(7));
+        assert_eq!(p["projected_s"], json!(8540.0));
+        assert_eq!(p["within"], json!(true));
+        std::fs::write(d.join("log.jsonl"), format!("{}\n", rows[0])).unwrap();
+        assert_eq!(project(&d)["within"], json!(false));
+        let _ = std::fs::remove_dir_all(&d);
+    }
 }
