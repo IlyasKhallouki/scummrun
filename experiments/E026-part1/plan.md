@@ -749,3 +749,307 @@ File:line references in this amendment are at 0df2ab4 (branch `e026`), not 3cb3b
   - New: whether K1's other 6 room-28 starts read under the bound with C1'.
   - New: why B's rule left obj:582@0x62 undecided.
   - New: what the remaining passes on j00006 are.
+
+## Amendment 2 (2026-11-10): after Amendment 1's check
+
+File:line references in this amendment are at ab2e871 (branch `e026`) unless another tree is named. Engine references are to svm-e024's tree (`third_party/scummvm/engines/scumm/`). The sources are under `~/.cache/fast-mi-e026/build/`:
+- **The check**, `amend1-check.md`, with its rerun in `/var/tmp/fast-mi/chk-c1p/peek-ar/`.
+- **T**, `res-talk-read/`: the decided WaitForMessage, made right (scratch diff `talk-final.diff`).
+- **J**, `res-j00006/`: b3's j00006 under wait_both (scratch diff `resj.diff`).
+- **L**, `res-lazy-passes/`: read the passing paths only when a try needs them (scratch diff `lazy.diff`).
+
+None of the research code is committed. The research ran on the project VM beside the other tracks' jobs (load 6-21). Records and CPU seconds compare across calls. Wall times compare only within one call.
+
+### The check's verdict, and how each problem is resolved
+
+The check found Amendment 1 not sound. Its engine facts held, G3'(a) was as strict as G3(b), and the numbers matched the files on disk.
+
+| Problem the check found | Resolution |
+|---|---|
+| 1. The 40.8 s was B's fork variant (`INV_TALK=read`), not the specified no-fork rule. The no-fork rule with the dump's actor rooms gives 162,697 records, 198.8 s, 584.4 CPU s on j00001: no gain | C1'' specifies the fork form: the rooms are read by the machine's ordinary fact reads, at the wait. Its proof is below. Its numbers are T's measurements of that rule (`cl2`, and `cl` where the reading is the same) |
+| 2. G3'(c) passes with no reduction (wait_both alone read j00001 in 189.3 s and 296.8 s) | G3''(c1) compares each start with wait_both, back to back. Its thresholds fail at the no-fork rule's 0.999 of wait_both's records |
+| 3. Actor rooms in the start row break reuse and the share gate, or, left out of the diff, make reuse unsound | The reuse and share diff adds the same keys to the try's side, from the try's live dump. Measured: no reuse or share decision changes in K1 or play10 |
+| 4. A try's start row comes from the live Obs, which carries the dump's actors, so the demo's readings change too | C1'' takes the actors from the live Obs for every reading of a try. With that start row, job-28025's reading was byte-identical. G3''(a2) re-reads the demo's shared readings |
+| 5. Build obligations: any write that may reach var 3 ends the mark; restart and load clear it; one round is one frame, across delay and breakHere | Listed under C1'', each with a test |
+| Minor: an RSS range, the wait_queued match, a contradiction | See Corrections |
+
+### The work runs as three tracks
+
+| Track | Branch | Worktree | Target dir | Items |
+|---|---|---|---|---|
+| A | `e026` | `/var/tmp/fast-mi/wt-e026` | `/var/tmp/fast-mi/target-e026` | research, this amendment, C2b, C1'' |
+| B | `e026-cost` | `/var/tmp/fast-mi/wt-e026-cost` | `/var/tmp/fast-mi/target-e026-cost` | C3, C4, C5 |
+| C | `e026-click` | `/var/tmp/fast-mi/wt-e026-click` | `/var/tmp/fast-mi/target-e026-click` | R1, R2, then L1-L4 |
+
+- The tracks run at once. Each gates its own items.
+- B and C merge into `e026` before G8. G8 and every later gate run on the merged build.
+- Builds, readings, tries and gates run on the project VM through `scripts/vmrun.sh`, at the laptop's paths. A timed gate takes the whole VM (`-w 6`), so idle_ok and quiet_ok pass. Back-to-back comparisons run in one call.
+- Laptop walls from before 10:55 UTC do not compare with the VM's.
+
+### What the research found
+
+**T: the talk rule, made right.**
+- B's fork variant had four defects:
+  - printEgo never reached the hook. The machine calls `op` only for Write, End and Deferred ops and for putActorInRoom under actor_rooms (scumm machine.rs:1523, :1525). printEgo's effect is None (heads.rs:73).
+  - `p.round` is always 0 in the reader, which has no settle rounds (reader machine.rs:2793). So the mark never ended, not even at `queue_end`, though the engine runs other slots before a held sentence (scumm.cpp:3233, :3257).
+  - No write to var 3, and no unknown write, ended the mark.
+  - A print whose actor is a variable stayed undecided.
+- T's decomposition reproduces B's count exactly (86,916: print only, at the talk, the dump's rooms).
+- **Deciding at the talk forks at every talk.** On j00001, 55,164 talks land in "not in the room" branches: ego's room forks over {28, 33, 41}, the room over {0, 28, 33, 41, 79, 81, 82}. Deciding at the wait forks only where a talk meets a WaitForMessage.
+- j00001, records:
+
+  | Variant | Records |
+  |---|---|
+  | wait_both, today's start row | 162,827 |
+  | print only, at the talk, the dump's rooms | 86,916 |
+  | print and printEgo, at the talk, the dump's rooms | 119,743 |
+  | print and printEgo, at the wait, the dump's rooms (C1'') | 87,491 |
+  | C1'', today's start row | 171,747 |
+
+- **The start row is part of the rule.** On today's row, C1'' reads 5% more records than wait_both. The at-the-talk form on today's row passed the reader's 10-minute cap (laptop, 1,576.3 CPU s, 2,376 MB).
+
+**J: b3's j00006 (scope [28, 33, 35, 38], start in room 33).**
+- No measured rule reads it under the bound. VM, 4 threads, B's `j6-in` start row, ON's switches:
+
+  | Rule | Records | Read wall / CPU s | Result |
+  |---|---|---|---|
+  | wait_both off | 228,924 | 38.2 s / 132.7 | done |
+  | wait_both | 53,343 in pass 2 | – | stopped at 30 min |
+  | face and talk, no fork | 53,020 in pass 2 | – | stopped at 20 min |
+  | face and talk, fork at the talk | 117,394 in pass 1 | – | stopped at 20 min |
+  | Upper bound, not sound: every WaitForMessage after any talk only yields | 294,833 | 80.3 s / 294.2 | done |
+  | Upper bound, not sound: talk, face, walk and camera | 231,268 | 45.5 s / 158.3 | done |
+
+- Under wait_both, pass 2 stalls on room 28's dialog (`event(local:220@3627)`) and the dialog-choice inputs `sentence(v,442..445)[14]`.
+- In pass 1, 156,043 of 221,885 records (70.3%) pass a wait. By what comes before the wait (records with a pass there): a walk 93,683; a talk 55,129; WaitForCamera with no camera op 45,695; faceActor 13,945.
+- **The worst single op in pass 2** is the dialog verb script's printEgo then WaitForMessage (script:14@00FE): 96,424 of the talk upper bound's 105,531 dropped forks. The start row holds `actorroom:1 = 33`, while those inputs are read in room 28 or 35. Actor 3 is not listed.
+- **Walks and the camera have no rule.**
+  - startWalkActor leaves `_moving` unchanged for an actor outside the room or already at its destination (actor.cpp:871-877, :902-906). Positions are not facts of the reading.
+  - The camera follows an actor's position (camera.cpp:93ff).
+  - Face is lossless (faceToObject sets `_moving = MF_TURN`, actor.cpp:1678-1690), but its upper bound removes 22,028 forks and still stalls.
+- **Dedup of continuations is too small.** In pass 1, 60,561 of the 116,063 passing forks' states are distinct (52%). An exact memo saves at most 48% of continuation runs, and no records.
+- **The shape is b3's.** All 4,223 tries in K1 (18), E016's K1 (132), E016's kill run (21) and play9 (4,052) had one-room scopes, and none used the ring fallback (grow.rs:32-35). Several-room scopes occur only in E009's ring-scope archives (53 tries) and b3's fixed jobs (15).
+
+**L: read the passing paths only when a try needs them.**
+- R0 is the reading without wait_both, R1 today's. A try plans on R0 and reads R1 at its first attempt end that is not "target reached".
+- It is sound. R0 is not an over-approximation (Lemma W), so every negative is drawn on R1 only. Positives are engine checkpoints.
+- **It escalated in 9 of 9 tries.** Room 28's first target, `room=41`, has no plan on R0 at any of the 7 starts.
+- Its cost: +9.9 s on the demo, +13.4 s on j00001 (2.4%), +105.1 s on j00006 before the same bounded R1.
+- On the demo it does not keep wait_both's 5 kept entries. "Continue" misses 19,207 and adds three. "Restart" has 22,870 where today has 22,871; base-phase state leaks within the process (not pinned down).
+- **Not adopted.** It reduces nothing on room 28, and j00006 stays bounded under it.
+
+### C1'', the decided WaitForMessage, decided at the wait (replaces C1')
+
+**The switch.**
+- Reader switch `wait_talk`. It needs `wait_both` and `actor_rooms`, and the reader refuses it without them.
+- Off by default. It is in the reading cache's key (step.rs:20-23) and the memo's key, through `--switches`.
+- On in E026's env.sh for both games when G3'' passes: `FMI_READ_SWITCHES=value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost,wait_both,wait_talk`.
+
+**At a talk.** A print or printEgo whose sub-ops include a text (SO_TEXTSTRING) is a talk. Its actor a is:
+- for print, the path's value of the actor operand, & 0xFF;
+- for printEgo, the path's value of `VAR_EGO`, & 0xFF.
+
+Then, by a:
+- not an int, 252-254, or not an actor number (1 to `scope::NUM_ACTORS`): nothing is recorded;
+- 255: the path is **marked**;
+- any other actor whose room is a non-fact now: nothing is recorded. A room is a non-fact when the path has not written ActorRoom(a) and the table holds it as NonFact or as the constant NOT_KNOWN (`room_may_decide`; it looks up the table without adding to the run's touched keys);
+- any other actor: the path keeps a **pending talk**: a, the path's write-map entries for ActorRoom(a) and Room, its count of writes to `VAR_HAVE_MSG`, and its count of unknown writes.
+
+**At a WaitForMessage in wait_both's `None` arm.**
+- The op only yields (the blocking branch, `h_done "yield"`, as with wait_both off) when either:
+  - a mark holds: both counts are unchanged since the talk;
+  - or a pending talk decides: both counts are unchanged, ActorRoom(a) and Room have the same write-map entries as at the talk, and `m.read(ActorRoom(a))` and `m.read(Room)` give equal ints.
+- Those reads are the machine's ordinary fact reads: a fork splits the path into value branches, or a precondition is recorded.
+- On every other branch, the op takes wait_both's both ways.
+- Every other WaitFor op is handled as wait_both handles it now.
+
+**Lifetime.** Marks and pending talks live in the path's run state (SymX). They end at `queue_end`, at the run's end (a yield, an end, an unmodelled op) and when either count changes. Both are in the join signature.
+
+**The start row.**
+- Under `wait_talk`, every reading of a try gets `actorroom:a = room` for each actor its live dump lists (visible and in the current room; speedrun_state.cpp:629-635). This covers the first reading and any reach or refine reading at a later frame.
+- The actors come from the same Obs as the reading's other start facts (tryjob.rs:562-563; step.rs:1197, `write_facts_ordered`). Actors not listed stay NOT_KNOWN.
+- The reader keeps today's kinds: a listed actor's room is a constant, unless a scope write may reach it, in which case it is F9's fact.
+- The planner's start takes the same keys (start.rs `actor_rooms_listed`, after `actor_rooms_start`; harness.rs).
+- Play does not test `actorroom:` keys. They are unobserved and predicted (start.rs:43-60), as today under F9.
+
+**Reuse and the share gate.**
+- `choose_reading` (tryjob.rs:427-470) and the share gate (tryjob.rs:940) compare a reading's start facts with the try's live facts (tryjob.rs:883-887). Under `wait_talk`, the try's side gets the same `actorroom:` keys from its live dump (`with_actor_rooms`, before `choose_reading` and the share gate).
+- Nothing else changes. Entry identity, novelty and the archive keep today's fact maps.
+- A constant actor room must be equal on both sides. An actor listed on one side only is a differing key (Facts::diff counts an absent key as 0; fmi-core lib.rs:335-355), so that reading is not reused. That is conservative.
+- A fact-kind actor room is a record precondition, which the planner tests against its start.
+- The scratch's `reuse_of` change, which tolerates every `actorroom:` key, is dropped.
+- **Measured on the archives** (T's `reuse_actors.py`). Every reuse and share had the same listed actors at the reading's start and at the try's entry:
+  - K1: 8 of 8 reuses.
+  - play10: 7,918 of 7,918 reuses (972 fresh; 2,377 reach and 4,569 refine, these two with the start entry approximated), and 46 of 46 registered shared readings. One shared reading is not registered, so it cannot be checked.
+  - So no reuse or share decision would change in either archive.
+- **Rejected designs.**
+  - Actor rooms as entry facts: entries would split by actor visibility in both games, changing novelty, the archive and b3's reference.
+  - Today's start row: +5% records (T).
+  - Listed rooms made facts with a domain: sound, but adds forks for actors no scope write reaches, and no better on j00001 (T).
+
+**Why it is lossless (D9).** It drops only passing branches the engine cannot take.
+1. **The wait.** SO_WAIT_FOR_MESSAGE passes only when `VAR(VAR_HAVE_MSG)` is 0. Otherwise it restores the script pointer and breaks (script_v5.cpp:3316-3318, :3336-3337).
+2. **A deciding talk sets it to 0xFF.**
+   - o5_print and o5_printEgo (script_v5.cpp:2066, :2086) go to decodeParseString, which takes text slot 0 for every actor but 252-254 (:3474-3487).
+   - SO_TEXTSTRING (:3596) reaches printString's slot 0, which calls actorTalk.
+   - For actor 0xFF (actor.cpp:3492-3496), or an actor in the current room (:3502; `oldact` is then the actor's number, under 0x80, so :3521 does not return), actorTalk writes `VAR(VAR_HAVE_MSG) = 0xFF` (:3542).
+   - An actor not in the current room returns at :3521 before that write, and the rule decides nothing for it.
+3. **Nothing the path does not see writes var 3 between the talk and the wait in one run.**
+   - Script writes go through `Machine::put` and `write` (scumm machine.rs:1239, :832). Known targets are counted, including indexed vars with a known index and every setVarRange element (:2147ff). An unknown target is an unknown write (:1244).
+   - Nested scripts run inline, since the reader has calls and room_change on (reader machine.rs:2793), so their writes are on the path. An unknown callee is an unknown write (scumm machine.rs:1370, :1786, :1795, :1820, :1848).
+   - actorTalk only writes 0xFF again. stopTalk writes var 3 only for DIG and CMI (actor.cpp:3599-3601). startScene's stopTalk (room.cpp:53) is the same function.
+   - The per-frame copy runs before the scripts (scumm.cpp:3200, :3383-3384).
+   - Restart (systemOps) is unmodelled (heads.rs:115) and saveLoadGame has no rule (heads.rs:116). The path ends there (scumm machine.rs:1518-1520), and its mark with it.
+4. **Deciding at the wait gives the talk's answer.** The reads at the wait see the same ActorRoom(a) and Room as at the talk: their write-map entries are unchanged, and no unknown write happened. An unknown actor in putActorInRoom or loadRoomWithEgo is an unknown write (actor_rooms.rs:25-45, :50ff).
+5. **The reads drop nothing.** A fork's branches together are the path. Branches where the actor is not in the room keep both ways. The non-fact filter is exact: `actor_room_value` (reader machine.rs ~1078) turns a NOT_KNOWN or no-domain room into getActorRoom's non-fact, and with no write since the talk, it reads the same at the wait.
+6. **What it rests on: F9's actor-room model at the talk.** In v5 CD, `_room` is written within a run only by:
+   - putActorInRoom (script_v5.cpp:2195-2203);
+   - loadRoomWithEgo (:1875, :1891);
+   - startScene's putActor into the new room (room.cpp:230, :261);
+   - `Actor::putActor` (actor.cpp:1747).
+
+   initActor clears it only in modes 1 and -1, at boot and restart (actor.cpp:186-188, scumm.cpp:2101). The one other write (script_v5.cpp:3017-3031) is GID_MONKEY_VGA only.
+
+So at a decided wait, VAR_HAVE_MSG ≠ 0 on every engine execution the path stands for. The dropped branch holds no engine path. The reading keeps a subset of wait_both's passing paths that still holds every engine path (Lemma W).
+
+**What a record carries.**
+- No new effect. Var 3 is never written into a record (a mark lasts one run), and the reader already lists var 3 in TIME_VARS (table.rs:26).
+- A decided wait records the yield, as with wait_both off.
+- Where a read forked: `actorroom:a ∈ {v}` and `room ∈ {r}` in `pre`, on fact-kind keys only. A constant-kind actor room is the reading's start, like any constant.
+
+**No game numbers.** `VAR_HAVE_MSG` and `VAR_EGO` (vars.cpp), actors 252-255 and `NUM_ACTORS` are the engine's.
+
+**Build obligations.**
+1. printEgo reaches the hooks only under the switch (machine `Switches.talk`, a dispatch arm beside putActorInRoom's). The hook returns no paths for it.
+2. The count of writes to `VAR_HAVE_MSG` is kept in `Machine::write`, by the engine constant, not a literal 3.
+   - Indexed writes with a known index and setVarRange go through `put` and `write`, so they are counted.
+   - Unknown targets and unknown callees are unknown writes. Unknown writes from stopScript, doSentence, setClass and the like also end marks: conservative and sound.
+   - Narrowing on a test's sides (scumm machine.rs ~1673) is not an engine write and is not counted.
+3. The reader asserts `p.round == 0`, so one run is one frame. A run ends at breakHere, delay and delayVariable (heads.rs:34, scumm machine.rs:1511), at a blocked wait, at an end and at an unmodelled op.
+4. Marks and pending talks end at `queue_end`, at the run's end and when either count changes. They stay across a nested callee's yield (it returns to the caller in the same frame) and on wait_both's passing branch (it continues in the same frame).
+5. The fmi side keys three changes on `wait_talk` in `FMI_READ_SWITCHES`: the start row (`write_facts_ordered`), the plan start (`actor_rooms_listed`) and the reuse and share diff (`with_actor_rooms`).
+6. One code path: off by default, on for both games in env.sh.
+
+**Tests** (fake scripts, switch on unless stated).
+- Only yields:
+  - a print by actor 255, then a WaitForMessage in the same run;
+  - a printEgo by an ego the path holds in the room.
+- Ego's room a fact with two values, one of them the room: one branch only yields, the other takes both ways.
+- Both ways kept:
+  - a non-fact room; actors 252-254;
+  - a talk, then breakHere, delay or delayVariable, then the wait;
+  - a talk, then a held sentence (`queue_end`);
+  - a talk, then a write to VAR_HAVE_MSG, an indexed write that may reach it, a setVarRange over it, or an unknown write;
+  - a talk, then a write to ActorRoom(a) or Room;
+  - systemOps or saveLoadGame between the talk and the wait (the path ends).
+- obj:582@0x62's shape: a cutscene op, a printEgo and a WaitForMessage in one run.
+- Reuse: a reading whose start lists an actor the try's dump does not list is not reused, and the other way round.
+- Switch off: room 33's reading and the demo's job-28025 reading are byte-identical to ab2e871's.
+
+**What it does not decide.** The demo's obj:582@0x62 (11 passing actions) stays undecided.
+- With printEgo reaching the hook, ego's room is a non-fact in room 48's reading. All 5,688 of its talks are non-fact talks.
+- F9 leaves the room a non-fact because it cannot work out which of the scope's `putActorInRoom(Var[182], VAR_ROOM)` and three `putActorInRoom(VAR_EGO, VAR_ROOM)` writes it (table.rs `actor_room_domains`, ~477-520).
+- Deciding it needs F9 to work out that write. That is outside this rule.
+
+**Measured** (T's `cl`; VM, wait_both then C1'' back to back for each start in one call, beside other jobs, load 6-14). Records / read CPU s:
+
+| Start (entry) | wait_both, today's row | C1'', the dump's rooms | C1'' ÷ wait_both: records; CPU |
+|---|---|---|---|
+| j00001 (15) | 162,827 / 441.0 | 87,491 / 79.7 | 0.537; 0.181 |
+| j00012 (53) | 162,826 / 438.1 | 87,490 / 85.7 | 0.537; 0.196 |
+| j00013 (38) | 162,829 / 426.0 | 87,493 / 82.4 | 0.537; 0.193 |
+| j00014 (39) | 162,832 / 432.7 | 87,496 / 85.4 | 0.537; 0.197 |
+| j00016 (239) | 162,808 / 443.1 | 86,748 / 82.9 | 0.533; 0.187 |
+| j00017 (244) | 162,596 / 457.3 | 86,690 / 80.0 | 0.533; 0.175 |
+| j00018 (267) | 162,815 / 433.6 | 87,479 / 86.0 | 0.537; 0.198 |
+
+- Read wall: 27.5-29.7 s against 143.9-155.9 s. Peak RSS: 649-697 MB against 1,903-2,217 MB.
+- `cl` has no non-fact filter. With the filter (`cl2`, C1'' as specified), j00001's readings are the same: sha 9dac3ff3 with the dump's rooms (87,491 records; 44.6 s, 129.4 CPU s at load 12-17), and cf80cb2d on today's row. The other six starts were not re-read with the filter.
+- **No quiet timing of C1''.** The only quiet timing is the laptop's, before the move: j00001 under wait_both 245.3 s / 722.3 CPU s / 1,800 MB, and under the at-the-talk form with the dump's rooms 70.5 s / 206.6 CPU s / 636 MB.
+- **The demo's job-28025**, by `fmi try` under ON with the scratch build's start row (`cl2`):
+  - reading packed sha f776e50d, 24,649 records, as without the rule;
+  - attempts and kept entries as wait_both's, 5 kept.
+  - Without the non-fact filter (`cl`), the reading was 24,691 records (sha 3b76c090), because 5,688 pending non-fact talks split joins. Its attempts and kept entries were still wait_both's.
+  - The 46 shared readings were not re-read.
+- **Tries.** The try under C1'' on room 28 is not measured.
+  - j00001 under the at-the-talk form (not C1''): reading 60.7 s, 119,743 records; try 197 s. a00 and a01 "no plan"; a02 stopped at frame 17,230 on "the same empty window 2 times … no record's precondition holds"; 16 kept.
+  - j00001 under wait_both (L's VM batch): try 553.2 s, 16 kept, driver peak 13.8 GB. Under MemoryMax=5G it was killed at 196 s, so whether a02's stop also happens without the rule is not known.
+
+### G3'' (replaces G3')
+
+- Each part runs in one `vmrun -w 6` call (quiet_ok passes), cold, under `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`, with CPU seconds beside wall.
+- ON is E026's env.sh. "With C1''" adds `wait_talk`.
+
+| | What | Threshold |
+|---|---|---|
+| (a1) | The demo's job-28025 by `fmi try`, in this order: ON without C1'', with, without, with (MemoryMax=5G) | All four readings packed sha f776e50d. The same attempt events and kept entries in all four (compared as in G3). Reported: the wait_talk counters |
+| (a2) | play10's 46 registered shared readings, each re-read from its registered request with the start row the build writes (actors from its start entry's checkpoint), without and with C1'' | Each pair packed byte-identical. A reading that cannot be re-read fails (a2) |
+| (a3) | `reuse_actors.py`, copied into `run/`, on K1's and play10's archives, with the build's diff | No reuse or share decision changes (K1 8; play10 7,918 and 46) |
+| (b) | b3's j00006 by `fmi try` on its job.json, without and with C1'' (MemoryMax=16G) | D11's rule: with C1'', the reading is not bounded. Reported: records, CPU s, wall, and the passes left by J's groups |
+| (c1) | K1's 7 room-28 starts (j00001, 12, 13, 14, 16, 17, 18): the reading request the build's `fmi try` writes, read by reader-scope, without and then with C1'' for each start (MemoryMax=5G) | With C1'', at every start: records ≤ 0.6 × wait_both's; read CPU s ≤ 0.3 × wait_both's; read wall ≤ 0.3 × wait_both's and ≤ 60 s; not bounded. The build's start row is today's plus `actorroom:1 = 28` and `actorroom:3 = 28` |
+| (c2) | j00001's whole try by `fmi try`, without and with C1'' (MemoryMax=16G) | Reported: wall, stops, kept entries, the driver's peak RSS (an input to G9's W) |
+| (d) | `cargo test --locked`, switches off and on | All pass, the tests above included |
+
+- **Why these thresholds.**
+  - (c1) fails on a rule that reduces nothing: the no-fork rule the check reran gives 0.999 of wait_both's records (162,697 against 162,826). C1'' measured 0.533-0.537 of the records and 0.175-0.198 of the CPU.
+  - (a1)-(a3) fail on any change to the demo's reading at room 48, its try, its shared readings, or a reuse or share decision.
+- **Prediction** (estimates; measured inputs in brackets).
+  - (a1) passes [`cl2` on job-28025: f776e50d, wait_both's attempts, 5 kept].
+  - (a2) passes. This is the least supported: only job-28025 was re-read, and actor rooms in the start row alone changed j00001's packed reading (the check's ar-off).
+  - (a3) passes [0 changed decisions].
+  - (b) misses: bounded. [No at-the-wait form ran on j00006. The fork at the talk stalled in pass 1, with `sentence(8|10,322)[202]` taking 197-219 s each. The unsound talk upper bound, which drops every pass C1'' could drop, finishes in 80.3 s with 294,833 records.]
+  - (c1) passes, at about 0.54 of the records and 0.2 of the CPU [the table above].
+- **Stop rule.**
+  - (a1), (a2) or (a3) differs: stop, and C1'' stays off. Report the differing records, and whether a played step used one (A's test).
+  - (c1) misses at any start: stop, and C1'' stays off. Measure which talks that start leaves undecided.
+  - (d) fails: fix it first.
+  - (b) alone misses: C1'' goes on. It is lossless, and (a) and (c) are what it is for. The next section applies.
+
+### j00006: it stays bounded
+
+- No proven or lossless rule measured reads j00006 under the bound (J). C1'' is not measured on it; G3''(b) does that first.
+- If G3''(b) misses, j00006 stays bounded:
+  - b3 fails D11's "no reading at the bound" at G8 and G13, and **Run 1 does not start** (the stop rule).
+  - Nothing is capped. D11 stands; this amendment does not change it.
+  - The run's own readings do not have j00006's shape (see J), so G9 and G10 still run.
+- **What the evidence points at.**
+  - The stall is the talks. The unsound talk upper bound finishes in 80.3 s with every walk, face and camera pass still in.
+  - The other passes have no rule (walks, the camera) or barely fire (face).
+  - script:14@00FE alone is 96,424 of the upper bound's 105,531 dropped forks in pass 2. C1'' can decide it only if the reading holds ego's room for inputs read in rooms 28 and 35, while the start row holds room 33.
+- **The research that comes next** (Track A; plan, prediction and stop rule written before code):
+  1. **Ego's room after a room change inside a several-room scope.** The engine puts ego into the new room at startScene (room.cpp:230, :261), and loadRoomWithEgo writes it (script_v5.cpp:1875, :1891). The question is whether the reader's room change holds ActorRoom(VAR_EGO) as a fact on that path, so that C1'' decides script:14@00FE at its wait. Measure j00006's records and its passes at script:14@00FE against the upper bound.
+  2. **Actor 3's room** for a reading started in room 33: local 204 writes 28 or 0 when room 28 is entered (Amendment 1, B). This is F9's domain.
+  3. **Only if both leave it bounded:** J's control-state summary of continuations. It is lossless only with exact read sets, it still emits every record, and in J's count it would cut runs 29-76 times.
+- Each step meets D9 as C1'' does. Nothing on j00006 is ordered or capped by hand.
+
+### Corrections
+
+- **Amendment 1's B table.** The "wait_both, five runs" row includes B's pass2_reuse run (309.8 s, 3,729 MB) and ar-off (the dump's start row, 219.3 s). Its peak RSS range leaves out pass2_reuse's 3,729 MB. Plain wait_both on today's row read j00001 alone in 189.3 s and 296.8 s.
+- **wait_queued against wait_both.** "wait_queued's reading is wait_both's minus the passes on paths that hold no sentence" is not exact. A's match ran one way only. wait_queued has 16,666 pass-free actions against wait_both's 16,542, and event(script:59@783) has 1,615 actions against 1,507.
+- **Amendment 1 contradicted itself on the demo's needs.** What is measured: without the passes that hold no sentence, the demo's try changes (G3(b)), because the planner uses them, though both it played were wrong (A). So the answer to "whether every passing path the demo needs holds a sentence" is no. A's "the demo needs the passes that hold a sentence" means only that wait_queued is wrong by G3's rule.
+- **The wait's engine lines.** The block is at script_v5.cpp:3336-3337 (T's report gave :3341-3342).
+- **Room 28's cost under the talk rule.** Amendment 1's estimates (about 330 s of K1's 2,659.3 s, a 233 s mean, about 41 s at the gate) rest on the fork variant's 40.8 s.
+  - Re-estimated from the CPU ratio under C1'' on j00001 (0.181) and the laptop's quiet wait_both j00001 (245.3 s): about 44 s a reading on the laptop.
+  - With Amendment 1's arithmetic (five fresh readings, plus three queued tries waiting one reading each), that is about 360 s of K1's room-28 term. Both figures are estimates; G9 measures.
+- **Memory.** A room-28 try under today's ON peaks at 13.8 GB of driver RSS (L). C5's `FMI_READ_MAX_RSS_GB=6` covers the reading only. G9's W takes the driver's peak.
+
+### What changes in the plan above
+
+- **Order of work.** Items 2-3 and Part 4's build run at once as three tracks:
+  - A: C2, C2b and C1'' (G2, G3'');
+  - B: C3, C4 and C5 (G4, G5);
+  - C: R1 and R2 (G6, G7), then L1-L4 (G11, G12).
+  - B and C merge into `e026` before G8. Items 4, 6 and 7 follow on the merged build.
+- **C1'** stays as history. C1'' replaces it, and G3'' replaces G3'.
+- **Where jobs run.** Builds, readings, tries and gates run on the project VM through `scripts/vmrun.sh`. "Cost: Builds" and Amendment 1's walls are laptop figures. This amendment does not change where Run 1 runs.
+- **Prediction table.**
+  - "j00006 reading (C1)": Now, unfinished at 1,500 s under wait_both (A); C1'' not measured. Central: bounded (estimate). Range: about 80 s (the unsound talk upper bound, 80.3 s on the VM under load) up to bounded.
+  - New row, "A room-28 reading under C1'', K1's 7 starts": Now, 86,690-87,496 records, 27.5-29.7 s on the VM under load (`cl`). Central: 44 s on the laptop (estimate). Range: 28-71 s (the VM's walls up to the laptop's at-the-talk form).
+- **Unconfirmed inputs.**
+  - Answered: whether K1's other 6 room-28 starts read under the bound with the talk rule. In scratch, yes: 27.5-29.7 s. G3''(c1) checks the build.
+  - Answered: why B's rule left obj:582@0x62 undecided. printEgo never reached the hook; with it, ego's room is a non-fact in room 48's reading.
+  - Answered: what the remaining passes on j00006 are (J's groups above).
+  - New: C1'' on j00006 (G3''(b)).
+  - New: whether play10's 46 shared readings stay byte-identical under C1'' (G3''(a2)).
+  - New: the try under C1'' on room 28: kept entries, stops and peak memory; and whether j00001's a02 stop also happens without the rule.
+  - New: whether the reader's room change holds ego's room as a fact (j00006's research).
