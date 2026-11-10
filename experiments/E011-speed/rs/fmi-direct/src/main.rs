@@ -52,6 +52,8 @@ use std::time::{Duration, Instant};
 const MAX_CLICKS: usize = 4;
 /// Frames a stop is held before it is read (`calm`).
 const CALM: u64 = 6;
+/// Frames a trial's inputs take: the click, then the pointer's move.
+const LEAD: u64 = 3;
 /// The game's own moves: frames run with no input, each one trial of a stop. The first is the flicker's measure.
 const WAITS: [u64; 3] = [50, 200, 800];
 /// Pixels of the camera's bucket: a fifth of the screen, so a walk across part of it shows.
@@ -146,6 +148,7 @@ struct Search {
     live_max: usize,
     phase: [f64; 5],
     frames: u64,
+    skipped: u64,
     trials: u64,
     refused: u64,
     not_idle: u64,
@@ -290,7 +293,10 @@ fn settle(b: &mut Box<dyn Engine>, end: u64, ego: i32) -> EResult<Played> {
 /// A stop not reached within `horizon` frames of `from` gets four times as many.
 fn calm(b: &mut Box<dyn Engine>, from: u64, horizon: u64, ego: i32) -> EResult<Played> {
     for end in [from + horizon, from + 4 * horizon] {
+        let at = b.status().frame;
         match settle(b, end, ego)? {
+            // it stood already, CALM frames past the inputs' frames (the trial ran them before this): read at once
+            Played::Stop(st) if st.frame == at && at >= from + LEAD + CALM => return Ok(Played::Stop(st)),
             Played::Stop(st) => {
                 if let Err(s) = go(b, RunSpec { frame: Some(st.frame + CALM), ..Default::default() })? {
                     return Ok(Played::Ended(s));
@@ -316,6 +322,8 @@ struct Mid {
     engine: Option<Box<dyn Engine>>,
     clicks: Vec<Point>,
     events: Vec<Event>,
+    /// what the interface shows there
+    iface: u64,
 }
 
 /// What a stop's trials gave.
@@ -327,6 +335,8 @@ struct Out {
     refused: u64,
     not_idle: u64,
     mids: u64,
+    /// clicks not tried: slots known to pick another verb or to do nothing
+    skipped: u64,
     offer: Value,
     /// the variables the input script wrote in a trial, or that a fifth of the stop's inputs changed
     iface_vars: HashSet<Key>,
@@ -359,7 +369,12 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     let first = out.results.len();
     let mut seen_mid: HashSet<u64> = HashSet::from([r0.mid()]);
-    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: Vec::new() }];
+    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: Vec::new(), iface: r0.iface }];
+    // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
+    // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
+    // verb), or gave that stop again (it does nothing)
+    let mut first_gave: HashMap<Hit, u64> = HashMap::new();
+    let mut skip: Option<HashSet<Hit>> = None;
     for depth in 1..=MAX_CLICKS {
         let mut next: Vec<Mid> = Vec::new();
         for mut m in frontier {
@@ -370,7 +385,13 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
             let o = me.obs(&ObsReq::default())?;
             let of = afford::offer_cfg(me, &o, false, true)?;
             let park = park_point(me)?;
+            // the trials' forks record their slot runs and start with empty logs
+            me.segment(true)?;
+            me.runs()?;
+            let _ = me.input_log();
             let mf = me.status().frame;
+            let learn = depth == 2 && skip.is_none();
+            let mut learned: HashSet<Hit> = HashSet::new();
             let mego = o.ego_pos;
             let mut points: Vec<Point> = of.verbs.clone();
             points.extend(of.targets.iter().copied());
@@ -390,15 +411,14 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                 }
             }
             for p in &points {
+                if depth >= 2 && skip.as_ref().is_some_and(|s| s.contains(&p.hit)) {
+                    out.skipped += 1;
+                    continue;
+                }
                 let t = Instant::now();
                 let mut b = me.fork()?;
                 out.phase[0] += t.elapsed().as_secs_f64();
                 let t = Instant::now();
-                b.segment(true)?;
-                b.runs()?;
-                if depth == 1 {
-                    let _ = b.input_log();
-                }
                 let mut cl = m.clicks.clone();
                 cl.push(*p);
                 let mut events = m.events.clone();
@@ -418,7 +438,7 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                 }
                 out.phase[1] += t.elapsed().as_secs_f64();
                 let t = Instant::now();
-                if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + 3), ..Default::default() })? {
+                if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
                     out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                     b.quit();
                     continue;
@@ -445,10 +465,17 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                         };
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
+                            if matches!(p.hit, Hit::Verb { .. }) {
+                                if depth == 1 {
+                                    first_gave.insert(p.hit, r.iface);
+                                } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
+                                    learned.insert(p.hit);
+                                }
+                            }
                             // a stop to click on from; at the last click's depth it is no stop at all
                             if depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
                                 out.mids += 1;
-                                next.push(Mid { engine: Some(b), clicks: cl, events: r.events });
+                                next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events });
                                 continue;
                             }
                         } else {
@@ -461,6 +488,9 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                 let t = Instant::now();
                 b.quit();
                 out.phase[4] += t.elapsed().as_secs_f64();
+            }
+            if learn {
+                skip = Some(learned);
             }
             if let Some(x) = m.engine.take() {
                 x.quit();
@@ -583,6 +613,7 @@ impl Search {
         self.policy.clocks.extend(out.clocks.iter().copied());
         self.ambient.extend(out.ambient.iter().copied());
         self.trials += out.trials;
+        self.skipped += out.skipped;
         self.frames += out.frames;
         for (a, b) in self.phase.iter_mut().zip(out.phase.iter()) {
             *a += b;
@@ -699,7 +730,7 @@ impl Search {
             keep.push((i, nid, level as usize, class));
         }
         if let Some(f) = self.offers.as_mut() {
-            let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "mids": out.mids,
+            let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "skipped": out.skipped, "mids": out.mids,
                 "stops": results.len(), "kept": keep.len(), "refused": out.refused, "not_idle": out.not_idle}));
         }
         let mut make = Vec::new();
@@ -991,7 +1022,7 @@ fn main() {
     }
     let depth = s.nodes.iter().map(|n| n.depth).max().unwrap_or(0);
     let sum = json!({"seconds": t0.elapsed().as_secs_f64(), "workers": cfg.workers, "kept": s.nodes.len(), "by_queue": s.kept,
-        "expanded": s.expanded, "trials": s.trials, "refused": s.refused, "not_idle": s.not_idle, "rooms": s.rooms,
+        "expanded": s.expanded, "trials": s.trials, "skipped": s.skipped, "refused": s.refused, "not_idle": s.not_idle, "rooms": s.rooms,
         "max_depth": depth, "boots": s.boots, "top_level": s.top,
         "trial_seconds": {"fork": s.phase[0], "inputs": s.phase[1], "run": s.phase[2], "read": s.phase[3], "quit": s.phase[4]}, "trial_frames": s.frames,
         "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
