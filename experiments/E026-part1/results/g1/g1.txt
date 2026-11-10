@@ -1,0 +1,5 @@
+[01:17:21] PASS ladder --rungs rungs-demo.json on play9: JSON sha1 8d15685a54ab, built-in 8d15685a54ab; ladder /var/tmp/fast-mi/e016-archives/play9: furthest C4 (in order C4); 4176 entries; C0 e3 j00000 planned 2.1 min; C1 e128 j00045 model-free 4.6 min; C2 e136 j00048 model-free 4.7 min; C3 e144 j00051 model-free 5.4 min; C4 e3412 j01004 model-free 121.4 min
+[01:17:21] PASS rungs-part1.json on E012's kitchen: P1 at [entry, frame] [150,18416]; ladder /var/tmp/fast-mi/e012-archives/kitchen: furthest P1 (in order P1); 151 entries; P0 e0 - boot 0.0 min; P1 e150 j00052 planned 21.6 min; score 2 of 15 rungs (entry 150's chain)
+[01:17:21] PASS keyfacts on E012's kitchen: #1,8,15,16,19,20,21,45,51;  Part I key facts held (index: frame, entry): #1: 13924@135, #8: 18416@150, #15: 10111@45, #16: 10934@78, #19: 2945@47, #20: 2978@51, #21: 2945@47, #45: 14143@108, #51: 2728@0; the most on one chain: 5 of 99 (entry 78): #15, #16, #19, #21, #51;
+[01:17:22] stall-report --project on E012's kitchen: T_K1 1288.2 s (21.5 min): goal entry 150 (j00052), from the first try's start to its commit; 14 x T_K1 = 5.01 h, over the 4 h bound (T_K1 <= 17.1 min)
+[01:17:22] G1 PASS
