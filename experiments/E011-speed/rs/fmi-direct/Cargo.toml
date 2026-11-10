@@ -1,0 +1,14 @@
+[package]
+name = "fmi-direct"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "direct"
+path = "src/main.rs"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+fmi-engine = { path = "../fmi-engine" }
+fmi-explore = { path = "../fmi-explore" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
