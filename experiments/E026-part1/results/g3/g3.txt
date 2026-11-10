@@ -1,0 +1,29 @@
+# G3 (plan.md C1): gate3.sh /home/ilyask/.cache/fast-mi-e026/build/stage2/g3 (02:38-02:46) with the build 0ff15d6800a5 (C2 + C1; E26 then held QUEUED, hence a's "overrides: none"), and part b again in /home/ilyask/.cache/fast-mi-e026/build/stage2/g3-rep (02:47-02:52)
+a-queued j00006 rc 0 wall 105.1 s (overrides: none): {"why":"no cached reading","read_s":63.8,"read_wall_s":62.2,"read_cpu_s":182.0,"records":228924,"bound":null,"rss":1159,"stop":null,"wall_s":104.9}
+b both: rc 0 wall 131.0 s: {"why":"no cached reading","read_wall_s":23.5,"records":24649,"bound":null,"stop":"no plan (the planner proved none)","new":5,"wall_s":130.7}; wait_queued counts {}
+b queued: rc 0 wall 207.1 s: {"why":"no cached reading","read_wall_s":21.6,"records":19520,"bound":null,"stop":"no plan (the planner proved none)","new":12,"wall_s":206.7}; wait_queued counts {"FMI_READ_QUEUE: held sentences run where the run's step ended":221,"FMI_READ_QUEUE: sentences a doSentence holds":376,"wait_queued: WaitFor ops that also pass (the path holds a sentence)":376,"wait_queued: WaitFor ops that only yield (the path holds no sentence)":3614}
+b: attempts DIFFER (1), kept entries DIFFER (12)
+# b again
+b both: rc 0 wall 126.9 s: {"why":"no cached reading","read_wall_s":21.5,"records":24649,"bound":null,"stop":"no plan (the planner proved none)","new":5,"wall_s":126.7}; wait_queued counts {}
+b queued: rc 0 wall 210.9 s: {"why":"no cached reading","read_wall_s":23.8,"records":19520,"bound":null,"stop":"no plan (the planner proved none)","new":12,"wall_s":210.5}; wait_queued counts {"FMI_READ_QUEUE: held sentences run where the run's step ended":221,"FMI_READ_QUEUE: sentences a doSentence holds":376,"wait_queued: WaitFor ops that also pass (the path holds a sentence)":376,"wait_queued: WaitFor ops that only yield (the path holds no sentence)":3614}
+b: attempts DIFFER (1), kept entries DIFFER (12)
+# b again against b: both's attempts and kept entries reproduce byte for byte, queued's too
+# G3: (a) passes (62.2 s <= 90 s, not bounded; 228,924 records, as with FMI_READ_SWITCHES unset); (b) FAILS: the
+# demo's try differs, so by plan.md G3 wait_queued is wrong: stop.
+# b, what differs (b-*/attempts.json, b-*/kept.json; the readings' actions by label, labels-*.txt):
+# - the same 21 targets (tiers 0/1/2: 0/20/1) both ways; the attempt's target state:582=1 (tier 1) both ways; both stop
+#   on "no plan (the planner proved none)";
+# - the reading: 532 labels both ways, none in one only; actions 21,631 (both) and 17,046 (queued): 285 labels have
+#   more records under wait_both (+4,693; e.g. sentence(9,586) 76 against 6, sentence(9,582/583/585/587) 56 against 6,
+#   event(local:205@107/198) 178 against 14, event(script:2@882) 219 against 112), 1 more under wait_queued
+#   (event(script:59@783) 1,615 against 1,507); records 24,649 and 19,520;
+# - the plans differ from plan 0 (focus 12,755 actions, 28 steps; 8,062 actions, 34 steps), so the attempts differ:
+#   wait_both clicks (56,161), (155,131) at 19204-19206, five entries to frame 19271, then an empty window to 22871
+#   (3,668 frames, 7 refutations); wait_queued plays 9 inputs from 19204 to 19374 and keeps 12 entries to 19458
+#   (255 frames, 10 replans); no kept entry is the same;
+# - wait_queued's counts: 376 WaitFor ops also passed on a path holding a sentence, 3,614 only yielded; 376 sentences
+#   held by a doSentence, 221 run where the run's step ended.
+# So the passing paths on paths that hold no sentence (by label: the sentence script's waits in sentence(9,...), room
+# 48's local 205, script 2's events) are not only wait_both's cost: wait_queued drops their records, the
+# planner's model shrinks, and the plans and the try change. Which dropped records the wait_both plans used is not
+# checked.

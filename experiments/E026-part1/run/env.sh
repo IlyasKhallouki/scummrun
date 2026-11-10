@@ -43,6 +43,8 @@ ALLON="$ALLON FMI_SELECT_FURTHEST=1"
 # E024: the scripts' files in each engine's memory (patch 0010)
 ALLON="$ALLON FMI_MEM_FILES=1"
 # E026's switches (plan.md Parts 2-4), each added with its gate
+# C1 (wait_queued in place of wait_both in FMI_READ_SWITCHES): not on, G3 failed (results/g3: the demo's room-48 try
+# differs under it, plan.md G3's stop)
 E26=""
 ON="$ALLON $E26"
 ALLOFF="FMI_ENGINE_CUTS=1 FMI_PLAY_BATCH=1 FMI_HIT_CACHE=1 FMI_STONE_KEEP=1 FMI_PLAN_FAST=1 FMI_PLAN_LAMA=rust"
@@ -101,6 +103,13 @@ idle_ok() {
   local m l; m=$(awk '/MemAvailable/ { print $2 }' /proc/meminfo); l=$(cut -d' ' -f1 /proc/loadavg)
   awk -v m=$m -v l=$l 'BEGIN { exit !(m >= 10 * 1048576 && l < 2) }' || {
     echo "env.sh: not idle: MemAvailable $((m / 1024)) MB, load $l (needs >= 10 GB and < 2)" >&2; return 1; }
+}
+# a timed gate that is not a run (plan.md G3-G5: one try, a reading): load < 2 for its times and MemAvailable >= 4 GB
+# (G9's floor); the 10 GB start is the runs' (C5, G9)
+quiet_ok() {
+  local m l; m=$(awk '/MemAvailable/ { print $2 }' /proc/meminfo); l=$(cut -d' ' -f1 /proc/loadavg)
+  awk -v m=$m -v l=$l 'BEGIN { exit !(m >= 4 * 1048576 && l < 2) }' || {
+    echo "env.sh: not quiet: MemAvailable $((m / 1024)) MB, load $l (needs >= 4 GB and < 2)" >&2; return 1; }
 }
 # the laptop stays awake through a long check or a run (hypridle suspends otherwise)
 INHIBIT="systemd-inhibit --what=idle:sleep --who=E026 --why=check --mode=block"
