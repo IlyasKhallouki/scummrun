@@ -61,21 +61,25 @@ trap stop TERM INT HUP
 CMD=$(printf '%q ' "$@")
 SLOTS=${VM_SLOTS:-6}
 # the slots are lock files held by this job's shell on the VM: the kernel frees them when it ends, however it ends;
-# a job takes all W or none, so two jobs never wait on each other's half
+# a job takes all W or none, so two jobs never wait on each other's half; jobs take their slots in turn
 "${SSH[@]}" bash -s <<EOF &
 mkdir -p ~/vmslots ~/vmjobs
+# the turnstile: a job holds it until it has all its slots, so a job that needs many is not starved by single ones
+exec {turn}>~/vmslots/turn
+/usr/bin/flock \$turn
 got=()
 while :; do
     got=()
     for i in \$(seq 0 \$(($SLOTS - 1))); do
         exec {fd}>~/vmslots/\$i
-        if flock -n \$fd; then got+=(\$fd); else exec {fd}>&-; fi
+        if /usr/bin/flock -n \$fd; then got+=(\$fd); else exec {fd}>&-; fi
         [ \${#got[@]} -ge $W ] && break
     done
     [ \${#got[@]} -ge $W ] && break
     for fd in "\${got[@]}"; do exec {fd}>&-; done
     sleep 3
 done
+exec {turn}>&-
 cd $(printf '%q' "$PWD") || exit 2
 export PATH=\$HOME/.cargo/bin:\$HOME/.local/bin:\$PATH
 setsid bash -c $(printf '%q' "$CMD") < /dev/null &
