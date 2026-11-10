@@ -1,0 +1,24 @@
+# G2 (plan.md C2): gate2.sh /home/ilyask/.cache/fast-mi-e026/build/stage2/g2 (02:02-02:09), the build under test 5ac9fb45ac25 (C2), the base 37495bf065c9 (530ca2c's)
+a base (37495bf065c9): try wall 30.3 s (script 30.4 s), bound {"s":30.0,"waited_s":30.0,"background":false,"at_once":false,"joined":false}; reading threads at the try's end 6, gone after 10.4 s; CPU in the 60 s after the try 29.8 s
+a c2 (5ac9fb45ac25): try wall 30.3 s (script 30.3 s), bound {"s":30.0,"waited_s":30.0,"background":false,"at_once":false,"joined":false}; reading threads at the try's end 6, gone after 1.1 s; CPU in the 60 s after the try 0.9 s
+b base (37495bf065c9): rc 0 wall 99.5 s: {"why":"no cached reading","read_wall_s":59.1,"records":228924,"bound":null,"rss":1145,"wall_s":99.1}
+b c2 (5ac9fb45ac25): rc 0 wall 109.3 s: {"why":"no cached reading","read_wall_s":66.2,"records":228924,"bound":null,"rss":1145,"wall_s":108.8}
+b: 11 reading files, 4 differ across the builds
+# part b again (02:10-02:13; the second call stopped: load 2.66)
+b base (37495bf065c9): rc 0 wall 106.8 s: {"why":"no cached reading","read_wall_s":65.2,"records":228924,"bound":null,"rss":1160,"wall_s":106.3}
+b c2 (5ac9fb45ac25): rc 0 wall 110.5 s: {"why":"no cached reading","read_wall_s":69.3,"records":228924,"bound":null,"rss":1147,"wall_s":109.9}
+b: 11 reading files, 4 differ across the builds
+# j00006's reading (FMI_READ_SWITCHES unset), builds alternated (02:15-02:23): C2, base, base, C2
+r1 5ac9fb45ac25 load 2.17: {"read_wall_s":63.6,"read_cpu_s":186.6,"records":228924,"wall_s":103.4}
+r2 37495bf065c9 load 2.35: {"read_wall_s":63.5,"read_cpu_s":185.5,"records":228924,"wall_s":103.5}
+r3 37495bf065c9 load 2.40: {"read_wall_s":64.7,"read_cpu_s":190.0,"records":228924,"wall_s":103.8}
+r4 5ac9fb45ac25 load 2.02: {"read_wall_s":64.5,"read_cpu_s":188.1,"records":228924,"wall_s":104.9}
+# b, the 4 of 11 files that differ across the builds (readings-base.sha1, readings-c2.sha1): reading.json (its run
+# folder's path in "packed" and the start's name; read_s, read_wall_s, read_cpu_s), cache.json (the key, sha256 over a
+# text that holds the reader binary's sha1: fmi-reading cache.rs:157-161), reader-scope.err (the log's times) and the
+# report 28-33-35-38-j00006.json (times; the memo's folder named by the binary's sha1; the pool's scheduling counts: the
+# memo's questions_known 210,742 and 210,744, split parts run elsewhere 86 and 82, max_records_waiting 4,824 and
+# 4,764); the reading itself (reading.tc, reading.actions.jsonl, reading.idx, reading.lists.jsonl, reading.reached,
+# slot-locals.jsonl, start.jsonl) byte-identical
+# a, threads-*.tsv: seconds after the try's end, the process's reading threads (reader-*, the bounded reading's), its
+# CPU s
