@@ -144,3 +144,32 @@ Asked what Monkey Island's b3 check should compare against, now that a demo swit
 stop classes on purpose, Ilyas chose "Re-record": b3's reference is recorded once on the E026 build with every
 switch on, each class change from E013's reference is listed with the switch that causes it, new entries must still
 verify from boot with 0 differences, and no reading may reach the bound (E026 plan.md R3).
+
+## D12 (2026-11-10): b3's j00006 may reach the bound; it does not block Run 1
+
+Decided by: Ilyas.
+
+j00006 (scope [28, 33, 35, 38], start in room 33) has no proven or lossless reading under the 300 s bound (E026
+Amendment 2, research J). Its shape, a several-room scope that starts outside the room that blows up, exists only in
+b3's fixed job scopes and the old ring-scope archives: 0 of 4,223 room-scope tries in K1, E016's K1 and E016's play9
+had it, and none used the ring fallback (fmi-explore grow.rs:32-35). Asked whether it should still block Run 1,
+Ilyas chose "Don't block Run 1": D11's "no reading may reach the bound" no longer applies to b3's several-room jobs
+(j00006's [28, 33, 35, 38] and the [33, 38, 83, 85, 96] jobs); each such job that reaches the bound is listed as a known
+limit. Nothing is capped; the run's own readings keep the bound and its rules.
+
+## D13 (2026-11-10): G5's miss does not hold Run 1
+
+Decided by: Ilyas.
+
+G5 (K1's j00007 <= 60 s) fails: 292.5 s alone on the VM, 97.4% of its frames in the trials' waits, and neither of
+C4's levers saves anything (REJOIN 0, the budget changes nothing on j00007; E026 results/g5). Asked whether Run 1
+should wait for a new lever, Ilyas chose "Don't wait; measure in Run 1": C3 and C4 stay off, C5 is on, and the free
+tries' cost is measured in Run 1 and fixed in a fix round if it binds.
+
+## D14 (2026-11-10): R1 stays off; the landmarks start
+
+Decided by: Ilyas.
+
+R1 (the deferred sentence) realizes 14 of 14 steps job by job but misses one step along G6's chain because the chain's
+random numbers drift from the original's, which no change to realize can fix (E026 results/g6). Asked what next, Ilyas
+chose "R1 off, start landmarks": G6 stays as written, R1 stays off, R2 is on (G7 passed), and L1-L4 start on e026-click.
