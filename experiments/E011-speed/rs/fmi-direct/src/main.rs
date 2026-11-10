@@ -335,9 +335,13 @@ fn settle(b: &mut Box<dyn Engine>, end: u64, busy: u64, ego: i32) -> EResult<Pla
 }
 
 /// `settle`, then CALM frames on and `settle` again: the texts an input leaves on the interface for a moment are gone.
-/// A stop not reached within `horizon` frames of `from` gets four times as many.
+/// A stop not reached within `horizon` frames of `from` gets four times as many when a cutscene runs then.
 fn calm(b: &mut Box<dyn Engine>, from: u64, horizon: u64, ego: i32) -> EResult<Played> {
     for end in [from + horizon, from + 4 * horizon] {
+        // the longer horizon is a cutscene's: outside one, a run that reached no stop in the first is left there
+        if end > from + horizon && b.status().cs == 0 {
+            break;
+        }
         let at = b.status().frame;
         match settle(b, end, from + LEAD + BUSY, ego)? {
             // it stood already, CALM frames past the inputs' frames (the trial ran them before this): read at once
