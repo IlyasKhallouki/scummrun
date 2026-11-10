@@ -21,12 +21,14 @@
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
 //!   interface's own (those the input script writes, and those a fifth of a stop's inputs change), those that change
 //!   with no input (clocks), and those seen with more than VAR_CAP values (counters without end).
-//! * **Kept.** A stop goes to the first queue it fits: (0) a world atom other than a variable's that no kept stop
-//!   holds; (1) an interface or a thing on the screen none holds in that room; (2) a walk box or camera bucket none
-//!   holds in that room; (3) an object ego owns that none holds there owned (a thing carried to a new place); (4) a
-//!   variable's value none holds; (5) another atom of the guide's keys none holds in that room; (6) any other world
-//!   atom none holds in that room, or a world none holds (its atoms together, without those that change by
-//!   themselves). A stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on.
+//! * **Levels.** A stop's level is the number of objects ego has owned on the way to it (and did not own at the
+//!   boot). Something is new to a stop when no kept stop of its level or a higher one holds it: with one more object
+//!   in hand, every room, input and position counts again. The highest level is expanded first.
+//! * **Kept.** Within its level a stop goes to the first queue it fits: (0) a world atom other than a variable's
+//!   that is new; (1) an interface or a thing on the screen new in that room; (2) a walk box or camera bucket new in
+//!   that room; (3) a variable's value that is new; (4) an atom of the guide's keys new in that room; (5) any other
+//!   world atom new in that room, or a new world (its atoms together, without those that change by themselves). A
+//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -60,8 +62,8 @@ const FLOOR_Y: [i32; 4] = [3, 5, 7, 8];
 /// Engines kept alive for stops waiting in a queue; the others are booted again from their movies.
 const LIVE_MAX: usize = 32;
 /// The queues (the module's text, "Kept"), and the last one whose stops get a kept engine.
-const QUEUES: usize = 7;
-const LIVE_QUEUES: usize = 4;
+const QUEUES: usize = 6;
+const LIVE_QUEUES: usize = 3;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
@@ -71,6 +73,19 @@ struct Node {
     events: Vec<Event>,
     frame: u64,
     depth: u32,
+    /// the objects ego has owned on the way here and did not own at the boot, ascending; the level is their count
+    ever: Vec<u32>,
+}
+
+/// Whether `k` is new at `level`: no kept stop of that level or a higher one holds it. Marks it held at `level`.
+fn fresh<K: Hash + Eq>(m: &mut HashMap<K, u32>, k: K, level: u32) -> bool {
+    match m.get(&k) {
+        Some(&l) if l >= level => false,
+        _ => {
+            m.insert(k, level);
+            true
+        }
+    }
 }
 
 /// Which variables are world (the module's text, "The world").
@@ -103,15 +118,19 @@ struct Rung {
 #[derive(Default)]
 struct Search {
     nodes: Vec<Node>,
-    queues: [VecDeque<usize>; QUEUES],
+    /// per level, the queues
+    queues: Vec<[VecDeque<usize>; QUEUES]>,
     live: HashMap<usize, Box<dyn Engine>>,
-    seen: HashSet<(Key, Val)>,
-    seen_at: HashSet<(i32, Key, Val)>,
-    sees: HashSet<(i32, i32)>,
-    ifaces: HashSet<(i32, u64)>,
-    boxes: HashSet<(i32, i32)>,
-    cams: HashSet<(i32, i32)>,
-    cells: HashSet<u64>,
+    /// what kept stops hold, each with the highest level of a stop that holds it (`fresh`)
+    seen: HashMap<(Key, Val), u32>,
+    seen_at: HashMap<(i32, Key, Val), u32>,
+    sees: HashMap<(i32, i32), u32>,
+    ifaces: HashMap<(i32, u64), u32>,
+    boxes: HashMap<(i32, i32), u32>,
+    cams: HashMap<(i32, i32), u32>,
+    cells: HashMap<u64, u32>,
+    /// the objects ego owns at the boot
+    root_owned: HashSet<u32>,
     var_vals: HashMap<Key, Vec<Val>>,
     policy: Policy,
     /// the world keys a run with no input changed somewhere: left out of the cells
@@ -120,8 +139,13 @@ struct Search {
     room_stops: HashMap<i32, u32>,
     flicker: HashMap<(i32, Key), u32>,
     rooms: Vec<i32>,
+    /// the highest level of a kept stop
+    top: u32,
     /// engines being made for kept stops (counted against LIVE_MAX)
     making: usize,
+    live_max: usize,
+    phase: [f64; 5],
+    frames: u64,
     trials: u64,
     refused: u64,
     not_idle: u64,
@@ -240,7 +264,7 @@ fn go(b: &mut Box<dyn Engine>, spec: RunSpec) -> EResult<Result<Status, Status>>
 }
 
 /// On to a stop where the bridge is idle and ego stands still, or `end`.
-fn settle(b: &mut Box<dyn Engine>, end: u64) -> EResult<Played> {
+fn settle(b: &mut Box<dyn Engine>, end: u64, ego: i32) -> EResult<Played> {
     loop {
         let st = b.status().clone();
         if st.frame >= end {
@@ -250,8 +274,9 @@ fn settle(b: &mut Box<dyn Engine>, end: u64) -> EResult<Played> {
             return Ok(Played::Stop(st));
         }
         let spec = if st.idle.is_some() {
-            // idle, ego still walking: a few frames on
-            RunSpec { frame: Some((st.frame + 4).min(end)), ..Default::default() }
+            // idle, ego still walking: on to where it stands
+            let stands = Cond { kind: CondKind::ActorMoving, subject: ego, op: CondOp::Eq, value: 0, values: Vec::new(), negate: false };
+            RunSpec { until: vec![stands], max_frame: Some(end), ..Default::default() }
         } else {
             RunSpec { idle: true, max_frame: Some(end), ..Default::default() }
         };
@@ -263,14 +288,14 @@ fn settle(b: &mut Box<dyn Engine>, end: u64) -> EResult<Played> {
 
 /// `settle`, then CALM frames on and `settle` again: the texts an input leaves on the interface for a moment are gone.
 /// A stop not reached within `horizon` frames of `from` gets four times as many.
-fn calm(b: &mut Box<dyn Engine>, from: u64, horizon: u64) -> EResult<Played> {
+fn calm(b: &mut Box<dyn Engine>, from: u64, horizon: u64, ego: i32) -> EResult<Played> {
     for end in [from + horizon, from + 4 * horizon] {
-        match settle(b, end)? {
+        match settle(b, end, ego)? {
             Played::Stop(st) => {
                 if let Err(s) = go(b, RunSpec { frame: Some(st.frame + CALM), ..Default::default() })? {
                     return Ok(Played::Ended(s));
                 }
-                match settle(b, end.max(st.frame + CALM + 1))? {
+                match settle(b, end.max(st.frame + CALM + 1), ego)? {
                     Played::NotIdle => {}
                     x => return Ok(x),
                 }
@@ -310,6 +335,10 @@ struct Out {
     ambient: HashSet<Key>,
     short: Vec<Key>,
     room: i32,
+    /// the trials' wall seconds by phase (the fork, the inputs, the run to the stop, the stop's reading, the quit), and
+    /// the frames they ran
+    phase: [f64; 5],
+    frames: u64,
 }
 
 /// A point where the pointer is over no verb, object or actor, by the engine's hit test at this stop.
@@ -327,6 +356,7 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
     let r0 = read(String::new(), Vec::new(), &o0, st0);
     let sentence = r0.facts.val(Key::var(afford::VAR_SENTENCE_SCRIPT as u64)) as i32;
     let input0 = r0.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32;
+    let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     let first = out.results.len();
     let mut seen_mid: HashSet<u64> = HashSet::from([r0.mid()]);
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: Vec::new() }];
@@ -360,7 +390,10 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                 }
             }
             for p in &points {
+                let t = Instant::now();
                 let mut b = me.fork()?;
+                out.phase[0] += t.elapsed().as_secs_f64();
+                let t = Instant::now();
                 b.segment(true)?;
                 b.runs()?;
                 if depth == 1 {
@@ -383,6 +416,8 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                     }
                     Err(x) => return Err(x),
                 }
+                out.phase[1] += t.elapsed().as_secs_f64();
+                let t = Instant::now();
                 if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + 3), ..Default::default() })? {
                     out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                     b.quit();
@@ -394,7 +429,11 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                         out.iface_vars.extend(l.records.iter().flat_map(|r| r.writes.iter()).filter(|t| t.kind == TouchKind::Var).map(|t| Key::var(t.a as u64)));
                     }
                 }
-                match calm(&mut b, mf, cfg.horizon)? {
+                let played = calm(&mut b, mf, cfg.horizon, ego)?;
+                out.phase[2] += t.elapsed().as_secs_f64();
+                out.frames += b.status().frame.saturating_sub(mf);
+                let t = Instant::now();
+                match played {
                     Played::Stop(st) => {
                         let ob = b.obs(&NAMES)?;
                         let r = read(name_of(pre, &cl), events, &ob, st);
@@ -404,6 +443,7 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                             let input = [input0, r.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32];
                             afford::composing(r.st.idle.as_deref(), &runs.runs, mf + 1, &input, sentence)
                         };
+                        out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
                             // a stop to click on from; at the last click's depth it is no stop at all
                             if depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
@@ -418,7 +458,9 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                     Played::Ended(st) => out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason)),
                     Played::NotIdle => out.not_idle += 1,
                 }
+                let t = Instant::now();
                 b.quit();
+                out.phase[4] += t.elapsed().as_secs_f64();
             }
             if let Some(x) = m.engine.take() {
                 x.quit();
@@ -459,6 +501,7 @@ fn explore(e: &mut Box<dyn Engine>, snap: &Snap, cfg: &Cfg) -> EResult<Out> {
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
     let mut out = Out { room: r0.room, ..Default::default() };
+    let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     clicks(e, "", cfg, &mut out)?;
     // the game's own moves: no input for a while; where the world moved by more than the room's flicker, the inputs
     // again from there
@@ -468,7 +511,7 @@ fn explore(e: &mut Box<dyn Engine>, snap: &Snap, cfg: &Cfg) -> EResult<Out> {
         out.trials += 1;
         match go(&mut b, RunSpec { frame: Some(st0.frame + n), ..Default::default() })? {
             Err(st) => out.ends.push(format!("wait{n} {}", st.reason)),
-            Ok(_) => match calm(&mut b, st0.frame + n, cfg.horizon)? {
+            Ok(_) => match calm(&mut b, st0.frame + n, cfg.horizon, ego)? {
                 Played::Stop(st) => {
                     let ob = b.obs(&NAMES)?;
                     let r = read(format!("wait{n}"), Vec::new(), &ob, st);
@@ -540,60 +583,76 @@ impl Search {
         self.policy.clocks.extend(out.clocks.iter().copied());
         self.ambient.extend(out.ambient.iter().copied());
         self.trials += out.trials;
+        self.frames += out.frames;
+        for (a, b) in self.phase.iter_mut().zip(out.phase.iter()) {
+            *a += b;
+        }
         self.refused += out.refused;
         self.not_idle += out.not_idle;
         for x in out.ends {
             self.ends.push((id, x));
         }
         let results = out.results;
-        let (movie, depth) = (self.nodes[id].events.clone(), self.nodes[id].depth);
-        let mut keep: Vec<(usize, usize, usize)> = Vec::new(); // (result, node, queue)
+        let (movie, depth, ever0) = (self.nodes[id].events.clone(), self.nodes[id].depth, self.nodes[id].ever.clone());
+        let mut keep: Vec<(usize, usize, usize, usize)> = Vec::new(); // (result, node, level, queue)
         for (i, r) in results.iter().enumerate() {
             let world = self.policy.world_of(&r.facts);
             let mut novel: Vec<String> = Vec::new();
             let mut class = QUEUES;
             let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
+            let mut ever = ever0.clone();
+            for p in r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego) {
+                let o = p.0.a() as u32;
+                if !self.root_owned.contains(&o) {
+                    if let Err(at) = ever.binary_search(&o) {
+                        ever.insert(at, o);
+                    }
+                }
+            }
+            let level = ever.len() as u32;
             for &(k, val) in &world {
                 if k.kind() == K_VAR {
-                    if self.seen.insert((k, val)) {
+                    if fresh(&mut self.seen, (k, val), level) {
                         novel.push(format!("{k}={val}"));
-                        class = class.min(4);
+                        class = class.min(3);
                         let vals = self.var_vals.entry(k).or_default();
-                        vals.push(val);
+                        if !vals.contains(&val) {
+                            vals.push(val);
+                        }
                         if vals.len() > VAR_CAP {
                             self.policy.capped.insert(k);
                         }
                     }
                     continue;
                 }
-                if self.seen.insert((k, val)) {
+                if fresh(&mut self.seen, (k, val), level) {
                     novel.push(format!("{k}={val}"));
                     class = 0;
                 }
-                if self.seen_at.insert((r.room, k, val)) {
-                    class = class.min(if k.kind() == K_OWNER && val == ego { 3 } else if self.policy.guide.contains(&k) { 5 } else { 6 });
+                if fresh(&mut self.seen_at, (r.room, k, val), level) {
+                    class = class.min(if self.policy.guide.contains(&k) { 4 } else { 5 });
                 }
             }
             for &t in &r.vis {
-                if self.sees.insert((r.room, t)) {
+                if fresh(&mut self.sees, (r.room, t), level) {
                     novel.push(format!("sees={t}"));
                     class = class.min(1);
                 }
             }
-            if self.ifaces.insert((r.room, r.iface)) {
+            if fresh(&mut self.ifaces, (r.room, r.iface), level) {
                 novel.push("iface".into());
                 class = class.min(1);
             }
-            if self.boxes.insert((r.room, r.walkbox)) {
+            if fresh(&mut self.boxes, (r.room, r.walkbox), level) {
                 novel.push(format!("box={}", r.walkbox));
                 class = class.min(2);
             }
-            if self.cams.insert((r.room, r.cam)) {
+            if fresh(&mut self.cams, (r.room, r.cam), level) {
                 novel.push(format!("cam={}", r.cam));
                 class = class.min(2);
             }
-            if self.cells.insert(cell(r.room, r.iface, &world, &self.ambient)) {
-                class = class.min(6);
+            if fresh(&mut self.cells, cell(r.room, r.iface, &world, &self.ambient), level) {
+                class = class.min(5);
             }
             // nothing new, alone or together: dropped
             if class == QUEUES {
@@ -622,24 +681,34 @@ impl Search {
                     eprintln!("[{secs:7.1}s] RUNG {} first held by node {nid}", g.name);
                 }
             }
-            let line = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room,
+            if novel.len() > 12 {
+                // a stop new to its level holds everything anew: the count is enough
+                let n = novel.len();
+                novel.truncate(12);
+                novel.push(format!("+{}", n - 12));
+            }
+            let line = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
                 "class": class, "how": r.name, "novel": novel, "t": (secs * 10.0).round() / 10.0,
                 "events": events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
             if let Some(f) = self.log.as_mut() {
                 let _ = writeln!(f, "{line}");
             }
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1 });
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever });
             self.kept[class] += 1;
-            keep.push((i, nid, class));
+            self.top = self.top.max(level);
+            keep.push((i, nid, level as usize, class));
         }
         if let Some(f) = self.offers.as_mut() {
             let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "mids": out.mids,
                 "stops": results.len(), "kept": keep.len(), "refused": out.refused, "not_idle": out.not_idle}));
         }
         let mut make = Vec::new();
-        for (i, nid, class) in keep {
-            self.queues[class].push_back(nid);
-            if class < LIVE_QUEUES && self.live.len() + self.making < LIVE_MAX {
+        for (i, nid, level, class) in keep {
+            if self.queues.len() <= level {
+                self.queues.resize_with(level + 1, Default::default);
+            }
+            self.queues[level][class].push_back(nid);
+            if class < LIVE_QUEUES && self.live.len() + self.making < self.live_max {
                 self.making += 1;
                 make.push((nid, results[i].events.clone(), results[i].st.frame));
             }
@@ -650,9 +719,11 @@ impl Search {
     fn progress(&self, last: &mut u64, dt: f64) {
         let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
         let rungs: Vec<&str> = self.rungs.iter().filter(|g| g.at.is_some()).map(|g| g.name.as_str()).collect();
+        let queued: Vec<usize> = (0..QUEUES).map(|c| self.queues.iter().map(|q| q[c].len()).sum()).collect();
+        let at_top: usize = self.queues.last().map_or(0, |q| q.iter().map(|x| x.len()).sum());
         eprintln!(
-            "[{secs:7.1}s] kept {} {:?}, expanded {}, queued {:?}, trials {} ({:.0}/s), rooms {}, rungs {:?}, boots {}",
-            self.nodes.len(), self.kept, self.expanded, self.queues.iter().map(|q| q.len()).collect::<Vec<_>>(),
+            "[{secs:7.1}s] kept {} {:?}, expanded {}, level {} ({} queued there), queued {:?}, trials {} ({:.0}/s), rooms {}, rungs {:?}, boots {}",
+            self.nodes.len(), self.kept, self.expanded, self.top, at_top, queued,
             self.trials, (self.trials - *last) as f64 / dt.max(0.1), self.rooms.len(), rungs, self.boots
         );
         *last = self.trials;
@@ -715,6 +786,44 @@ fn verify(nodes: &str, id: u64, out: &Path, keys: &str) {
 fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     let opt = |k: &str| a.iter().position(|x| x == k).and_then(|i| a.get(i + 1)).cloned();
+    if a.first().map(String::as_str) == Some("forkbench") {
+        // `direct forkbench OUT N`: the cost of a fork, a one-frame run, a dump and a quit, one engine, one thread
+        let out = PathBuf::from(&a[1]);
+        std::fs::create_dir_all(&out).expect("OUT");
+        let n: usize = a[2].parse().expect("N");
+        let host = Host::new(HostCfg::from_env()).expect("the host");
+        let mut e = host
+            .boot(&BootCfg { seed: 1, events: Vec::new(), frame: None, dump_locals: false, lean: true, out_dir: eng_dir(&out) })
+            .expect("the boot");
+        let f0 = e.status().frame;
+        let mut t = [0f64; 6];
+        for _ in 0..n {
+            let t0 = Instant::now();
+            let mut b = e.fork().expect("fork");
+            t[0] += t0.elapsed().as_secs_f64();
+            let t0 = Instant::now();
+            b.run(&RunSpec { frame: Some(f0 + 1), ..Default::default() }).expect("run 1");
+            t[1] += t0.elapsed().as_secs_f64();
+            let t0 = Instant::now();
+            b.run(&RunSpec { frame: Some(f0 + 101), ..Default::default() }).expect("run 100");
+            t[2] += t0.elapsed().as_secs_f64();
+            let t0 = Instant::now();
+            let _ = b.facts().expect("facts");
+            t[3] += t0.elapsed().as_secs_f64();
+            let t0 = Instant::now();
+            let _ = b.obs(&NAMES).expect("obs");
+            t[4] += t0.elapsed().as_secs_f64();
+            let t0 = Instant::now();
+            b.quit();
+            t[5] += t0.elapsed().as_secs_f64();
+        }
+        let ms = |x: f64| (x * 1e6 / n as f64).round() / 1e3;
+        let ns = |i: usize| fmi_engine::host::FORK_NS[i].load(Ordering::Relaxed) as f64 / 1e6 / n as f64;
+        eprintln!("fork: {:.3} ms to the parent's reply, {:.3} ms to the child's connection", ns(0), ns(1));
+        println!("{}", json!({"n": n, "ms": {"fork": ms(t[0]), "run_1_frame": ms(t[1]), "run_100_frames": ms(t[2]), "facts": ms(t[3]), "obs_names": ms(t[4]), "quit": ms(t[5])}}));
+        e.quit();
+        return;
+    }
     if a.first().map(String::as_str) == Some("verify") {
         return verify(&a[1], a[2].parse().expect("ID"), Path::new(&a[3]), a.get(4).map(String::as_str).unwrap_or(""));
     }
@@ -742,6 +851,7 @@ fn main() {
         log: Some(std::fs::File::create(out.join("nodes.jsonl")).expect("nodes.jsonl")),
         offers: Some(std::fs::File::create(out.join("offers.jsonl")).expect("offers.jsonl")),
         t0: Some(t0),
+        live_max: LIVE_MAX.max(4 * cfg.workers),
         ..Default::default()
     };
     if let Some(p) = opt("--guide") {
@@ -759,25 +869,28 @@ fn main() {
     }
     let o = e.obs(&NAMES).expect("the root's dump");
     let r = read(String::new(), Vec::new(), &o, st.clone());
+    let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
+    s.root_owned = r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).collect();
     for p in r.facts.iter().filter(|p| world_kind(p.0)) {
-        s.seen.insert(*p);
-        s.seen_at.insert((r.room, p.0, p.1));
+        s.seen.insert(*p, 0);
+        s.seen_at.insert((r.room, p.0, p.1), 0);
     }
     for p in r.facts.iter().filter(|p| p.0.kind() == K_VAR) {
-        s.seen.insert(*p);
+        s.seen.insert(*p, 0);
     }
     for &t in &r.vis {
-        s.sees.insert((r.room, t));
+        s.sees.insert((r.room, t), 0);
     }
-    s.ifaces.insert((r.room, r.iface));
-    s.boxes.insert((r.room, r.walkbox));
-    s.cams.insert((r.room, r.cam));
+    s.ifaces.insert((r.room, r.iface), 0);
+    s.boxes.insert((r.room, r.walkbox), 0);
+    s.cams.insert((r.room, r.cam), 0);
     s.rooms.push(r.room);
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0 });
-    s.queues[0].push_back(0);
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new() });
+    s.queues.push(Default::default());
+    s.queues[0][0].push_back(0);
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
     let (mut last, mut printed) = (0u64, Instant::now());
@@ -788,7 +901,8 @@ fn main() {
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
         while batch.len() < cfg.workers * BATCH {
-            let Some(id) = (0..QUEUES).find_map(|c| s.queues[c].pop_front()) else { break };
+            // the highest level first, and in it the first queue
+            let Some(id) = s.queues.iter_mut().rev().find_map(|q| q.iter_mut().find_map(|c| c.pop_front())) else { break };
             let n = &s.nodes[id];
             batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame))));
         }
@@ -878,7 +992,9 @@ fn main() {
     let depth = s.nodes.iter().map(|n| n.depth).max().unwrap_or(0);
     let sum = json!({"seconds": t0.elapsed().as_secs_f64(), "workers": cfg.workers, "kept": s.nodes.len(), "by_queue": s.kept,
         "expanded": s.expanded, "trials": s.trials, "refused": s.refused, "not_idle": s.not_idle, "rooms": s.rooms,
-        "max_depth": depth, "boots": s.boots, "queued": s.queues.iter().map(|q| q.len()).collect::<Vec<_>>(),
+        "max_depth": depth, "boots": s.boots, "top_level": s.top,
+        "trial_seconds": {"fork": s.phase[0], "inputs": s.phase[1], "run": s.phase[2], "read": s.phase[3], "quit": s.phase[4]}, "trial_frames": s.frames,
+        "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
         "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(),
         "ends": s.ends.iter().map(|(n, x)| json!([n, x])).collect::<Vec<Value>>(),
         "rungs": s.rungs.iter().map(|g| json!({"rung": g.name, "node": g.at.map(|x| x.0), "seconds": g.at.map(|x| x.1)})).collect::<Vec<Value>>(),

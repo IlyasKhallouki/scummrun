@@ -528,6 +528,9 @@ impl EngineHost for Host {
     }
 }
 
+/// Spike (E027): nanoseconds of `fork_bin` so far: to the parent's reply, then to the child's connection.
+pub static FORK_NS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
 /// What a Step returns besides the new state (kept in the engine: `facts`, `block`).
 #[derive(Clone, Debug, Default)]
 pub struct StepOut {
@@ -1146,12 +1149,16 @@ impl BinEngine {
 
     /// `fork` as a `BinEngine`: the child stops where this one is, with this stop's facts already known.
     pub fn fork_bin(&mut self) -> EResult<BinEngine> {
+        let t0 = Instant::now();
         self.send(W::msg(wire::C_FORK).finish())?;
         let p = self.expect(wire::R_FORKED)?;
+        FORK_NS[0].fetch_add(t0.elapsed().as_nanos() as u64, Ordering::Relaxed);
+        let t0 = Instant::now();
         let mut r = R::new(&p);
         let pid = r.u32().map_err(bad)?;
         r.done().map_err(bad)?;
         let mut c = self.child_of(pid)?;
+        FORK_NS[1].fetch_add(t0.elapsed().as_nanos() as u64, Ordering::Relaxed);
         if self.last_now {
             // the child stands where this one stands: the same block and facts. Its connection has sent no block,
             // so its first block comes whole and `last` is only a cache there, never a delta's base.

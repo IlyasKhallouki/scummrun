@@ -1,0 +1,58 @@
+[ 1005.9s] kept 3547 [122, 164, 96, 12, 25, 165, 2962], expanded 577, queued [0, 0, 0, 0, 0, 12, 2958], trials 279521 (197/s), rooms 21, rungs ["P0", "P1"], boots 408
+[ 1029.5s] kept 3624 [122, 164, 96, 12, 25, 166, 3038], expanded 598, queued [0, 0, 0, 0, 0, 1, 3025], trials 284474 (210/s), rooms 21, rungs ["P0", "P1"], boots 429
+[ 1059.6s] kept 3678 [122, 164, 96, 12, 25, 166, 3092], expanded 619, queued [0, 0, 0, 0, 0, 0, 3059], trials 289326 (161/s), rooms 21, rungs ["P0", "P1"], boots 450
+[ 1097.0s] kept 3721 [122, 164, 96, 12, 25, 166, 3135], expanded 640, queued [0, 0, 0, 0, 0, 0, 3081], trials 295996 (178/s), rooms 21, rungs ["P0", "P1"], boots 471
+[ 1127.0s] kept 3721 [122, 164, 96, 12, 25, 166, 3135], expanded 661, queued [0, 0, 0, 0, 0, 0, 3060], trials 301809 (194/s), rooms 21, rungs ["P0", "P1"], boots 492
+[ 1151.5s] kept 3725 [122, 164, 96, 12, 25, 166, 3139], expanded 682, queued [0, 0, 0, 0, 0, 0, 3043], trials 307027 (213/s), rooms 21, rungs ["P0", "P1"], boots 513
+[ 1175.7s] kept 3737 [122, 164, 96, 12, 25, 166, 3151], expanded 703, queued [0, 0, 0, 0, 0, 0, 3034], trials 312375 (221/s), rooms 21, rungs ["P0", "P1"], boots 534
+[ 1204.2s] kept 3740 [122, 164, 96, 12, 25, 166, 3154], expanded 724, queued [0, 0, 0, 0, 0, 0, 3016], trials 318730 (223/s), rooms 21, rungs ["P0", "P1"], boots 555
+[ 1234.7s] kept 3740 [122, 164, 96, 12, 25, 166, 3154], expanded 745, queued [0, 0, 0, 0, 0, 0, 2995], trials 325942 (237/s), rooms 21, rungs ["P0", "P1"], boots 576
+[ 1269.9s] kept 3741 [122, 164, 96, 12, 25, 166, 3155], expanded 766, queued [0, 0, 0, 0, 0, 0, 2975], trials 333214 (206/s), rooms 21, rungs ["P0", "P1"], boots 597
+[   12.7s] kept 31 [4, 7, 14, 0, 1, 0, 4], expanded 17, queued [3, 4, 5, 0, 0, 0, 2], trials 4081 (329/s), rooms 3, rungs ["P0"], boots 3
+[ 1298.6s] kept 3741 [122, 164, 96, 12, 25, 166, 3155], expanded 787, queued [0, 0, 0, 0, 0, 0, 2954], trials 338285 (177/s), rooms 21, rungs ["P0", "P1"], boots 618
+[ 1330.0s] kept 3741 [122, 164, 96, 12, 25, 166, 3155], expanded 808, queued [0, 0, 0, 0, 0, 0, 2933], trials 344285 (191/s), rooms 21, rungs ["P0", "P1"], boots 639
+[ 1365.6s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 829, queued [0, 0, 0, 0, 0, 0, 2913], trials 350922 (186/s), rooms 21, rungs ["P0", "P1"], boots 660
+[ 1397.9s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 850, queued [0, 0, 0, 0, 0, 0, 2892], trials 357346 (199/s), rooms 21, rungs ["P0", "P1"], boots 681
+[ 1428.5s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 871, queued [0, 0, 0, 0, 0, 0, 2871], trials 363484 (200/s), rooms 21, rungs ["P0", "P1"], boots 702
+[ 1463.3s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 892, queued [0, 0, 0, 0, 0, 0, 2850], trials 369605 (176/s), rooms 21, rungs ["P0", "P1"], boots 723
+[  146.6s] WATCH room=41 first held by node 590
+[ 1502.8s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 913, queued [0, 0, 0, 0, 0, 0, 2829], trials 375921 (160/s), rooms 21, rungs ["P0", "P1"], boots 744
+[ 1537.0s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 934, queued [0, 0, 0, 0, 0, 0, 2808], trials 382546 (194/s), rooms 21, rungs ["P0", "P1"], boots 765
+[ 1565.5s] kept 3742 [122, 164, 96, 12, 25, 166, 3156], expanded 955, queued [0, 0, 0, 0, 0, 0, 2787], trials 388179 (197/s), rooms 21, rungs ["P0", "P1"], boots 786
+[  158.8s] kept 849 [68, 56, 58, 1, 6, 43, 616], expanded 94, queued [16, 46, 33, 1, 4, 43, 612], trials 55576 (335/s), rooms 15, rungs ["P0"], boots 34
+[ 1596.7s] kept 3754 [122, 165, 96, 12, 25, 166, 3167], expanded 976, queued [0, 1, 0, 0, 0, 0, 2777], trials 394123 (191/s), rooms 21, rungs ["P0", "P1"], boots 807
+[ 1628.2s] kept 3898 [122, 175, 96, 12, 25, 166, 3301], expanded 997, queued [0, 10, 0, 0, 0, 0, 2891], trials 399839 (181/s), rooms 21, rungs ["P0", "P1"], boots 827
+[ 1648.1s] kept 3907 [122, 175, 96, 12, 25, 166, 3310], expanded 1018, queued [0, 0, 0, 0, 0, 0, 2889], trials 403914 (204/s), rooms 21, rungs ["P0", "P1"], boots 838
+[ 1675.2s] kept 3908 [122, 175, 96, 12, 25, 166, 3311], expanded 1039, queued [0, 0, 0, 0, 0, 0, 2869], trials 409977 (224/s), rooms 21, rungs ["P0", "P1"], boots 859
+[ 1698.5s] kept 3915 [122, 175, 96, 12, 25, 166, 3318], expanded 1060, queued [0, 0, 0, 0, 0, 0, 2855], trials 415720 (246/s), rooms 21, rungs ["P0", "P1"], boots 880
+[ 1724.7s] kept 3946 [122, 175, 96, 12, 25, 166, 3349], expanded 1081, queued [0, 0, 0, 0, 0, 0, 2865], trials 422049 (242/s), rooms 21, rungs ["P0", "P1"], boots 901
+[ 1766.3s] kept 3995 [122, 175, 96, 12, 25, 166, 3398], expanded 1102, queued [0, 0, 0, 0, 0, 0, 2893], trials 435351 (320/s), rooms 21, rungs ["P0", "P1"], boots 922
+[ 1794.4s] kept 4031 [122, 175, 96, 12, 25, 166, 3434], expanded 1123, queued [0, 0, 0, 0, 0, 0, 2908], trials 441683 (225/s), rooms 21, rungs ["P0", "P1"], boots 943
+[ 1823.8s] kept 4088 [122, 175, 96, 12, 25, 166, 3491], expanded 1144, queued [0, 0, 0, 0, 0, 0, 2944], trials 449219 (0/s), rooms 21, rungs ["P0", "P1"], boots 964
+[ 1823.8s] kept 4088 [122, 175, 96, 12, 25, 166, 3491], expanded 1144, queued [0, 0, 0, 0, 0, 0, 2944], trials 449219 (256/s), rooms 21, rungs ["P0", "P1"], boots 964
+[  201.9s] RUNG P1 first held by node 951
+[  205.3s] kept 1081 [83, 77, 71, 1, 6, 62, 780], expanded 115, queued [15, 62, 46, 1, 4, 62, 776], trials 70459 (320/s), rooms 17, rungs ["P0", "P1"], boots 48
+[  256.7s] kept 1271 [94, 108, 79, 3, 13, 68, 905], expanded 136, queued [11, 87, 54, 3, 11, 68, 901], trials 88927 (360/s), rooms 19, rungs ["P0", "P1"], boots 63
+[  289.6s] kept 1390 [99, 114, 83, 3, 13, 68, 1009], expanded 157, queued [5, 83, 58, 3, 11, 68, 1005], trials 108209 (586/s), rooms 19, rungs ["P0", "P1"], boots 78
+[  325.6s] kept 1448 [100, 114, 83, 3, 13, 75, 1059], expanded 178, queued [1, 67, 58, 3, 11, 75, 1055], trials 127750 (543/s), rooms 20, rungs ["P0", "P1"], boots 97
+[   36.0s] kept 206 [40, 22, 38, 0, 4, 4, 97], expanded 52, queued [30, 12, 13, 0, 2, 4, 93], trials 12758 (371/s), rooms 13, rungs ["P0"], boots 6
+[  370.5s] kept 1718 [110, 128, 87, 3, 13, 92, 1284], expanded 220, queued [3, 47, 62, 3, 11, 92, 1280], trials 141898 (315/s), rooms 20, rungs ["P0", "P1"], boots 132
+[  428.2s] kept 1810 [114, 130, 94, 3, 14, 92, 1362], expanded 241, queued [4, 31, 69, 3, 12, 92, 1358], trials 151438 (165/s), rooms 21, rungs ["P0", "P1"], boots 153
+[  487.7s] kept 1915 [114, 136, 95, 5, 14, 96, 1454], expanded 262, queued [0, 20, 70, 5, 12, 96, 1450], trials 168329 (283/s), rooms 21, rungs ["P0", "P1"], boots 169
+[  527.3s] kept 2003 [115, 138, 95, 5, 14, 96, 1539], expanded 283, queued [1, 2, 69, 5, 12, 96, 1535], trials 176904 (217/s), rooms 21, rungs ["P0", "P1"], boots 183
+[  564.6s] kept 2051 [115, 138, 95, 5, 14, 101, 1582], expanded 304, queued [0, 0, 51, 5, 12, 101, 1578], trials 184209 (196/s), rooms 21, rungs ["P0", "P1"], boots 185
+[  618.6s] kept 2072 [115, 138, 96, 5, 14, 101, 1602], expanded 325, queued [0, 0, 31, 5, 12, 101, 1598], trials 198708 (269/s), rooms 21, rungs ["P0", "P1"], boots 206
+[  655.9s] kept 2081 [115, 138, 96, 5, 14, 101, 1611], expanded 346, queued [0, 0, 10, 5, 12, 101, 1607], trials 207982 (249/s), rooms 21, rungs ["P0", "P1"], boots 221
+[  695.5s] kept 2183 [119, 144, 96, 7, 16, 101, 1699], expanded 367, queued [4, 6, 0, 2, 8, 101, 1695], trials 218603 (268/s), rooms 21, rungs ["P0", "P1"], boots 238
+[  742.6s] kept 2323 [119, 147, 96, 12, 18, 109, 1821], expanded 388, queued [0, 3, 0, 5, 2, 108, 1817], trials 229613 (233/s), rooms 21, rungs ["P0", "P1"], boots 247
+[  775.4s] kept 2510 [120, 160, 96, 12, 20, 113, 1988], expanded 409, queued [1, 13, 0, 0, 2, 101, 1984], trials 236953 (224/s), rooms 21, rungs ["P0", "P1"], boots 260
+[  814.7s] kept 2594 [121, 163, 96, 12, 21, 115, 2065], expanded 430, queued [1, 3, 0, 0, 1, 98, 2061], trials 243806 (174/s), rooms 21, rungs ["P0", "P1"], boots 267
+[  848.3s] kept 2751 [121, 164, 96, 12, 22, 115, 2220], expanded 451, queued [0, 1, 0, 0, 1, 82, 2216], trials 248735 (147/s), rooms 21, rungs ["P0", "P1"], boots 284
+[  862.2s] kept 2886 [121, 164, 96, 12, 23, 115, 2354], expanded 472, queued [0, 0, 0, 0, 1, 63, 2350], trials 251611 (207/s), rooms 21, rungs ["P0", "P1"], boots 304
+[   86.5s] kept 580 [58, 41, 46, 0, 5, 10, 419], expanded 73, queued [27, 31, 21, 0, 3, 10, 415], trials 31341 (368/s), rooms 13, rungs ["P0"], boots 15
+[  893.8s] kept 3016 [121, 164, 96, 12, 24, 121, 2477], expanded 493, queued [0, 0, 0, 0, 1, 49, 2473], trials 258031 (203/s), rooms 21, rungs ["P0", "P1"], boots 325
+[  917.0s] kept 3177 [122, 164, 96, 12, 25, 125, 2632], expanded 514, queued [1, 0, 0, 0, 1, 33, 2628], trials 262723 (202/s), rooms 21, rungs ["P0", "P1"], boots 346
+[  943.9s] kept 3313 [122, 164, 96, 12, 25, 153, 2740], expanded 535, queued [0, 0, 0, 0, 0, 42, 2736], trials 267832 (190/s), rooms 21, rungs ["P0", "P1"], boots 366
+[  977.8s] kept 3466 [122, 164, 96, 12, 25, 161, 2885], expanded 556, queued [0, 0, 0, 0, 0, 29, 2881], trials 273989 (182/s), rooms 21, rungs ["P0", "P1"], boots 387
+boot: frame 2728 room 33 idle Some("sentence") in 0.2 s
+guide: 805 keys, 115 of them variables
