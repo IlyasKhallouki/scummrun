@@ -85,3 +85,7 @@ path = "src/bin/e016/main.rs"
 [[bin]]
 name = "e024"
 path = "src/bin/e024/main.rs"
+
+[[bin]]
+name = "keyfacts"
+path = "src/bin/keyfacts.rs"
