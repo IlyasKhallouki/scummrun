@@ -13,11 +13,12 @@
 //!   stood) gives a stop to click on from, unless an earlier sequence showed the same interface over the same world;
 //!   any other click ends its sequence. At most MAX_CLICKS clicks.
 //! * **A trial** is a fork, the click, the pointer parked on a point that is no verb, object or actor (the sentence
-//!   line names what the pointer is over), then a run to the next stop where the bridge is idle and ego stands still
-//!   (`calm`), within the horizon, or four times it.
-//! * **The game's own moves.** Each stop is also run with no input for WAITS frames. Where that changes the world by
-//!   more than the room's flicker (the keys a short wait changed at two of its stops or more), the inputs are tried
-//!   again from there (a door a timer opens is open only then).
+//!   line names what the pointer is over), then a run to the next stop (`calm`), within the horizon, or four times
+//!   it. A stop is where ego stands still and the bridge is idle, or, BUSY frames after the inputs, where the game
+//!   takes a click all the same (user input on, no cutscene): a scene whose actors talk on has no idle frame.
+//! * **The game's own moves.** Each stop is also run with no input for WAITS frames. Where that changes a key of the
+//!   world that fewer than MOTION_TRIES stops of that room and level saw change, the inputs are tried again from
+//!   there (a door a timer opens is open only then; a room's own motion is tried a few times, not at every stop).
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
 //!   interface's own (those the input script writes, and those a fifth of a stop's inputs change), those that change
 //!   with no input (clocks), and those seen with more than VAR_CAP values (counters without end).
@@ -28,7 +29,8 @@
 //!   that is new; (1) an interface or a thing on the screen new in that room; (2) a walk box or camera bucket new in
 //!   that room; (3) a variable's value that is new; (4) an atom of the guide's keys new in that room; (5) any other
 //!   world atom new in that room, or a new world (its atoms together, without those that change by themselves). A
-//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on.
+//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queues 4 and 5 wait until no
+//!   level holds a stop in queues 0 to 3.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -54,8 +56,12 @@ const MAX_CLICKS: usize = 4;
 const CALM: u64 = 6;
 /// Frames a trial's inputs take: the click, then the pointer's move.
 const LEAD: u64 = 3;
-/// The game's own moves: frames run with no input, each one trial of a stop. The first is the flicker's measure.
+/// Frames after a trial's inputs from which a stop need not be idle (the module's text, "A trial").
+const BUSY: u64 = 300;
+/// The game's own moves: frames run with no input, each one trial of a stop.
 const WAITS: [u64; 3] = [50, 200, 800];
+/// Stops of a room and level whose waits a key may change before its change stops calling for the inputs again.
+const MOTION_TRIES: u32 = 3;
 /// Pixels of the camera's bucket: a fifth of the screen, so a walk across part of it shows.
 const CAM_BUCKET: i32 = 64;
 /// The floor clicks' grid over the main screen: the columns, and the rows in eighths of its height.
@@ -66,6 +72,8 @@ const LIVE_MAX: usize = 32;
 /// The queues (the module's text, "Kept"), and the last one whose stops get a kept engine.
 const QUEUES: usize = 6;
 const LIVE_QUEUES: usize = 3;
+/// The queues expanded at every level, the highest first, before any level's later ones.
+const FIRST_QUEUES: usize = 4;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
@@ -137,9 +145,8 @@ struct Search {
     policy: Policy,
     /// the world keys a run with no input changed somewhere: left out of the cells
     ambient: HashSet<Key>,
-    /// per room: the stops expanded there, and per key those whose short wait changed it
-    room_stops: HashMap<i32, u32>,
-    flicker: HashMap<(i32, Key), u32>,
+    /// per level, room and key: the stops expanded there whose waits changed it
+    motion: HashMap<(u32, i32, Key), u32>,
     rooms: Vec<i32>,
     /// the highest level of a kept stop
     top: u32,
@@ -266,22 +273,33 @@ fn go(b: &mut Box<dyn Engine>, spec: RunSpec) -> EResult<Result<Status, Status>>
     }
 }
 
-/// On to a stop where the bridge is idle and ego stands still, or `end`.
-fn settle(b: &mut Box<dyn Engine>, end: u64, ego: i32) -> EResult<Played> {
+/// Whether the game takes a click at this stop (the engine's own gate, checkExecVerbs: user input on, no cutscene,
+/// a room).
+fn takes_click(st: &Status) -> bool {
+    st.up > 0 && st.cs == 0 && st.room != 0
+}
+
+/// On to a stop where ego stands still and the bridge is idle, or, from frame `busy` on, the game takes a click; or
+/// `end`.
+fn settle(b: &mut Box<dyn Engine>, end: u64, busy: u64, ego: i32) -> EResult<Played> {
     loop {
         let st = b.status().clone();
         if st.frame >= end {
             return Ok(Played::NotIdle);
         }
-        if st.idle.is_some() && st.mv.unwrap_or(0) == 0 {
+        let ready = st.idle.is_some() || (st.frame >= busy && takes_click(&st));
+        if ready && st.mv.unwrap_or(0) == 0 {
             return Ok(Played::Stop(st));
         }
-        let spec = if st.idle.is_some() {
-            // idle, ego still walking: on to where it stands
+        let spec = if ready {
+            // ego still walking: on to where it stands
             let stands = Cond { kind: CondKind::ActorMoving, subject: ego, op: CondOp::Eq, value: 0, values: Vec::new(), negate: false };
             RunSpec { until: vec![stands], max_frame: Some(end), ..Default::default() }
+        } else if st.frame < busy {
+            RunSpec { idle: true, max_frame: Some(busy.min(end)), ..Default::default() }
         } else {
-            RunSpec { idle: true, max_frame: Some(end), ..Default::default() }
+            // past `busy` and no click taken yet: on to the first frame that is idle or takes one
+            RunSpec { idle: true, control: true, max_frame: Some(end), ..Default::default() }
         };
         if let Err(s) = go(b, spec)? {
             return Ok(Played::Ended(s));
@@ -294,14 +312,14 @@ fn settle(b: &mut Box<dyn Engine>, end: u64, ego: i32) -> EResult<Played> {
 fn calm(b: &mut Box<dyn Engine>, from: u64, horizon: u64, ego: i32) -> EResult<Played> {
     for end in [from + horizon, from + 4 * horizon] {
         let at = b.status().frame;
-        match settle(b, end, ego)? {
+        match settle(b, end, from + LEAD + BUSY, ego)? {
             // it stood already, CALM frames past the inputs' frames (the trial ran them before this): read at once
             Played::Stop(st) if st.frame == at && at >= from + LEAD + CALM => return Ok(Played::Stop(st)),
             Played::Stop(st) => {
                 if let Err(s) = go(b, RunSpec { frame: Some(st.frame + CALM), ..Default::default() })? {
                     return Ok(Played::Ended(s));
                 }
-                match settle(b, end.max(st.frame + CALM + 1), ego)? {
+                match settle(b, end.max(st.frame + CALM + 1), from + LEAD + BUSY, ego)? {
                     Played::NotIdle => {}
                     x => return Ok(x),
                 }
@@ -340,10 +358,9 @@ struct Out {
     offer: Value,
     /// the variables the input script wrote in a trial, or that a fifth of the stop's inputs changed
     iface_vars: HashSet<Key>,
-    /// the variables, and the world's other keys, a run with no input changed; of the latter, the short wait's
+    /// the variables, and the world's other keys, a run with no input changed
     clocks: HashSet<Key>,
     ambient: HashSet<Key>,
-    short: Vec<Key>,
     room: i32,
     /// the trials' wall seconds by phase (the fork, the inputs, the run to the stop, the stop's reading, the quit), and
     /// the frames they ran
@@ -461,7 +478,7 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
                         let half = ob.ego_pos == mego && {
                             let runs = b.runs()?;
                             let input = [input0, r.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32];
-                            afford::composing(r.st.idle.as_deref(), &runs.runs, mf + 1, &input, sentence)
+                            afford::composing(r.st.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
                         };
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
@@ -520,23 +537,23 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, cfg: &Cfg, out: &mut Out) -> EResu
     Ok(())
 }
 
-/// What `explore` reads of the search: the rooms' flicker at the batch's start.
+/// What `explore` reads of the search: the rooms' motion at the batch's start.
 struct Snap {
-    flicker: HashMap<(i32, Key), u32>,
+    motion: HashMap<(u32, i32, Key), u32>,
 }
 
 /// Every input of the stop tried, at the stop and after the game's own moves. Reads the engine and `snap` only.
-fn explore(e: &mut Box<dyn Engine>, snap: &Snap, cfg: &Cfg) -> EResult<Out> {
+fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResult<Out> {
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
     let mut out = Out { room: r0.room, ..Default::default() };
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     clicks(e, "", cfg, &mut out)?;
-    // the game's own moves: no input for a while; where the world moved by more than the room's flicker, the inputs
-    // again from there
-    let flickers = |k: Key| snap.flicker.get(&(r0.room, k)).is_some_and(|&c| c >= 2);
-    for (wi, n) in WAITS.into_iter().enumerate() {
+    // the game's own moves: no input for a while; where a key moved that few stops of this room and level saw move,
+    // the inputs again from there
+    let known = |k: Key| snap.motion.get(&(level, r0.room, k)).is_some_and(|&c| c >= MOTION_TRIES);
+    for n in WAITS {
         let mut b = e.fork()?;
         out.trials += 1;
         match go(&mut b, RunSpec { frame: Some(st0.frame + n), ..Default::default() })? {
@@ -551,10 +568,7 @@ fn explore(e: &mut Box<dyn Engine>, snap: &Snap, cfg: &Cfg) -> EResult<Out> {
                             out.clocks.insert(k);
                         } else if world_kind(k) {
                             out.ambient.insert(k);
-                            if wi == 0 {
-                                out.short.push(k);
-                            }
-                            moved |= !flickers(k);
+                            moved |= !known(k);
                         }
                     }
                     out.results.push(r);
@@ -605,9 +619,9 @@ impl Search {
     /// engine for: (the node, its events past the parent's, its frame).
     fn commit(&mut self, id: usize, out: Out) -> Vec<(usize, Vec<Event>, u64)> {
         let room0 = out.room;
-        *self.room_stops.entry(room0).or_default() += 1;
-        for &k in &out.short {
-            *self.flicker.entry((room0, k)).or_default() += 1;
+        let level0 = self.nodes[id].ever.len() as u32;
+        for &k in &out.ambient {
+            *self.motion.entry((level0, room0, k)).or_default() += 1;
         }
         self.policy.iface_vars.extend(out.iface_vars.iter().copied());
         self.policy.clocks.extend(out.clocks.iter().copied());
@@ -709,7 +723,7 @@ impl Search {
                 });
                 if held.count() >= g.least {
                     g.at = Some((nid, secs));
-                    eprintln!("[{secs:7.1}s] RUNG {} first held by node {nid}", g.name);
+                    eprintln!("[{secs:7.1}s] RUNG {} first held by node {nid} (level {level}, {} trials so far)", g.name, self.trials);
                 }
             }
             if novel.len() > 12 {
@@ -778,6 +792,64 @@ fn rungs_of(path: &str) -> Vec<Rung> {
             Rung { name: g["rung"].as_str().unwrap_or("?").to_string(), conds, least, at: None }
         })
         .collect()
+}
+
+/// `direct show NODES.jsonl ID OUT [FRAMES]`: a measurement tool. The kept stop's movie played from boot, then each
+/// single click of its offer (targets and floor points) in a fork, run FRAMES frames at most: what the stop was, or
+/// where the run stood every 400 frames when it reached none (room, idle, cutscene depth, user input, ego moving).
+fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
+    let text = std::fs::read_to_string(nodes).expect("NODES.jsonl");
+    let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
+    let events: Vec<Event> = line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect();
+    let frame = line["frame"].as_u64().unwrap();
+    std::fs::create_dir_all(out).expect("OUT");
+    let host = Host::new(HostCfg::from_env()).expect("the host");
+    let mut e = host
+        .boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(out) })
+        .expect("the boot");
+    let o = e.obs(&ObsReq::default()).expect("obs");
+    let base = facts_of(&o);
+    let ego = base.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
+    let of = afford::offer_cfg(&mut e, &o, false, true).expect("offer");
+    println!("stop: frame {frame} room {} offer {}", e.status().room, of.json());
+    let mut points: Vec<Point> = of.targets.clone();
+    let (top, h) = e.status().screen.map(|s| (s.0, s.1)).unwrap_or((0, afford::SCREEN_H));
+    let grid: Vec<(i32, i32)> = FLOOR_Y.iter().flat_map(|&k| FLOOR_X.iter().map(move |&x| (x, (top + (h - top) * k / 8).min(h - 2)))).collect();
+    let ats = e.at_many(&grid).expect("at");
+    for (i, (&(x, y), a)) in grid.iter().zip(ats.iter()).enumerate() {
+        if a.main.is_some_and(|m| m.2 == 0 && m.3 == 0) {
+            points.push(Point { x, y, hit: Hit::Walk(i as i32) });
+        }
+    }
+    for p in &points {
+        let mut b = e.fork().expect("fork");
+        b.inputs(&[Event { frame: frame + 1, what: Input::Click(p.x, p.y) }]).expect("inputs");
+        let _ = go(&mut b, RunSpec { frame: Some(frame + LEAD + CALM), ..Default::default() });
+        let mut trace: Vec<String> = Vec::new();
+        let mut end = frame + 400;
+        let res = loop {
+            match settle(&mut b, end.min(frame + frames), frame + LEAD + BUSY, ego) {
+                Ok(Played::Stop(st)) => break format!("stop at +{} room {}", st.frame - frame, st.room),
+                Ok(Played::Ended(st)) => break format!("ended: {} at +{}", st.reason, st.frame - frame),
+                Ok(Played::NotIdle) => {
+                    let st = b.status().clone();
+                    trace.push(format!("+{} room {} idle {:?} cs {} up {} mv {:?} blk {:?}", st.frame - frame, st.room, st.idle, st.cs, st.up, st.mv, st.blk));
+                    if end >= frame + frames {
+                        break "no stop".to_string();
+                    }
+                    end += 400;
+                }
+                Err(x) => break format!("error: {x}"),
+            }
+        };
+        let diff: Vec<String> = b.facts().map(|f| base.diff(&f).into_iter().filter(|d| world_kind(d.0)).map(|d| format!("{}:{}->{}", d.0, d.1, d.2)).take(8).collect()).unwrap_or_default();
+        println!("{} ({},{}) -> {res} world {:?}", p.hit.name(), p.x, p.y, diff);
+        for t in trace.iter().take(20) {
+            println!("    {t}");
+        }
+        b.quit();
+    }
+    e.quit();
 }
 
 /// `direct verify NODES.jsonl ID OUT [KEY=V,..]`: the kept stop's movie played from boot in a fresh engine, to its
@@ -855,6 +927,9 @@ fn main() {
         e.quit();
         return;
     }
+    if a.first().map(String::as_str) == Some("show") {
+        return show(&a[1], a[2].parse().expect("ID"), Path::new(&a[3]), a.get(4).and_then(|x| x.parse().ok()).unwrap_or(6400));
+    }
     if a.first().map(String::as_str) == Some("verify") {
         return verify(&a[1], a[2].parse().expect("ID"), Path::new(&a[3]), a.get(4).map(String::as_str).unwrap_or(""));
     }
@@ -925,22 +1000,24 @@ fn main() {
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
     let (mut last, mut printed) = (0u64, Instant::now());
-    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64);
+    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32);
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
     type Parent = (Box<dyn Engine>, Vec<(usize, Vec<Event>, u64)>);
     while t0.elapsed() < limit {
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
         while batch.len() < cfg.workers * BATCH {
-            // the highest level first, and in it the first queue
-            let Some(id) = s.queues.iter_mut().rev().find_map(|q| q.iter_mut().find_map(|c| c.pop_front())) else { break };
+            // the highest level first and in it the first queue, over the first queues of every level; then the same
+            // over the later ones
+            let first = s.queues.iter_mut().rev().find_map(|q| q[..FIRST_QUEUES].iter_mut().find_map(|c| c.pop_front()));
+            let Some(id) = first.or_else(|| s.queues.iter_mut().rev().find_map(|q| q[FIRST_QUEUES..].iter_mut().find_map(|c| c.pop_front()))) else { break };
             let n = &s.nodes[id];
-            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame))));
+            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.ever.len() as u32))));
         }
         if batch.is_empty() {
             break;
         }
-        let snap = Snap { flicker: s.flicker.clone() };
+        let snap = Snap { motion: s.motion.clone() };
         // side by side: each stop explored, from the search's state at the batch's start
         let n = batch.len();
         let done: Vec<Mutex<Option<Done>>> = (0..n).map(|_| Mutex::new(None)).collect();
@@ -952,14 +1029,14 @@ fn main() {
                     if i >= n {
                         break;
                     }
-                    let (id, engine, events, frame) = batch[i].lock().unwrap().take().unwrap();
+                    let (id, engine, events, frame, level) = batch[i].lock().unwrap().take().unwrap();
                     let booted = engine.is_none();
                     let e = match engine {
                         Some(e) => Ok(e),
                         None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(&cfg.out) }),
                     };
                     let r = match e {
-                        Ok(mut e) => match explore(&mut e, &snap, &cfg) {
+                        Ok(mut e) => match explore(&mut e, level, &snap, &cfg) {
                             Ok(out) => Ok((e, out)),
                             Err(x) => {
                                 e.quit();
