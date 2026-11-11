@@ -168,6 +168,8 @@ struct Node {
     gline: u64,
     /// what it won over the stop it came from, where it began a line: the objects gained and the flags set
     news: Vec<Key>,
+    /// the stop at the end of a walk the search made (`--go`)
+    walk: bool,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -2315,7 +2317,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -2771,7 +2773,7 @@ fn main() {
             "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
         let _ = f.write_all(format!("{first}\n").as_bytes());
     }
-    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news });
+    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
@@ -2816,7 +2818,37 @@ fn main() {
             } else {
                 None
             };
-            let first = if let Some((l, f)) = shared {
+            // and before any line's turn, a stop at the end of a walk the search made (the newest first): the scripts
+            // name that room for what the line's first stop won, so it is looked at once before the line goes on.
+            // (Such a stop is of the line of the stop that won, which is an old line as soon as another begins.)
+            let walked = if s.shares && newest {
+                // (the stop, its level, its queue or usize::MAX for the stack, its place there)
+                let mut best: Option<(usize, usize, usize, usize)> = None;
+                for l in 0..s.queues.len() {
+                    for (i, &id) in s.stacks.get(l).into_iter().flatten().enumerate() {
+                        if s.nodes[id].walk && best.map_or(true, |b| id > b.0) {
+                            best = Some((id, l, usize::MAX, i));
+                        }
+                    }
+                    for c in 0..FIRST_QUEUES {
+                        for (i, &id) in s.queues[l][c].iter().enumerate() {
+                            if s.nodes[id].walk && best.map_or(true, |b| id > b.0) {
+                                best = Some((id, l, c, i));
+                            }
+                        }
+                    }
+                }
+                best
+            } else {
+                None
+            };
+            let first = if let Some((_, l, c, i)) = walked {
+                if c == usize::MAX {
+                    Some(s.stacks[l].remove(i))
+                } else {
+                    s.queues[l][c].remove(i)
+                }
+            } else if let Some((l, f)) = shared {
                 // of that line: the stack's newest stop, then queues 1, 2 and 3, each its earliest
                 let nodes = &s.nodes;
                 match s.stacks.get(l).and_then(|st| (0..st.len()).filter(|&i| nodes[st[i]].fline == f).max_by_key(|&i| st[i])) {
