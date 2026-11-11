@@ -906,6 +906,14 @@ fn clicks(
         {
             let o = me.obs(&NAMES)?;
             let shown: Arc<HashSet<(i32, i32, String)>> = Arc::new(o.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect());
+            // how many slots show each image here, and the slots with that count beside them (as slot -1, the count
+            // for the id): two things may share a picture, so an image is the same thing in another place only where
+            // no more slots show it than did on a page before
+            let mut images: HashMap<String, i32> = HashMap::new();
+            for n in o.verbs.iter().filter_map(|x| x.name.as_ref()).filter(|n| n.starts_with('#')) {
+                *images.entry(n.clone()).or_default() += 1;
+            }
+            let shown_all: Arc<HashSet<(i32, i32, String)>> = Arc::new(shown.iter().cloned().chain(images.iter().flat_map(|(n, &c)| (1..=c).map(move |k| (-1, k, n.clone())))).collect());
             let of = afford::offer_cfg(me, &o, false, true)?;
             let park = park_point(me)?;
             // the trials' forks record their slot runs and start with empty logs
@@ -925,15 +933,15 @@ fn clicks(
                     v.extend(of.targets.iter().copied());
                     v
                 }
-                // after an interface-only click: the slots that changed (a slot whose image another slot showed
-                // before is the same thing in another place, and no change); at the round's depth also the slots
-                // that start a sentence and those that change the interface again
+                // after an interface-only click: the slots that changed (a slot whose image as many slots showed
+                // on a page before is the same thing in another place, and no change); at the round's depth also
+                // the slots that start a sentence and those that change the interface again
                 Some(before) => of
                     .verbs
                     .iter()
                     .filter(|p| match p.hit {
                         Hit::Verb { slot, id } => {
-                            shown.iter().any(|x| x.0 == slot && x.1 == id && if x.2.starts_with('#') { !before.iter().any(|b| b.2 == x.2) } else { !before.contains(x) })
+                            shown.iter().any(|x| x.0 == slot && x.1 == id && if x.2.starts_with('#') { !before.contains(&(-1, images[&x.2], x.2.clone())) } else { !before.contains(x) })
                                 || (depth == 1 && (first_gave.contains_key(&p.hit) || shifters.contains(&p.hit)))
                         }
                         _ => false,
@@ -1094,8 +1102,8 @@ fn clicks(
                             trace(&format!("    shows {} depth {depth} ({} slots changed)", r.name, slots.len()));
                             // (the slots shown before it: on this stop and, where pages led to it, on those before)
                             let before = match &m.only {
-                                Some(b) => Arc::new(b.union(&shown).cloned().collect()),
-                                None => shown.clone(),
+                                Some(b) => Arc::new(b.union(&shown_all).cloned().collect()),
+                                None => shown_all.clone(),
                             };
                             let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events, paged: m.paged };
                             acts.push(Act::Shows { hit: p.hit, page, cand, before });
