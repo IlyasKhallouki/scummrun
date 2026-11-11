@@ -1851,6 +1851,9 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     let known = |k: Key| snap.motion.get(&(level, r0.room, r0.walkbox, k)).is_some_and(|&c| c >= MOTION_TRIES);
     let mut waited: Vec<(u64, Box<dyn Engine>)> = Vec::new();
     let mut values: HashMap<Key, Vec<Val>> = HashMap::new();
+    // the worlds the stop's waits came to (what differs from the stop's): the inputs are tried again from each
+    // once, not after every wait that comes to it (a room that turns between two states comes to them again)
+    let mut came_to: HashSet<Vec<(Key, Val)>> = HashSet::new();
     let tx = Instant::now();
     for n in WAITS {
         let mut b = e.fork()?;
@@ -1862,6 +1865,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                     let ob = b.obs(&NAMES)?;
                     let r = read(format!("wait{n}"), Vec::new(), &ob, st);
                     let mut moved = false;
+                    let mut to: Vec<(Key, Val)> = Vec::new();
                     for (k, _, now) in r0.facts.diff(&r.facts) {
                         if k.kind() == K_VAR {
                             let v = values.entry(k).or_default();
@@ -1871,10 +1875,11 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                         } else if world_kind(k) {
                             out.ambient.insert(k);
                             moved |= !known(k);
+                            to.push((k, now));
                         }
                     }
                     out.results.push(slim(r, &r0.facts));
-                    if moved {
+                    if moved && came_to.insert(to) {
                         waited.push((n, b));
                         continue;
                     }
