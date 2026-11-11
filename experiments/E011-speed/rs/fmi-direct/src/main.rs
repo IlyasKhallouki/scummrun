@@ -65,9 +65,9 @@
 //!   Flags are won one at a time and on different paths; the stop that has won the most is the one to go on from,
 //!   and once one stop holds them all the others' sets are within its own. With `--flag-lines` such a stop also
 //!   starts a line of its own, as a gain does (every room and input counts again from it), and every stop of
-//!   queue 0 goes before the queues, the newest first; the other first queues give the newest line's stops before
-//!   any older line's, in their own order: the search works on its newest line, walks through it, and then goes
-//!   through what it saw there.
+//!   queue 0 goes on the stack. The newest line's stops go before any older line's: its stack's newest stop
+//!   first, then its queues 1 to 3 in their own order. The search works on its newest line, walks through it,
+//!   then goes through what it saw there, and only then turns to the line before.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -1844,26 +1844,49 @@ fn main() {
         while batch.len() < at_once * cfg.batch {
             // the highest level first and in it the first queue, over the first queues of every level; then the same
             // over the later ones
-            // with --flag-lines the first queues give the newest line's stops before any older line's, and of that
-            // line the first queue's, the earliest first: when no new set of flags is left to follow, what the
-            // newest line saw on its way (a thing on the screen, an interface, a position) is gone through in the
-            // order it was seen, and the older lines' stops stay behind
+            // with --flag-lines the newest line's stops go before any older line's (a line is as new as the stop
+            // with a new set of flags it began at): of that line the stack's first (its newest stop: the walk
+            // through the rooms), then queue 1, 2 and 3, each its earliest stop first. An older line's stops, the
+            // stack's too, wait until the newest line has none: when no new set of flags is left to follow, what
+            // the newest line saw on its way is gone through, not the walks of the lines left behind
             let newest = s.flag_lines;
             let first = (0..s.queues.len()).rev().find_map(|l| {
-                if let Some(id) = s.stacks.get_mut(l).and_then(|st| st.pop()) {
-                    return Some(id);
-                }
                 if !newest {
+                    if let Some(id) = s.stacks.get_mut(l).and_then(|st| st.pop()) {
+                        return Some(id);
+                    }
                     return s.queues[l][..FIRST_QUEUES].iter_mut().find_map(|c| c.pop_front());
                 }
                 let nodes = &s.nodes;
-                let best = (0..FIRST_QUEUES)
+                // (the line's age, the queue, the order in it) of the best stop in the stack and in each queue
+                let top = s.stacks.get(l).and_then(|st| {
+                    (0..st.len()).max_by_key(|&i| (nodes[st[i]].fline, st[i])).map(|i| ((std::cmp::Reverse(nodes[st[i]].fline), 0usize, std::cmp::Reverse(st[i]).0), usize::MAX, i))
+                });
+                let rest = (0..FIRST_QUEUES)
                     .flat_map(|c| (0..s.queues[l][c].len()).map(move |i| (c, i)))
-                    .min_by_key(|&(c, i)| {
+                    .map(|(c, i)| {
                         let id = s.queues[l][c][i];
-                        (std::cmp::Reverse(nodes[id].fline), c, id)
-                    })?;
-                s.queues[l][best.0].remove(best.1)
+                        ((std::cmp::Reverse(nodes[id].fline), c + 1, id), c, i)
+                    })
+                    .min_by_key(|x| x.0);
+                // the stack's best is its newest stop of the newest line; a queue's best its earliest of that line
+                let pick = match (top, rest) {
+                    (Some(t), Some(r)) => {
+                        if (t.0 .0, t.0 .1) <= (r.0 .0, r.0 .1) {
+                            t
+                        } else {
+                            r
+                        }
+                    }
+                    (Some(t), None) => t,
+                    (None, Some(r)) => r,
+                    (None, None) => return None,
+                };
+                if pick.1 == usize::MAX {
+                    Some(s.stacks[l].remove(pick.2))
+                } else {
+                    s.queues[l][pick.1].remove(pick.2)
+                }
             });
             // the last queue: of the highest level that has one, the stop that holds the most flags (the earliest of
             // them): what is won one flag at a time is carried on by the stop that has won most
