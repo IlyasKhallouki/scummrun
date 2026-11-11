@@ -60,7 +60,8 @@
 //!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queue 4 waits until no
 //!   level holds a stop in queues 0 to 3 (queue 3 carries a flag from room to room, which nothing else does), and
 //!   gives its stop with the most flags set first.
-//! * **Flags.** A stop whose set of flags (those not seen unset again somewhere) is held whole by no kept stop of
+//! * **Flags.** A flag is a bit, or a class of an object. A stop whose set of flags (those not seen unset again
+//!   somewhere) is held whole by no kept stop of
 //!   its line is new, whatever else it holds, and goes before every queue of its level, the last such stop first.
 //!   Flags are won one at a time and on different paths; the stop that has won the most is the one to go on from,
 //!   and once one stop holds them all the others' sets are within its own. With `--flag-lines` such a stop also
@@ -147,6 +148,8 @@ struct Node {
     flags: u32,
     /// the last stop on the way here (or this one) whose set of flags was new in its line of gains
     fline: usize,
+    /// its line of gains
+    gline: u64,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -1296,13 +1299,16 @@ impl Search {
             let (level, gline) = if self.gains_only { (ever.len() as u32, line_of(&ever, &[])) } else { ((2 * ever.len() - owned.len()) as u32, line_of(&ever, &owned)) };
             // the flags the stop holds set (but those seen unset again): a count no stop of the line has held is new
             // (a stop that holds two flags which two other stops hold one each is the first with both)
-            for c in r.changed.iter().filter(|c| c.0.kind() == K_BIT && c.1 == 0) {
+            // a flag here is a bit or a class of an object (an object made into something else keeps its number and
+            // gets a class): both are set once and stay, or are seen unset again and count no more
+            let flaglike = |k: Key| k.kind() == K_BIT || k.kind() == K_CLASS;
+            for c in r.changed.iter().filter(|c| flaglike(c.0) && c.1 == 0) {
                 self.toggles.insert(c.0);
             }
             let mut set: Vec<u64> = Vec::new();
             let mut flags = 0u32;
-            for p in world.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && !self.toggles.contains(&p.0)) {
-                let n = p.0.a() as usize;
+            for p in world.iter().filter(|p| flaglike(p.0) && p.1 != 0 && !self.toggles.contains(&p.0)) {
+                let n = if p.0.kind() == K_BIT { p.0.a() as usize } else { 4096 + (p.0.a() as usize) * 32 + (p.0.b() as usize & 31) };
                 if set.len() <= n / 64 {
                     set.resize(n / 64 + 1, 0);
                 }
@@ -1314,7 +1320,10 @@ impl Search {
             let within = |a: &[u64], b: &[u64]| a.iter().enumerate().all(|(i, w)| w & !b.get(i).copied().unwrap_or(0) == 0);
             let tops = self.tops.entry(gline).or_default();
             let mut dive = false;
-            if !tops.iter().any(|m| within(&set, m)) {
+            // only a stop that changed a flag, or stands in another line of gains than the expanded stop, can hold
+            // a set that is new
+            let moved = gline != self.nodes[id].gline || r.changed.iter().any(|c| flaglike(c.0));
+            if moved && !tops.iter().any(|m| within(&set, m)) {
                 tops.retain(|m| !within(m, &set));
                 tops.push(set);
                 dive = true;
@@ -1456,7 +1465,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline });
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -1827,7 +1836,7 @@ fn main() {
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0 });
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
