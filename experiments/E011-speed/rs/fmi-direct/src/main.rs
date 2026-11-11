@@ -69,6 +69,11 @@
 //!   queue 0 goes on the stack. The newest line's stops go before any older line's: its stack's newest stop
 //!   first, then its queues 1 to 3 in their own order. The search works on its newest line, walks through it,
 //!   then goes through what it saw there, and only then turns to the line before.
+//! * **Where to go (`--go`).** A stop that begins a line has won something: an object, a flag. The scripts name
+//!   it somewhere (an owner asked for, the other object of a sentence, a flag tested): from that stop one walk is
+//!   made to each of the nearest GO_ROOMS rooms whose scripts do, over the clicks that were seen to lead from room
+//!   to room, one trial a walk. Those stops are expanded first. The scripts advise only: a walk that fails, or a
+//!   room that holds nothing, costs a trial or a stop, and the walk through every room stays.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -121,6 +126,11 @@ const QUEUES: usize = 5;
 const LIVE_QUEUES: usize = 3;
 /// The queues expanded at every level, the highest first, before any level's later ones.
 const FIRST_QUEUES: usize = 4;
+/// `--go`: the rooms walked to from a stop that has won something, and the rooms a walk may cross.
+const GO_ROOMS: usize = 6;
+const GO_HOPS: usize = 14;
+/// Floor clicks a walk may make in one room to bring a thing onto the screen.
+const GO_SCROLLS: usize = 8;
 /// The kept stops of one expanded stop that get a kept engine.
 const LIVE_EACH: usize = 8;
 /// Stops of one batch for each worker.
@@ -150,6 +160,8 @@ struct Node {
     fline: usize,
     /// its line of gains
     gline: u64,
+    /// what it won over the stop it came from, where it began a line: the objects gained and the flags set
+    news: Vec<Key>,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -210,6 +222,11 @@ struct Search {
     /// lines by gains alone (--lines gains); a new set of flags starts a line (--flag-lines)
     gains_only: bool,
     flag_lines: bool,
+    /// --go: where the scripts name what a stop has won, and the clicks seen to lead from a room to the next
+    go: bool,
+    mentions: Mentions,
+    edges: HashMap<(i32, i32), Vec<Hit>>,
+    edges_log: Option<std::fs::File>,
     /// the scripts' local variables: per line the values kept stops held, the values seen, the clocks, the capped
     lseen: HashSet<(u64, u64, i32)>,
     lvals: HashMap<u64, Vec<i32>>,
@@ -1078,6 +1095,336 @@ fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&Has
     }
 }
 
+/// Where the game's scripts name an object or test a flag: per object and per flag, the rooms whose scripts do (the
+/// scripts' dump, FMI_GAME_SCRIPTS: one folder a room, one file a script). Advice on where to go with what was
+/// won, never taken as true: a room that is named and holds nothing costs one stop.
+#[derive(Default)]
+struct Mentions {
+    objs: HashMap<u32, Vec<i32>>,
+    bits: HashMap<u32, Vec<i32>>,
+}
+
+/// The integers that follow each `pat` in `line`.
+fn nums_after(line: &str, pat: &str) -> Vec<u32> {
+    let mut v = Vec::new();
+    let mut at = 0;
+    while let Some(i) = line[at..].find(pat) {
+        let from = at + i + pat.len();
+        let digits: String = line[from..].chars().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(n) = digits.parse() {
+            v.push(n);
+        }
+        at = from;
+    }
+    v
+}
+
+/// The objects a script's text names (an owner asked for, a second object compared, an object's code started, a
+/// class asked for or set, a sentence's objects) and the flags it tests (a flag written is no test).
+fn names_of(text: &str) -> (Vec<u32>, Vec<u32>) {
+    let (mut objs, mut bits) = (Vec::new(), Vec::new());
+    for line in text.lines().filter(|l| !l.starts_with('#')) {
+        for pat in ["getObjectOwner(", "startObject(", "classOfIs(", "setClass(", "pickupObject("] {
+            objs.extend(nums_after(line, pat));
+        }
+        // `Local[n] == N`: the sentence's other object, as an object's own code asks for it
+        let mut at = 0;
+        while let Some(i) = line[at..].find("Local[") {
+            let from = at + i + 6;
+            let rest = line[from..].trim_start_matches(|c: char| c.is_ascii_digit());
+            if let Some(r) = rest.strip_prefix("] == ") {
+                let digits: String = r.chars().take_while(|c| c.is_ascii_digit()).collect();
+                if let Ok(n) = digits.parse() {
+                    objs.push(n);
+                }
+            }
+            at = from;
+        }
+        if let Some(i) = line.find("doSentence(") {
+            let args = line[i + 11..].split(')').next().unwrap_or("");
+            objs.extend(args.split(',').skip(1).filter_map(|a| a.trim().parse::<u32>().ok()));
+        }
+        let mut at = 0;
+        while let Some(i) = line[at..].find("Bit[") {
+            let from = at + i + 4;
+            let digits: String = line[from..].chars().take_while(|c| c.is_ascii_digit()).collect();
+            let after = &line[from + digits.len()..];
+            if let (Ok(n), true) = (digits.parse(), after.starts_with(']') && !after.starts_with("] = ")) {
+                bits.push(n);
+            }
+            at = from;
+        }
+    }
+    (objs, bits)
+}
+
+/// The mentions of a scripts' dump: a room's scripts' own, those of the global scripts few rooms start (GLOBAL_ROOMS
+/// at most: a script every room starts says nothing of a room), and for an object the rooms of the objects its
+/// own code names.
+fn mentions_of(dir: &Path) -> Mentions {
+    const GLOBAL_ROOMS: usize = 3;
+    let mut m = Mentions::default();
+    let num = |name: &str, pre: &str| -> Option<u32> { name.strip_prefix(pre)?.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok() };
+    let mut home: HashMap<u32, i32> = HashMap::new();
+    let mut own: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut globals: HashMap<u32, (Vec<u32>, Vec<u32>)> = HashMap::new();
+    let mut starts: HashMap<u32, Vec<i32>> = HashMap::new();
+    let Ok(rd) = std::fs::read_dir(dir) else { return m };
+    let mut folders: Vec<PathBuf> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    folders.sort();
+    for folder in folders {
+        let fname = folder.file_name().and_then(|x| x.to_str()).unwrap_or("").to_string();
+        let room = num(&fname, "room-").map(|r| r as i32);
+        let Ok(rd) = std::fs::read_dir(&folder) else { continue };
+        let mut files: Vec<PathBuf> = rd.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+        files.sort();
+        for f in files {
+            let name = f.file_name().and_then(|x| x.to_str()).unwrap_or("").to_string();
+            let Ok(text) = std::fs::read_to_string(&f) else { continue };
+            let (objs, bits) = names_of(&text);
+            match room {
+                Some(r) => {
+                    let me = num(&name, "obj-");
+                    if let Some(o) = me {
+                        home.insert(o, r);
+                        own.entry(o).or_default().extend(objs.iter().copied().filter(|x| *x != o));
+                    }
+                    for o in objs.into_iter().filter(|x| Some(*x) != me) {
+                        let v = m.objs.entry(o).or_default();
+                        if !v.contains(&r) {
+                            v.push(r);
+                        }
+                    }
+                    for b in bits {
+                        let v = m.bits.entry(b).or_default();
+                        if !v.contains(&r) {
+                            v.push(r);
+                        }
+                    }
+                    for g in text.lines().filter(|l| !l.starts_with('#')).flat_map(|l| nums_after(l, "startScript(")) {
+                        let v = starts.entry(g).or_default();
+                        if !v.contains(&r) {
+                            v.push(r);
+                        }
+                    }
+                }
+                None => {
+                    if let Some(g) = num(&name, "script-") {
+                        globals.insert(g, (objs, bits));
+                    }
+                }
+            }
+        }
+    }
+    for (g, (objs, bits)) in &globals {
+        let Some(rooms) = starts.get(g).filter(|r| r.len() <= GLOBAL_ROOMS) else { continue };
+        for &r in rooms {
+            for o in objs {
+                let v = m.objs.entry(*o).or_default();
+                if !v.contains(&r) {
+                    v.push(r);
+                }
+            }
+            for b in bits {
+                let v = m.bits.entry(*b).or_default();
+                if !v.contains(&r) {
+                    v.push(r);
+                }
+            }
+        }
+    }
+    for (o, others) in &own {
+        for r in others.iter().filter_map(|x| home.get(x)) {
+            let v = m.objs.entry(*o).or_default();
+            if !v.contains(r) {
+                v.push(*r);
+            }
+        }
+    }
+    for v in m.objs.values_mut().chain(m.bits.values_mut()) {
+        v.sort_unstable();
+    }
+    m
+}
+
+/// The clicks of a stop's name (`v<verb>`, `t<object>`, `t-<actor>`, `w<floor point>`); None where the name holds
+/// more than clicks (a wait, a window, a walk of the search's own).
+fn hits_of(name: &str) -> Option<Vec<Hit>> {
+    let name = name.strip_suffix('~').unwrap_or(name);
+    let mut v = Vec::new();
+    let b = name.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        let kind = b[i];
+        i += 1;
+        let neg = i < b.len() && b[i] == b'-';
+        if neg {
+            i += 1;
+        }
+        let from = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        let n: i32 = name[from..i].parse().ok()?;
+        v.push(match (kind, neg) {
+            (b'v', false) => Hit::Verb { slot: 0, id: n },
+            (b't', false) => Hit::Object(n),
+            (b't', true) => Hit::Actor(n),
+            (b'w', false) => Hit::Walk(n),
+            _ => return None,
+        });
+    }
+    (!v.is_empty()).then_some(v)
+}
+
+/// The shortest way from room to room over the clicks that were seen to lead from one to the next.
+fn way<'a>(edges: &'a HashMap<(i32, i32), Vec<Hit>>, from: i32, to: i32) -> Option<Vec<(i32, &'a Vec<Hit>)>> {
+    let mut prev: HashMap<i32, i32> = HashMap::from([(from, from)]);
+    let mut queue = VecDeque::from([from]);
+    while let Some(a) = queue.pop_front() {
+        if a == to {
+            break;
+        }
+        let mut next: Vec<i32> = edges.keys().filter(|k| k.0 == a && !prev.contains_key(&k.1)).map(|k| k.1).collect();
+        next.sort_unstable();
+        for b in next {
+            prev.insert(b, a);
+            queue.push_back(b);
+        }
+    }
+    let mut path = Vec::new();
+    let mut at = to;
+    while at != from {
+        let a = *prev.get(&at)?;
+        path.push((at, edges.get(&(a, at))?));
+        at = a;
+    }
+    path.reverse();
+    (!path.is_empty() && path.len() <= GO_HOPS).then_some(path)
+}
+
+/// A walk from the engine's stop along `path`, each room's clicks as they were seen to lead on: the stop at its
+/// end, or None where a click finds nothing to click or a room is not the one expected (the world is another now).
+fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg) -> EResult<Option<Res>> {
+    let mut cur = e.fork()?;
+    let mut events: Vec<Event> = Vec::new();
+    let mut last = cur.status().clone();
+    for (room, hits) in path {
+        let mut from = cur.status().frame;
+        for (k, hit) in hits.iter().enumerate() {
+            // the click's point; a thing of the room that is off the screen (a room wider than it) is walked
+            // towards first, floor click by floor click at the screen's edge on its side, until it shows
+            let mut point = None;
+            for _ in 0..GO_SCROLLS {
+                let o = cur.obs(&NAMES)?;
+                let of = afford::offer_cfg(&mut cur, &o, false, true)?;
+                let (top, h) = cur.status().screen.map(|s| (s.0, s.1)).unwrap_or((0, afford::SCREEN_H));
+                let grid: Vec<(i32, i32)> =
+                    FLOOR_Y.iter().flat_map(|&k| FLOOR_X.iter().map(move |&x| (x, (top + (h - top) * k / 8).min(h - 2)))).collect();
+                point = match *hit {
+                    Hit::Walk(i) => grid.get(i as usize).copied(),
+                    Hit::Verb { id, .. } => of.verbs.iter().find(|p| matches!(p.hit, Hit::Verb { id: i, .. } if i == id)).map(|p| (p.x, p.y)),
+                    other => of.targets.iter().find(|p| p.hit == other).map(|p| (p.x, p.y)),
+                };
+                if point.is_some() {
+                    break;
+                }
+                // where the thing is in the room, against what the screen shows
+                let (x0, x1) = (cur.status().xstart, cur.status().xstart + afford::SCREEN_W);
+                let at = match *hit {
+                    Hit::Object(id) => o.room_objects.as_deref().unwrap_or(&[]).iter().find(|r| r.id == id).map(|r| r.x + r.w / 2),
+                    Hit::Actor(id) => o.actors.iter().find(|a| a.id == id).map(|a| a.x),
+                    _ => None,
+                };
+                let Some(at) = at.filter(|x| *x < x0 || *x >= x1) else {
+                    trace(&format!("    walk: {} is not in the room's list, or on the screen and not offered (screen {x0}..{x1}, at {at:?})", hit.name()));
+                    break;
+                };
+                // the points at the screen's edge on that side, the outermost column first and in it the lowest
+                // first: a click there walks ego that way (to a thing, if one lies there), and the room scrolls
+                // once ego is near the screen's edge
+                let cols: Vec<usize> = if at < x0 { (0..FLOOR_X.len()).collect() } else { (0..FLOOR_X.len()).rev().collect() };
+                let ats = cur.at_many(&grid)?;
+                let is_floor = |i: usize| ats.get(i).is_some_and(|a| a.main.is_some_and(|m| m.2 == 0 && m.3 == 0));
+                // (only points of the room's picture: below it lie the verbs)
+                let mut cands: Vec<usize> = cols
+                    .iter()
+                    .take(3)
+                    .flat_map(|&c| (0..FLOOR_Y.len()).rev().map(move |r| r * FLOOR_X.len() + c))
+                    .filter(|&i| ats.get(i).is_some_and(|a| a.main.is_some()))
+                    .collect();
+                cands.truncate(FLOOR_Y.len());
+                let before = cur.status().xstart;
+                let mut moved = false;
+                for &i in cands.iter().take(4) {
+                    let f = cur.status().frame;
+                    let ev = Event { frame: f + 1, what: Input::Click(grid[i].0, grid[i].1) };
+                    if cur.inputs(std::slice::from_ref(&ev)).is_err() || go(&mut cur, RunSpec { frame: Some(f + LEAD + CALM), ..Default::default() })?.is_err() {
+                        break;
+                    }
+                    events.push(ev);
+                    if !matches!(calm(&mut cur, f, cfg.horizon, ego)?, Played::Stop(_)) {
+                        break;
+                    }
+                    // the room goes on scrolling after ego stands: on until it rests
+                    for _ in 0..40 {
+                        let x = cur.status().xstart;
+                        let f = cur.status().frame;
+                        if go(&mut cur, RunSpec { frame: Some(f + 8), ..Default::default() })?.is_err() || cur.status().xstart == x {
+                            break;
+                        }
+                    }
+                    trace(&format!("    walk: click at {:?} (floor {}) -> xstart {} ego {:?} (of {} points in the picture)", grid[i], is_floor(i), cur.status().xstart, cur.status().ego, cands.len()));
+                    if cur.status().xstart != before {
+                        moved = true;
+                        break;
+                    }
+                }
+                if !moved {
+                    trace(&format!("    walk: no click at the screen's edge moved the room towards {} (screen {x0}..{x1}, at {at})", hit.name()));
+                    break;
+                }
+            }
+            let Some((x, y)) = point else {
+                trace(&format!("    walk: in room {} nothing to click for {} (on the way to {room})", cur.status().room, hit.name()));
+                cur.quit();
+                return Ok(None);
+            };
+            let park = park_point(&mut cur)?;
+            from = cur.status().frame;
+            let mut evs = vec![Event { frame: from + 1, what: Input::Click(x, y) }];
+            if let Some((px, py)) = park {
+                evs.push(Event { frame: from + 2, what: Input::Move(px, py) });
+            }
+            if cur.inputs(&evs).is_err() {
+                cur.quit();
+                return Ok(None);
+            }
+            events.extend(evs);
+            if k + 1 < hits.len() && go(&mut cur, RunSpec { frame: Some(from + LEAD + CALM), ..Default::default() })?.is_err() {
+                cur.quit();
+                return Ok(None);
+            }
+        }
+        if go(&mut cur, RunSpec { frame: Some(from + LEAD + CALM), ..Default::default() })?.is_err() {
+            cur.quit();
+            return Ok(None);
+        }
+        match calm(&mut cur, from, cfg.horizon, ego)? {
+            Played::Stop(st) if st.room == *room => last = st,
+            other => {
+                trace(&format!("    walk: {} led to room {} not {room} ({})", hits.iter().map(|h| h.name()).collect::<String>(), cur.status().room, match other { Played::Stop(_) => "a stop", Played::Ended(_) => "the end", Played::NotIdle => "no stop" }));
+                cur.quit();
+                return Ok(None);
+            }
+        }
+    }
+    let ob = cur.obs(&NAMES)?;
+    let r = read(format!("go{}", last.room), events, &ob, last);
+    cur.quit();
+    Ok(Some(r))
+}
+
 /// What `explore` reads of the search: the rooms' motion at the batch's start.
 struct Snap<'a> {
     motion: &'a HashMap<(u32, i32, i32, Key), u32>,
@@ -1086,10 +1433,12 @@ struct Snap<'a> {
     lclocks: &'a HashSet<u64>,
     policy: &'a Policy,
     ambient: &'a HashSet<Key>,
+    mentions: &'a Mentions,
+    edges: &'a HashMap<(i32, i32), Vec<Hit>>,
 }
 
 /// Every input of the stop tried, at the stop and after the game's own moves. Reads the engine and `snap` only.
-fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: bool, snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
+fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: bool, news: &[Key], snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
@@ -1209,6 +1558,31 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     if let Some(x) = bad {
         return Err(x);
     }
+    // --go: the stop has won something (an object, a flag). Where the scripts name it, there it is asked for: a
+    // walk to each such room over the clicks seen to lead from room to room, one trial a walk; the nearest room's
+    // stop last, so that it is the first to be expanded. The walk through every room stays, for what the scripts
+    // do not say
+    if !news.is_empty() {
+        let mut rooms: Vec<i32> = Vec::new();
+        for k in news {
+            let named = if k.kind() == K_BIT { snap.mentions.bits.get(&(k.a() as u32)) } else { snap.mentions.objs.get(&(k.a() as u32)) };
+            for &r in named.into_iter().flatten() {
+                if r != r0.room && !rooms.contains(&r) {
+                    rooms.push(r);
+                }
+            }
+        }
+        let mut ways: Vec<Vec<(i32, &Vec<Hit>)>> = rooms.iter().filter_map(|&t| way(snap.edges, r0.room, t)).collect();
+        ways.sort_by_key(|w| (w.len(), w.last().map(|x| x.0)));
+        ways.truncate(GO_ROOMS);
+        trace(&format!("  room {} go: rooms named {:?}, ways {:?}", r0.room, rooms, ways.iter().map(|w| w.iter().map(|x| format!("{}:{}", x.0, x.1.iter().map(|h| h.name()).collect::<String>())).collect::<Vec<_>>().join(" ")).collect::<Vec<_>>()));
+        for w in ways.iter().rev() {
+            out.trials += 1;
+            if let Some(r) = walk(e, w, ego, cfg)? {
+                out.results.push(r);
+            }
+        }
+    }
     let locals0: HashMap<u64, i32> = r0.locals.iter().copied().collect();
     for r in out.results.iter_mut() {
         r.changed = r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) || d.0.kind() == K_VAR).map(|d| (d.0, d.2)).collect();
@@ -1327,6 +1701,28 @@ impl Search {
                 tops.retain(|m| !within(m, &set));
                 tops.push(set);
                 dive = true;
+            }
+            // what the stop won, where it begins a line: the objects it gained, the flags it set
+            let news: Vec<Key> = if dive {
+                r.changed
+                    .iter()
+                    .filter(|c| (c.0.kind() == K_OWNER && c.1 == ego) || (flaglike(c.0) && c.1 != 0 && !self.toggles.contains(&c.0)))
+                    .map(|c| c.0)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            // the clicks that led from the expanded stop's room to another: the way between the two, for a walk
+            if r.room != room00 && !r.name.contains('+') && !r.name.contains('>') && !r.name.starts_with("go") {
+                if let Some(h) = hits_of(&r.name) {
+                    if !self.edges.contains_key(&(room00, r.room)) {
+                        // kept beside the stops (OUT/edges.jsonl), for a run that starts from one of them
+                        if let Some(f) = self.edges_log.as_mut() {
+                            let _ = writeln!(f, "{}", json!({"from": room00, "to": r.room, "how": r.name.trim_end_matches('~')}));
+                        }
+                        self.edges.insert((room00, r.room), h);
+                    }
+                }
             }
             // --flag-lines: such a stop starts a line of its own, as a gain does: every room and input counts
             // again from it (a flag is carried to where it matters by the stops that are new on the way)
@@ -1453,6 +1849,7 @@ impl Search {
             }
             let text = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
                 "owned": owned.len(), "class": class, "how": r.name, "novel": novel, "t": (secs * 10.0).round() / 10.0,
+                "news": news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(),
                 "events": events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
             if let Some(f) = self.log.as_mut() {
                 let _ = writeln!(f, "{text}");
@@ -1465,7 +1862,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline });
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -1701,7 +2098,7 @@ fn main() {
         let say = |e: &mut Box<dyn Engine>, what: &str| {
             let f = e.facts().expect("facts");
             let st = e.status().clone();
-            println!("+{:<4} {what:<14} idle {:?} mv {:?} box {:?} {}", st.frame - frame, st.idle, st.mv, st.walkbox,
+            println!("+{:<4} {what:<14} room {} xstart {} ego {:?} idle {:?} mv {:?} box {:?} {}", st.frame - frame, st.room, st.xstart, st.ego, st.idle, st.mv, st.walkbox,
                 keys.iter().map(|k| format!("{k}={}", f.val(*k))).collect::<Vec<_>>().join(" "));
             if std::env::var_os("DIRECT_SEQ_VERBS").is_some() {
                 // the slots shown (id, point, the text's length; the text itself only with DIRECT_SEQ_TEXT, for a
@@ -1770,15 +2167,16 @@ fn main() {
         vec![Event { frame: 1, what: Input::Skips { text: true, cutscenes: true, spare: None } }]
     };
     // --from NODES ID (a measurement aid): the search starts at that kept stop of another run, not at the boot
-    let from: Option<(Vec<Event>, u64)> = opt("--from").map(|nodes| {
+    let from: Option<(Vec<Event>, u64, Vec<Key>)> = opt("--from").map(|nodes| {
         let id: u64 = a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID");
         let text = std::fs::read_to_string(&nodes).expect("--from NODES");
         let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
-        (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect(), line["frame"].as_u64().unwrap())
+        let news = line["news"].as_array().map(|v| v.iter().filter_map(|x| x.as_str()).map(Key::parse).collect()).unwrap_or_default();
+        (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect(), line["frame"].as_u64().unwrap(), news)
     });
-    let (root_events, root_frame) = match from {
-        Some((ev, f)) => (ev, Some(f)),
-        None => (root_events, None),
+    let (root_events, root_frame, from_news) = match from {
+        Some((ev, f, n)) => (ev, Some(f), n),
+        None => (root_events, None, Vec::new()),
     };
     let t0 = Instant::now();
     let mut e = host
@@ -1795,6 +2193,29 @@ fn main() {
     };
     s.gains_only = opt("--lines").as_deref() == Some("gains");
     s.flag_lines = a.iter().any(|x| x == "--flag-lines");
+    s.go = a.iter().any(|x| x == "--go");
+    let mut loaded: Vec<String> = Vec::new();
+    if s.go {
+        if let Ok(d) = std::env::var("FMI_GAME_SCRIPTS") {
+            s.mentions = mentions_of(Path::new(&d));
+        }
+        // --edges FILE: the ways from room to room an earlier run saw (its OUT/edges.jsonl)
+        if let Some(p) = opt("--edges") {
+            for v in std::fs::read_to_string(&p).expect("--edges").lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()) {
+                if let (Some(a), Some(b), Some(h)) = (v["from"].as_i64(), v["to"].as_i64(), v["how"].as_str().and_then(hits_of)) {
+                    s.edges.entry((a as i32, b as i32)).or_insert(h);
+                    loaded.push(v.to_string());
+                }
+            }
+        }
+        eprintln!("mentions: {} objects, {} flags named in rooms' scripts; {} ways from room to room", s.mentions.objs.len(), s.mentions.bits.len(), s.edges.len());
+    }
+    s.edges_log = std::fs::File::create(out.join("edges.jsonl")).ok();
+    if let Some(f) = s.edges_log.as_mut() {
+        for l in &loaded {
+            let _ = writeln!(f, "{l}");
+        }
+    }
     if let Some(p) = opt("--guide") {
         // the guide's keys (fmi guide map): the variables among them are the ones the game's code tests
         let g: Value = serde_json::from_str(&std::fs::read_to_string(&p).expect("--guide")).expect("the guide's JSON");
@@ -1836,14 +2257,20 @@ fn main() {
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline });
+    // what the starting stop won (its line of nodes.jsonl, or --news KEY,KEY for a stop of an older run): it is
+    // walked from like any stop that begins a line
+    let root_news: Vec<Key> = match opt("--news") {
+        Some(t) => t.split(',').filter(|x| !x.is_empty()).map(Key::parse).collect(),
+        None => from_news.clone(),
+    };
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
     let (mut last, mut printed) = (0u64, Instant::now());
-    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool);
+    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool, Vec<Key>);
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
     type Parent = (Box<dyn Engine>, Vec<(usize, Vec<Event>, u64)>);
     while t0.elapsed() < limit {
@@ -1909,12 +2336,12 @@ fn main() {
             };
             let Some(id) = first.or_else(last) else { break };
             let n = &s.nodes[id];
-            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level, n.pending.clone(), n.inside))));
+            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level, n.pending.clone(), n.inside, if s.go { n.news.clone() } else { Vec::new() }))));
         }
         if batch.is_empty() {
             break;
         }
-        let snap = Snap { motion: &s.motion, wins: &s.wins, noise: &s.noise, lclocks: &s.lclocks, policy: &s.policy, ambient: &s.ambient };
+        let snap = Snap { motion: &s.motion, wins: &s.wins, noise: &s.noise, lclocks: &s.lclocks, policy: &s.policy, ambient: &s.ambient, mentions: &s.mentions, edges: &s.edges };
         // side by side: each stop explored, from the search's state at the batch's start
         let n = batch.len();
         let done: Vec<Mutex<Option<Done>>> = (0..n).map(|_| Mutex::new(None)).collect();
@@ -1926,14 +2353,14 @@ fn main() {
                     if i >= n {
                         break;
                     }
-                    let (id, engine, events, frame, level, pending, inside) = batch[i].lock().unwrap().take().unwrap();
+                    let (id, engine, events, frame, level, pending, inside, news) = batch[i].lock().unwrap().take().unwrap();
                     let booted = engine.is_none();
                     let e = match engine {
                         Some(e) => Ok(e),
                         None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(&cfg.out) }),
                     };
                     let r = match e {
-                        Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &pending, inside, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
+                        Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &pending, inside, &news, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
                             Ok(out) => Ok((e, out)),
                             Err(x) => {
                                 e.quit();
