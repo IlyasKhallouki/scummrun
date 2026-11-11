@@ -1,0 +1,4 @@
+[
+{"rung":"P8","node":902,"from_boot":true,"frame":53598,"room":83,"keys":[["var:196",3],["owner:578",1]],"clicks":808,"ok":true},
+{"rung":"P9","node":1022,"from_boot":true,"frame":53682,"room":83,"keys":[["var:196",3],["bit:304",1]],"clicks":810,"ok":true}
+]

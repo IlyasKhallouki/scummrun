@@ -1703,6 +1703,23 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
             out.lclocks.extend(r.locals.iter().map(|l| l.0));
         }
     }
+    // stops that are one stop for all the search counts (the room, the interface, the picture, the floor, the
+    // scripts' locals, and the world against the expanded stop's): the first stands for the rest. Most inputs of a
+    // stop end where another did, and the commit, which is not made side by side, need not read them again
+    let before = out.results.len();
+    let mut seen: HashSet<u64> = HashSet::new();
+    out.results.retain(|r| {
+        if r.name.starts_with("wait") || r.name.starts_with("go") {
+            return true;
+        }
+        let mut h = DefaultHasher::new();
+        (r.room, r.iface, &r.vis, r.walkbox, r.cam, r.inside, &r.locals, &r.own).hash(&mut h);
+        for c in r.changed.iter().filter(|c| snap.policy.world(c.0)) {
+            c.hash(&mut h);
+        }
+        seen.insert(h.finish())
+    });
+    trace(&format!("  room {}: {} stops, {} of them not one another's like", r0.room, before, out.results.len()));
     Ok(out)
 }
 
