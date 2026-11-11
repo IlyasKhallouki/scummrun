@@ -213,6 +213,9 @@ struct Search {
     /// per line: the largest sets of flags kept stops hold (none within another), as bits by the flag's number
     tops: HashMap<u64, Vec<Vec<u64>>>,
     live: HashMap<usize, Box<dyn Engine>>,
+    /// --shares: the lines take turns (the batch's loop), and the turns counted so far
+    shares: bool,
+    tick: u64,
     /// the engines of expanded stops, each with the count at its last use: a stop that comes of one of them, or of
     /// a stop that does, is made from it
     parents: HashMap<usize, (Arc<Mutex<Box<dyn Engine>>>, u64)>,
@@ -2658,6 +2661,7 @@ fn main() {
     };
     s.gains_only = opt("--lines").as_deref() == Some("gains");
     s.flag_lines = a.iter().any(|x| x == "--flag-lines");
+    s.shares = a.iter().any(|x| x == "--shares");
     s.go = a.iter().any(|x| x == "--go");
     let mut loaded: Vec<String> = Vec::new();
     if s.go {
@@ -2774,7 +2778,38 @@ fn main() {
             // stack's too, wait until the newest line has none: when no new set of flags is left to follow, what
             // the newest line saw on its way is gone through, not the walks of the lines left behind
             let newest = s.flag_lines;
-            let first = (0..s.queues.len()).rev().find_map(|l| {
+            // --shares (with --flag-lines): the lines take turns. A line here is the stops of one level that one
+            // stop with a new set of flags began. The newest line of the highest level has every second turn, the
+            // next every fourth, and so on: a turn's line is named by the trailing zeros of the turn's number (past
+            // the last line, the first). The search still follows what is newest; a line that leads nowhere (a room
+            // with much to say, entered on the way) cannot keep the others waiting for good
+            let shared = if s.shares && newest {
+                s.tick += 1;
+                let mut lines: Vec<(usize, usize)> = Vec::new();
+                for l in 0..s.queues.len() {
+                    for &id in s.stacks.get(l).into_iter().flatten().chain(s.queues[l][..FIRST_QUEUES].iter().flatten()) {
+                        lines.push((l, s.nodes[id].fline));
+                    }
+                }
+                lines.sort_unstable_by(|a, b| b.cmp(a));
+                lines.dedup();
+                let r = s.tick.trailing_zeros() as usize;
+                lines.get(if r < lines.len() { r } else { 0 }).copied()
+            } else {
+                None
+            };
+            let first = if let Some((l, f)) = shared {
+                // of that line: the stack's newest stop, then queues 1, 2 and 3, each its earliest
+                let nodes = &s.nodes;
+                match s.stacks.get(l).and_then(|st| (0..st.len()).filter(|&i| nodes[st[i]].fline == f).max_by_key(|&i| st[i])) {
+                    Some(i) => Some(s.stacks[l].remove(i)),
+                    None => (0..FIRST_QUEUES).find_map(|c| {
+                        let i = (0..s.queues[l][c].len()).find(|&i| nodes[s.queues[l][c][i]].fline == f)?;
+                        s.queues[l][c].remove(i)
+                    }),
+                }
+            } else {
+                (0..s.queues.len()).rev().find_map(|l| {
                 if !newest {
                     if let Some(id) = s.stacks.get_mut(l).and_then(|st| st.pop()) {
                         return Some(id);
@@ -2811,7 +2846,8 @@ fn main() {
                 } else {
                     s.queues[l][pick.1].remove(pick.2)
                 }
-            });
+                })
+            };
             // the last queue: of the highest level that has one, the stop that holds the most flags (the earliest of
             // them): what is won one flag at a time is carried on by the stop that has won most
             let nodes = &s.nodes;

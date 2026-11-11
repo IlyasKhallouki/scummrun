@@ -7,6 +7,7 @@
 #   bench.sh BIN OUT [WORKERS=4] [STOPS=7] [REFS="p7top cake crew meathook boot"]
 #   SLICES=S in the environment: S threads for one stop's round (1: one thread)
 #   ENGINE=PATH: another engine binary than env.sh's; EXTRA="K=V ...": more settings for the engine or the search
+#   FLAGS="--shares ...": more flags for the search; WATCH=K=V,...: values to report when first held
 set -e
 BIN=$1; OUT=$2; W=${3:-4}; N=${4:-7}; REFS=${5:-"p7top cake crew meathook boot"}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); ROOT=$(cd "$HERE/../../.." && pwd); RES=$ROOT/experiments/E027-direct/results
@@ -26,7 +27,7 @@ for ref in $REFS; do
   O=$OUT/$ref; rm -rf "$O"; mkdir -p "$O"
   env $ON $MI ${EXTRA:-} "$BIN" "$O" --minutes 60 --stops $N --workers $W --slices ${SLICES:-1} --batch 1 --at-once 1 \
     --guide $GUIDE27 --rungs $RUNGS27 ${WATCH:+--watch $WATCH} \
-    --lines gains --flag-lines --go $FROM > "$O/out.txt" 2> "$O/err.txt" || { echo "$ref: the run failed"; tail -3 "$O/err.txt"; continue; }
+    --lines gains --flag-lines --go ${FLAGS:-} $FROM > "$O/out.txt" 2> "$O/err.txt" || { echo "$ref: the run failed"; tail -3 "$O/err.txt"; continue; }
   rm -rf "$O/eng"
   python3 - "$ref" "$O" <<'PY'
 import json, sys, hashlib
