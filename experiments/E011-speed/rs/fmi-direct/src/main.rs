@@ -579,6 +579,26 @@ impl Out {
     }
 }
 
+/// A half-made stop's identity in a round: its interface and scripts' locals (`base`), and the values of the
+/// variables a page of the interface was seen to change.
+fn mid_key(base: u64, vars: &Facts, pvars: &[Key]) -> u64 {
+    if pvars.is_empty() {
+        return base;
+    }
+    let mut h = DefaultHasher::new();
+    (base, pvars.iter().map(|k| vars.val(*k)).collect::<Vec<Val>>()).hash(&mut h);
+    h.finish()
+}
+
+/// Whether the round has not seen this half-made stop yet; it is noted with its variables.
+fn see(seen: &mut HashSet<u64>, list: &mut Vec<(u64, Facts)>, base: u64, facts: &Facts, pvars: &[Key]) -> bool {
+    let fresh = seen.insert(mid_key(base, facts, pvars));
+    if fresh {
+        list.push((base, Facts(facts.iter().filter(|p| p.0.kind() == K_VAR).copied().collect())));
+    }
+    fresh
+}
+
 /// A line on stderr when DIRECT_TRACE is set (a measurement aid).
 fn trace(text: &str) {
     if std::env::var_os("DIRECT_TRACE").is_some() {
@@ -654,17 +674,12 @@ fn clicks(
         h.finish()
     };
     // and the values of the variables that a slot's click changed while it changed nothing else (a page of slots that
-    // show no text: what they hold is not in what the interface shows)
-    let mk = |r: &Res, pvars: &[Key]| -> u64 {
-        if pvars.is_empty() {
-            return mkey(r);
-        }
-        let mut h = DefaultHasher::new();
-        (mkey(r), pvars.iter().map(|k| r.facts.val(*k)).collect::<Vec<Val>>()).hash(&mut h);
-        h.finish()
-    };
+    // show no text: what they hold is not in what the interface shows). The list grows in the round; the stops seen
+    // are kept with their variables, for their keys under the longer list
     let mut pvars: Vec<Key> = Vec::new();
-    let mut seen_mid: HashSet<u64> = HashSet::from([mkey(&r0)]);
+    let mut seen_mid: HashSet<u64> = HashSet::new();
+    let mut seen_list: Vec<(u64, Facts)> = Vec::new();
+    see(&mut seen_mid, &mut seen_list, mkey(&r0), &r0.facts, &pvars);
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None }];
     // the stops that are windows (the module's text, "After an input"), MAX_WINDOWS of them at most
     let mut found = 0;
@@ -813,9 +828,18 @@ fn clicks(
                     // no input at the same frame: a room moves by itself (a juggler, a fire), and that is not the
                     // click's doing
                     let world_same = |x: &Obs, w: &Option<Facts>| w.as_ref().is_some_and(|w| !w.diff(&facts_of(x)).iter().any(|d| world_kind(d.0)));
-                    let slot = matches!(p.hit, Hit::Verb { .. });
+                    // a page of slots that show no text: at the round's depth a slot's click that left no text of
+                    // the interface another (no verb, no sentence) and two or more variables other than they are
+                    // with no input
+                    let slot = depth == 1 && matches!(p.hit, Hit::Verb { .. }) && {
+                        let texts = |v: &[Verb]| -> Vec<(i32, i32, String)> {
+                            let mut t: Vec<(i32, i32, String)> = v.iter().filter_map(|x| x.name.clone().filter(|n| !n.is_empty()).map(|n| (x.slot, x.id, n))).collect();
+                            t.sort_unstable();
+                            t
+                        };
+                        texts(&ob.verbs) == texts(&o.verbs)
+                    };
                     let mut shows = !half3 && early.idle.is_some() && ob.ego_pos == mego && (slot || iface(&ob) != m.iface);
-                    // the variables a slot's click left other than they are with no input
                     let mut vd: Vec<Key> = Vec::new();
                     let mut half = half3;
                     if half3 || shows {
@@ -843,6 +867,9 @@ fn clicks(
                             if let Some(w) = quiet.as_ref().and_then(|q| q.2.as_ref()) {
                                 vd = w.diff(&facts_of(&ob)).into_iter().filter(|d| d.0.kind() == K_VAR).map(|d| d.0).collect();
                             }
+                        }
+                        if vd.len() < 2 {
+                            vd.clear();
                         }
                         shows = shows && still && (iface(&ob) != m.iface || !vd.is_empty()) && quiet.as_ref().is_some_and(|q| world_same(&ob, &q.2));
                         half = half3 && still;
@@ -880,7 +907,7 @@ fn clicks(
                             let mut slots: Vec<i32> = now.symmetric_difference(&shown).map(|x| x.0).collect();
                             slots.sort_unstable();
                             slots.dedup();
-                            let page = slots.len() >= 2 || vd.len() >= 2;
+                            let page = slots.len() >= 2 || !vd.is_empty();
                             trace(&format!("    shows {} depth {depth} ({} slots changed, {} variables)", r.name, slots.len(), vd.len()));
                             if !vd.is_empty() {
                                 let n = pvars.len();
@@ -888,30 +915,27 @@ fn clicks(
                                 pvars.sort_unstable();
                                 pvars.dedup();
                                 if pvars.len() != n {
-                                    // the round's stop under the longer list
-                                    seen_mid.insert(mk(&r0, &pvars));
+                                    seen_mid = seen_list.iter().map(|(b, f)| mid_key(*b, f, &pvars)).collect();
                                 }
                             }
                             if shadow {
                                 if page && m.only.is_none() {
                                     shifters.insert(p.hit);
                                 }
-                                seen_mid.insert(mk(&r, &pvars));
+                                see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
                                 b.quit();
                                 continue;
                             }
                             if page && depth == 1 {
-                                if m.only.is_none() {
-                                    shifters.insert(p.hit);
-                                }
-                                if seen_mid.insert(mk(&r, &pvars)) {
+                                shifters.insert(p.hit);
+                                if see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) {
                                     out.mids += 1;
                                     let before = m.only.clone().unwrap_or_else(|| shown.clone());
                                     work.push_back(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: Some(before) });
                                 } else {
                                     b.quit();
                                 }
-                            } else if !page && depth < MAX_CLICKS && seen_mid.insert(mk(&r, &pvars)) {
+                            } else if !page && depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) {
                                 out.mids += 1;
                                 next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: None });
                             } else {
@@ -927,11 +951,11 @@ fn clicks(
                             }
                         }
                         if shadow {
-                            seen_mid.insert(mk(&r, &pvars));
+                            see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
                             b.quit();
                             continue;
                         }
-                        if depth < MAX_CLICKS && seen_mid.insert(mk(&r, &pvars)) {
+                        if depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) {
                             out.mids += 1;
                             // a sentence begun after a page of the interface goes on at the slots that changed
                             let only = if depth == 1 { m.only.clone() } else { None };
@@ -991,7 +1015,7 @@ fn clicks(
                             }
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
                             // line, not a verb's slot): a stop like any other, too
-                            let fresh = seen_mid.insert(mk(&r, &pvars));
+                            let fresh = see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
                             if depth < MAX_CLICKS && fresh {
                                 out.mids += 1;
                                 next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events.clone(), only: None });
