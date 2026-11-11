@@ -33,11 +33,11 @@
 //!   a stop when no kept stop of its line holds it: with an object gained or used up, every room, input and position
 //!   counts again. The highest level is expanded first.
 //! * **Kept.** Within its level a stop goes to the first queue it fits: (0) a world atom other than a variable's
-//!   that is new; (1) an interface or a thing on the screen new in that room; (2) a walk box or camera bucket new in
-//!   that room; (3) a variable's value that is new; (4) an atom of the guide's keys new in that room; (5) any other
+//!   that is new; (1) an interface or a thing on the screen new in that room; (2) a variable's value that is new, or
+//!   a walk box or camera bucket new in that room; (3) an atom of the guide's keys new in that room; (4) any other
 //!   world atom new in that room, or a new world (its atoms together, without those that change by themselves). A
-//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queues 4 and 5 wait until no
-//!   level holds a stop in queues 0 to 3.
+//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queues 3 and 4 wait until no
+//!   level holds a stop in queues 0 to 2.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -82,10 +82,10 @@ const FLOOR_Y: [i32; 4] = [3, 5, 7, 8];
 /// Engines kept alive for stops waiting in a queue; the others are booted again from their movies.
 const LIVE_MAX: usize = 32;
 /// The queues (the module's text, "Kept"), and the last one whose stops get a kept engine.
-const QUEUES: usize = 6;
+const QUEUES: usize = 5;
 const LIVE_QUEUES: usize = 3;
 /// The queues expanded at every level, the highest first, before any level's later ones.
-const FIRST_QUEUES: usize = 4;
+const FIRST_QUEUES: usize = 3;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
@@ -781,7 +781,7 @@ impl Search {
                 if k.kind() == K_VAR {
                     if self.seen.insert((line, k, val)) {
                         novel.push(format!("{k}={val}"));
-                        class = class.min(3);
+                        class = class.min(2);
                         let vals = self.var_vals.entry(k).or_default();
                         if !vals.contains(&val) {
                             vals.push(val);
@@ -791,7 +791,7 @@ impl Search {
                         }
                     }
                     if self.seen_at.insert((line, r.room, k, val)) {
-                        class = class.min(4);
+                        class = class.min(3);
                     }
                     continue;
                 }
@@ -800,7 +800,7 @@ impl Search {
                     class = 0;
                 }
                 if self.seen_at.insert((line, r.room, k, val)) {
-                    class = class.min(if guide { 4 } else { 5 });
+                    class = class.min(if guide { 3 } else { 4 });
                 }
             }
             for &t in &r.vis {
@@ -822,7 +822,7 @@ impl Search {
                 class = class.min(2);
             }
             if self.cells.insert((line, cell(r.room, r.iface, &world, &self.ambient))) {
-                class = class.min(5);
+                class = class.min(4);
             }
             // nothing new, alone or together: dropped
             if class == QUEUES {
