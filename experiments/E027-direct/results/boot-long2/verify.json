@@ -1,3 +1,4 @@
 [
-{"rung":"P4","what":"objects 396 and 388 owned and paid (bit 98), with one trial done and room 51's deal","node":10098,"from_boot":true,"frame":27025,"room":30,"keys":[["owner:396",1],["owner:388",1],["bit:98",1],["var:196",1],["bit:103",1]],"clicks":371,"ok":true}
+{"rung":"P4","what":"objects 396 and 388 owned and paid (bit 98), with one trial done and room 51's deal","node":10098,"from_boot":true,"frame":27025,"room":30,"keys":[["owner:396",1],["owner:388",1],["bit:98",1],["var:196",1],["bit:103",1]],"clicks":371,"ok":true},
+{"rung":"P3","what":"bit 65 and object 442, with P4 and one trial","node":11258,"from_boot":true,"frame":27480,"room":35,"keys":[["bit:65",1],["owner:442",1],["owner:396",1],["owner:388",1],["bit:98",1],["var:196",1]],"clicks":379,"ok":true}
 ]
