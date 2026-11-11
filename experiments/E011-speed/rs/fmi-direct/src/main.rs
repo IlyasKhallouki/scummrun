@@ -51,14 +51,16 @@
 //!   counts again. The highest level is expanded first. With `--lines gains` a line is the gains alone and the
 //!   level their count: a loss starts no line (what it changed is new in its line, the rooms are not).
 //! * **Kept.** Within its level a stop goes to the first queue it fits: (0) a world atom other than a variable's
-//!   that is new, or a count of the guide's flags set that no stop of its line has held (the flags are won one by
-//!   one on different paths: the first stop with more of them is new, though each flag is not); (1) an interface new in its line, or a thing on the screen new in that room; (2) a variable's value that is new, or
+//!   that is new, or a count of flags set that no stop of its line has held (the flags are won one by one on
+//!   different paths: the first stop with more of them is new, though each flag is not; a flag seen unset again
+//!   somewhere is not counted); (1) an interface new in its line, or a thing on the screen new in that room; (2) a variable's value that is new, or
 //!   a walk box or camera bucket new in that room, or a new value of a local variable of a script running at the
 //!   stop (a script that waits for the player keeps there what the facts do not show: how often a line was said;
 //!   those a wait moves, and those seen with more than LOCAL_CAP values, do not count); (3) an atom of the guide's keys new in that room; (4) any other
 //!   world atom new in that room, or a new world (its atoms together, without those that change by themselves). A
 //!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queue 4 waits until no
-//!   level holds a stop in queues 0 to 3 (queue 3 carries a flag from room to room, which nothing else does).
+//!   level holds a stop in queues 0 to 3 (queue 3 carries a flag from room to room, which nothing else does), and
+//!   gives its stop with the most flags set first.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -132,6 +134,8 @@ struct Node {
     /// the stop was made inside a window or after a wait
     pending: Vec<(Key, Val)>,
     inside: bool,
+    /// the flags it holds set, but those seen unset again somewhere
+    flags: u32,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -182,8 +186,10 @@ struct Search {
     boxes: HashSet<(u64, i32, i32)>,
     cams: HashSet<(u64, i32, i32)>,
     cells: HashSet<(u64, u64)>,
-    /// per line: the counts of the guide's flags set that a kept stop has held
+    /// per line: the counts of flags set that a kept stop has held; and the flags seen unset again (they are no
+    /// record of anything: a dialog's choices, a door's state)
     counts: HashSet<(u64, u32)>,
+    toggles: HashSet<Key>,
     /// lines by gains alone (--lines gains)
     gains_only: bool,
     /// the scripts' local variables: per line the values kept stops held, the values seen, the clocks, the capped
@@ -1323,9 +1329,12 @@ impl Search {
                 novel.push("local".into());
                 class = class.min(2);
             }
-            // the guide's flags the stop holds set: a count no stop of the line has held is new (a stop that holds
-            // two flags which two other stops hold one each is the first with both)
-            let flags = world.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && self.policy.guide.contains(&p.0)).count() as u32;
+            // the flags the stop holds set (but those seen unset again): a count no stop of the line has held is new
+            // (a stop that holds two flags which two other stops hold one each is the first with both)
+            for c in r.changed.iter().filter(|c| c.0.kind() == K_BIT && c.1 == 0) {
+                self.toggles.insert(c.0);
+            }
+            let flags = world.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && !self.toggles.contains(&p.0)).count() as u32;
             if self.counts.insert((line, flags)) {
                 novel.push(format!("flags={flags}"));
                 class = 0;
@@ -1398,7 +1407,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside });
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             keep.push((i, nid, level as usize, class));
@@ -1738,7 +1747,7 @@ fn main() {
         s.sees.insert((line, r.room, t));
     }
     s.ifaces.insert((line, r.iface));
-    let flags0 = r.facts.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && s.policy.guide.contains(&p.0)).count() as u32;
+    let flags0 = r.facts.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0).count() as u32;
     s.counts.insert((line, flags0));
     s.boxes.insert((line, r.room, r.walkbox));
     s.cams.insert((line, r.room, r.cam));
@@ -1746,7 +1755,7 @@ fn main() {
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false });
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0 });
     s.queues.push(Default::default());
     s.queues[0][0].push_back(0);
     s.live.insert(0, e);
@@ -1763,7 +1772,17 @@ fn main() {
             // the highest level first and in it the first queue, over the first queues of every level; then the same
             // over the later ones
             let first = s.queues.iter_mut().rev().find_map(|q| q[..FIRST_QUEUES].iter_mut().find_map(|c| c.pop_front()));
-            let Some(id) = first.or_else(|| s.queues.iter_mut().rev().find_map(|q| q[FIRST_QUEUES..].iter_mut().find_map(|c| c.pop_front()))) else { break };
+            // the last queue: of the highest level that has one, the stop that holds the most flags (the earliest of
+            // them): what is won one flag at a time is carried on by the stop that has won most
+            let nodes = &s.nodes;
+            let last = || {
+                s.queues.iter_mut().rev().find_map(|q| {
+                    let c = &mut q[QUEUES - 1];
+                    let i = (0..c.len()).max_by_key(|&i| (nodes[c[i]].flags, std::cmp::Reverse(c[i])))?;
+                    c.remove(i)
+                })
+            };
+            let Some(id) = first.or_else(last) else { break };
             let n = &s.nodes[id];
             batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level, n.pending.clone(), n.inside))));
         }
