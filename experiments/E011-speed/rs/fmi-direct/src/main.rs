@@ -24,8 +24,16 @@
 //!   with no input. Where they differ in a key of the world, the input changed it, and the trial is run PROBE frames
 //!   on with no input. The stop reached there is one more stop to keep (an effect that lands after the first stop: a
 //!   count the game raises when its actor has landed). And where a key the input changed is back at its old value
-//!   there, or is a key that moves by itself in that room, the first stop is a window that closes by itself: the
-//!   inputs are tried from it, whether it holds anything new or not (the first MAX_WINDOWS windows of a stop).
+//!   there, or PROBE_LONG frames on, the first stop is a window that closes by itself: the inputs are tried from it,
+//!   whether it holds anything new or not (the first MAX_WINDOWS windows of a stop). A key the stop's own waits
+//!   moved is not counted as changed by an input: it moves by itself from that stop. Nor is a key of the game's own
+//!   motion: one the waits moved at some stop where no input's change of it was pending (a stop carries the keys the
+//!   inputs on its path changed, each until it is back at its old value: PENDING of them at most; the stops inside
+//!   a window and after a wait teach nothing). Such motion runs another way after any input, and is no effect of
+//!   it. And a window is followed only
+//!   while fewer than WINDOW_TRIES windows on one of its keys were followed from the same cell (its room, its
+//!   interface and its world without the keys that move by themselves): where a room's own motion differs after
+//!   every input, the same window is not entered at every stop.
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
 //!   interface's own (those the input script writes, and those a fifth of a stop's own inputs change), the clocks (those
 //!   that take two values or more over one stop's waits), and those seen with more than VAR_CAP values.
@@ -71,7 +79,11 @@ const WAITS: [u64; 3] = [50, 200, 800];
 /// Frames a trial that changed the world is run on with no input (the module's text, "After an input"), and the
 /// windows one round follows.
 const PROBE: u64 = 60;
+const PROBE_LONG: u64 = 240;
 const MAX_WINDOWS: usize = 3;
+const WINDOW_TRIES: u32 = 3;
+/// The keys a stop carries as changed by the inputs on its path and not yet back (the module's text, "After an input").
+const PENDING: usize = 16;
 /// Stops of a level, room and walk box whose waits a key may change before its change stops calling for the inputs
 /// again.
 const MOTION_TRIES: u32 = 3;
@@ -102,6 +114,10 @@ struct Node {
     level: u32,
     line: u64,
     room: i32,
+    /// the keys the inputs on the way here changed and that are not back yet, each with its old value; and whether
+    /// the stop was made inside a window or after a wait
+    pending: Vec<(Key, Val)>,
+    inside: bool,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -158,10 +174,12 @@ struct Search {
     policy: Policy,
     /// the world keys a run with no input changed somewhere: left out of the cells
     ambient: HashSet<Key>,
-    /// per level, room, walk box and key: the stops expanded there whose waits changed it; and per room the keys
-    /// any did
+    /// per level, room, walk box and key: the stops expanded there whose waits changed it
     motion: HashMap<(u32, i32, i32, Key), u32>,
-    room_motion: HashSet<(i32, Key)>,
+    /// per cell and key: the windows on that key followed from that cell
+    wins: HashMap<(u64, Key), u32>,
+    /// the game's own motion: the keys a wait moved at a stop where no input's change of them was pending
+    noise: HashSet<Key>,
     rooms: Vec<i32>,
     /// the highest level of a kept stop
     top: u32,
@@ -230,6 +248,10 @@ struct Res {
     iface: u64,
     /// the world's and the variables' atoms that differ from the expanded stop's (set by `explore`)
     changed: Vec<(Key, Val)>,
+    /// the keys its input changed (against the twin), each with its old value; and whether it was made inside a
+    /// window or after a wait
+    own: Vec<(Key, Val)>,
+    inside: bool,
 }
 
 fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
@@ -254,6 +276,8 @@ fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
         cam: st.xstart.div_euclid(CAM_BUCKET),
         iface: iface(o),
         changed: Vec::new(),
+        own: Vec::new(),
+        inside: false,
         facts,
         st,
     }
@@ -392,6 +416,10 @@ struct Out {
     windows: u64,
     /// clicks not tried: slots known to pick another verb or to do nothing
     skipped: u64,
+    /// the windows followed: each one's cell with each of its keys
+    followed: Vec<(u64, Key)>,
+    /// the keys the stop's waits moved while no input's change of them was pending
+    noise: HashSet<Key>,
     offer: Value,
     /// the variables the input script wrote in a trial, or that a fifth of the stop's inputs changed
     iface_vars: HashSet<Key>,
@@ -459,6 +487,8 @@ fn clicks(
     lead: &[Event],
     motion: Option<&HashSet<Key>>,
     echo: Option<&HashSet<Key>>,
+    carry: &[(Key, Val)],
+    snap: &Snap<'_>,
     cfg: &Cfg,
     out: &mut Out,
 ) -> EResult<()> {
@@ -471,12 +501,14 @@ fn clicks(
     let first = out.results.len();
     let mut seen_mid: HashSet<u64> = HashSet::from([r0.mid()]);
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface }];
-    // the stops that are windows (the module's text, "After an input"): their engines, names and events
-    let mut windows: Vec<(Box<dyn Engine>, String, Vec<Event>)> = Vec::new();
+    // the stops that are windows (the module's text, "After an input"): their engines, names, events and changed keys
+    let mut windows: Vec<(Box<dyn Engine>, String, Vec<Event>, Vec<(Key, Val)>)> = Vec::new();
     // the twin: a copy of the round's stop to fork it from, the fork run on, and its world at the frames asked
     let mut twin_src: Option<Box<dyn Engine>> = if motion.is_some() { Some(e.fork()?) } else { None };
     let mut twin: Option<Box<dyn Engine>> = None;
     let mut twin_at: HashMap<u64, Option<Facts>> = HashMap::new();
+    // the windows this round follows, per cell and key
+    let mut mine: HashMap<(u64, Key), u32> = HashMap::new();
     // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
     // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
     // verb), or gave that stop again (it does nothing)
@@ -601,7 +633,10 @@ fn clicks(
                 match played {
                     Played::Stop(st) => {
                         let ob = b.obs(&NAMES)?;
-                        let r = read(name_of(pre, &cl), events, &ob, st);
+                        let mut r = read(name_of(pre, &cl), events, &ob, st);
+                        r.inside = !pre.is_empty();
+                        // inside a window: its keys are still the window's input's doing, where not back yet
+                        r.own = carry.iter().filter(|c| r.facts.val(c.0) != c.1).copied().collect();
                         // only the input script ran since the click and ego stands where it stood: a sentence half made
                         let half = settled_half.is_none() && ob.ego_pos == mego && {
                             let runs = b.runs()?;
@@ -629,10 +664,19 @@ fn clicks(
                             if let (Some(src), true) = (twin_src.as_mut(), r.room == r0.room) {
                                 if let Some(tw) = twin_world(src, &mut twin, &mut twin_at, r.st.frame)? {
                                     let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
-                                    touched = tw.diff(&mine).into_iter().map(|d| (d.0, r0.facts.val(d.0))).collect();
+                                    touched = tw
+                                        .diff(&mine)
+                                        .into_iter()
+                                        .filter(|d| !motion.is_some_and(|m| m.contains(&d.0)) && !snap.noise.contains(&d.0))
+                                        .map(|d| (d.0, r0.facts.val(d.0)))
+                                        .collect();
                                 }
                             }
-                            let mut window = false;
+                            if !touched.is_empty() {
+                                r.own = touched.clone();
+                            }
+                            // the keys back at their old value PROBE frames on, or PROBE_LONG frames on
+                            let mut back: Vec<Key> = Vec::new();
                             if !touched.is_empty() {
                                 let mut pb = b.fork()?;
                                 out.trials += 1;
@@ -640,18 +684,34 @@ fn clicks(
                                 if go(&mut pb, RunSpec { frame: Some(at + PROBE), ..Default::default() })?.is_ok() {
                                     if let Played::Stop(st2) = calm(&mut pb, at + PROBE, cfg.horizon, ego)? {
                                         let ob2 = pb.obs(&NAMES)?;
-                                        let r2 = read(format!("{}~", r.name), r.events.clone(), &ob2, st2);
-                                        // back at its old value, or a key that moves by itself here
-                                        window = touched.iter().any(|&(k, old)| r2.facts.val(k) == old || motion.is_some_and(|m| m.contains(&k)));
+                                        let mut r2 = read(format!("{}~", r.name), r.events.clone(), &ob2, st2);
+                                        r2.own = touched.clone();
+                                        back = touched.iter().filter(|&&(k, old)| r2.facts.val(k) == old).map(|t| t.0).collect();
+                                        let room2 = r2.room;
                                         out.results.push(r2);
+                                        if back.is_empty() && room2 == r0.room && go(&mut pb, RunSpec { frame: Some(at + PROBE_LONG), ..Default::default() })?.is_ok() {
+                                            let w3 = pb.facts()?;
+                                            back = touched.iter().filter(|&&(k, old)| w3.val(k) == old).map(|t| t.0).collect();
+                                        }
                                     }
                                 }
                                 pb.quit();
                             }
-                            if window && windows.len() < MAX_WINDOWS {
-                                windows.push((b, format!("{}>", r.name), r.events.clone()));
-                                out.results.push(r);
-                                continue;
+                            if !back.is_empty() && windows.len() < MAX_WINDOWS {
+                                // a window: followed while one of its keys was followed from this cell fewer than
+                                // WINDOW_TRIES times
+                                let c = cell(r.room, r.iface, &snap.policy.world_of(&r.facts), snap.ambient);
+                                let tries = |k: Key| snap.wins.get(&(c, k)).copied().unwrap_or(0) + mine.get(&(c, k)).copied().unwrap_or(0);
+                                if back.iter().any(|&k| tries(k) < WINDOW_TRIES) {
+                                    trace(&format!("    window at {}: cell {c:x} {}", r.name, back.iter().map(|k| format!("{k}({}{})", tries(*k), if snap.ambient.contains(k) { "a" } else { "" })).collect::<Vec<_>>().join(" ")));
+                                    for &k in &back {
+                                        *mine.entry((c, k)).or_default() += 1;
+                                        out.followed.push((c, k));
+                                    }
+                                    windows.push((b, format!("{}>", r.name), r.events.clone(), touched.clone()));
+                                    out.results.push(r);
+                                    continue;
+                                }
                             }
                             out.results.push(r);
                         }
@@ -702,10 +762,10 @@ fn clicks(
         }
     }
     // the windows: the inputs from each, with no window found inside one
-    for (mut b, name, events) in windows {
+    for (mut b, name, events, keys) in windows {
         out.windows += 1;
         trace(&format!("    window {name} ({} trials so far)", out.trials));
-        let r = clicks(&mut b, &name, &events, None, None, cfg, out);
+        let r = clicks(&mut b, &name, &events, None, None, &keys, snap, cfg, out);
         b.quit();
         r?;
     }
@@ -713,14 +773,16 @@ fn clicks(
 }
 
 /// What `explore` reads of the search: the rooms' motion at the batch's start.
-struct Snap {
-    motion: HashMap<(u32, i32, i32, Key), u32>,
-    /// per room, the keys a wait has moved at any stop
-    room_motion: HashSet<(i32, Key)>,
+struct Snap<'a> {
+    motion: &'a HashMap<(u32, i32, i32, Key), u32>,
+    wins: &'a HashMap<(u64, Key), u32>,
+    noise: &'a HashSet<Key>,
+    policy: &'a Policy,
+    ambient: &'a HashSet<Key>,
 }
 
 /// Every input of the stop tried, at the stop and after the game's own moves. Reads the engine and `snap` only.
-fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResult<Out> {
+fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: bool, snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
@@ -766,14 +828,18 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
     }
     let moving: HashSet<Key> = values.keys().copied().collect();
     out.clocks.extend(values.into_iter().filter(|x| x.1.len() >= 2).map(|x| x.0));
-    let mut motion = out.ambient.clone();
-    motion.extend(snap.room_motion.iter().filter(|x| x.0 == r0.room).map(|x| x.1));
+    // what the stop's own waits moved: no input's doing
+    let motion = out.ambient.clone();
+    // and the game's own motion, where no input's change of the key was pending
+    if !inside {
+        out.noise = out.ambient.iter().filter(|k| !pending.iter().any(|p| p.0 == **k)).copied().collect();
+    }
     trace(&format!("  room {} waits done, {} moved", r0.room, waited.len()));
-    clicks(e, "", &[], Some(&motion), Some(&moving), cfg, &mut out)?;
+    clicks(e, "", &[], Some(&motion), Some(&moving), &[], snap, cfg, &mut out)?;
     trace(&format!("  room {} round done: {} trials, {} windows", r0.room, out.trials, out.windows));
     // where the world moved by itself (and few stops of this room and level saw that): the inputs again from there
     for (n, mut b) in waited {
-        let r = clicks(&mut b, &format!("wait{n}+"), &[], None, None, cfg, &mut out);
+        let r = clicks(&mut b, &format!("wait{n}+"), &[], None, None, &[], snap, cfg, &mut out);
         b.quit();
         r?;
     }
@@ -820,7 +886,10 @@ impl Search {
         let level0 = self.nodes[id].level;
         for &k in &out.ambient {
             *self.motion.entry((level0, room0, out.walkbox, k)).or_default() += 1;
-            self.room_motion.insert((room0, k));
+        }
+        self.noise.extend(out.noise.iter().copied());
+        for f in &out.followed {
+            *self.wins.entry(*f).or_default() += 1;
         }
         self.policy.iface_vars.extend(out.iface_vars.iter().copied());
         self.policy.clocks.extend(out.clocks.iter().copied());
@@ -947,7 +1016,15 @@ impl Search {
             if let Some(f) = self.log.as_mut() {
                 let _ = writeln!(f, "{text}");
             }
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room });
+            let mut pending = r.own.clone();
+            for &(k, old) in &self.nodes[id].pending {
+                if r.facts.val(k) != old && !pending.iter().any(|p| p.0 == k) {
+                    pending.push((k, old));
+                }
+            }
+            pending.truncate(PENDING);
+            let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             keep.push((i, nid, level as usize, class));
@@ -1280,13 +1357,13 @@ fn main() {
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room });
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false });
     s.queues.push(Default::default());
     s.queues[0][0].push_back(0);
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
     let (mut last, mut printed) = (0u64, Instant::now());
-    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32);
+    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool);
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
     type Parent = (Box<dyn Engine>, Vec<(usize, Vec<Event>, u64)>);
     while t0.elapsed() < limit {
@@ -1298,12 +1375,12 @@ fn main() {
             let first = s.queues.iter_mut().rev().find_map(|q| q[..FIRST_QUEUES].iter_mut().find_map(|c| c.pop_front()));
             let Some(id) = first.or_else(|| s.queues.iter_mut().rev().find_map(|q| q[FIRST_QUEUES..].iter_mut().find_map(|c| c.pop_front()))) else { break };
             let n = &s.nodes[id];
-            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level))));
+            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level, n.pending.clone(), n.inside))));
         }
         if batch.is_empty() {
             break;
         }
-        let snap = Snap { motion: s.motion.clone(), room_motion: s.room_motion.clone() };
+        let snap = Snap { motion: &s.motion, wins: &s.wins, noise: &s.noise, policy: &s.policy, ambient: &s.ambient };
         // side by side: each stop explored, from the search's state at the batch's start
         let n = batch.len();
         let done: Vec<Mutex<Option<Done>>> = (0..n).map(|_| Mutex::new(None)).collect();
@@ -1315,14 +1392,14 @@ fn main() {
                     if i >= n {
                         break;
                     }
-                    let (id, engine, events, frame, level) = batch[i].lock().unwrap().take().unwrap();
+                    let (id, engine, events, frame, level, pending, inside) = batch[i].lock().unwrap().take().unwrap();
                     let booted = engine.is_none();
                     let e = match engine {
                         Some(e) => Ok(e),
                         None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(&cfg.out) }),
                     };
                     let r = match e {
-                        Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
+                        Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &pending, inside, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
                             Ok(out) => Ok((e, out)),
                             Err(x) => {
                                 e.quit();
