@@ -1,3 +1,4 @@
 [
-{"rung":"P11","node":5809,"from_boot":true,"frame":56146,"room":61,"keys":[["bit:89",1],["bit:304",1],["var:196",3]],"clicks":878,"ok":true}
+{"rung":"P11","node":5809,"from_boot":true,"frame":56146,"room":61,"keys":[["bit:89",1],["bit:304",1],["var:196",3]],"clicks":878,"ok":true},
+{"rung":"P12","node":20874,"from_boot":true,"frame":62206,"room":48,"keys":[["bit:88",1],["bit:89",1],["bit:304",1],["var:196",3]],"clicks":1043,"ok":true}
 ]
