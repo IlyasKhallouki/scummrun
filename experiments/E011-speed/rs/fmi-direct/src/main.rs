@@ -43,7 +43,8 @@
 //!   interface and its world without the keys that move by themselves): where a room's own motion differs after
 //!   every input, the same window is not entered at every stop.
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
-//!   interface's own (those the input script writes, and those a fifth of a stop's own inputs change), the clocks (those
+//!   interface's own (those the input script writes, and those a fifth of a stop's own inputs change where they change
+//!   nothing else in the world), the clocks (those
 //!   that take two values or more over one stop's waits), and those seen with more than VAR_CAP values.
 //! * **Lines and levels.** A stop's line is what ego has gained and lost on the way to it: the objects it has owned
 //!   (and did not own at the boot) and those of them it owns no more. Its level is their count. Something is new to
@@ -1148,9 +1149,14 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     trace(&format!("  room {} round done: {} trials, {} windows found", r0.room, out.trials, cands.len()));
     // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
     // only (in a window's round, or after a wait, an earlier input's effect lands in every trial), over its first
-    // stops (not those read PROBE frames on), and never a variable the stop's waits moved
+    // stops (not those read PROBE frames on) that changed nothing else in the world (where a dialog has three
+    // lines and one of them wins, a fifth of the inputs raise the count of what was won: that is no echo), and
+    // never a variable the stop's waits moved
     {
-        let made: Vec<&Res> = out.results[first..].iter().filter(|r| !r.name.ends_with('~')).collect();
+        let made: Vec<&Res> = out.results[first..]
+            .iter()
+            .filter(|r| !r.name.ends_with('~') && !r0.facts.diff(&r.facts).iter().any(|d| world_kind(d.0)))
+            .collect();
         if made.len() >= 10 {
             let mut changed: HashMap<Key, usize> = HashMap::new();
             for r in &made {
