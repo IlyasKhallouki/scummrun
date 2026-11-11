@@ -133,6 +133,9 @@ const GO_HOPS: usize = 14;
 const GO_SCROLLS: usize = 8;
 /// The kept stops of one expanded stop that get a kept engine.
 const LIVE_EACH: usize = 8;
+/// Half-made stops clicked on from in one round of one fork, at most: where a room makes one of every verb and thing
+/// (it drops the sentence and shows it), the round stays a round. The shallow ones come first.
+const MAX_MIDS: usize = 150;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
@@ -677,6 +680,7 @@ fn clicks(
     // show no text: what they hold is not in what the interface shows). The list grows in the round; the stops seen
     // are kept with their variables, for their keys under the longer list
     let mut pvars: Vec<Key> = Vec::new();
+    let mut mids_here = 0usize;
     let mut seen_mid: HashSet<u64> = HashSet::new();
     let mut seen_list: Vec<(u64, Facts)> = Vec::new();
     see(&mut seen_mid, &mut seen_list, mkey(&r0), &r0.facts, &pvars);
@@ -928,14 +932,16 @@ fn clicks(
                             }
                             if page && depth == 1 {
                                 shifters.insert(p.hit);
-                                if see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) {
+                                if see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) && mids_here < MAX_MIDS {
+                                    mids_here += 1;
                                     out.mids += 1;
                                     let before = m.only.clone().unwrap_or_else(|| shown.clone());
                                     work.push_back(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: Some(before) });
                                 } else {
                                     b.quit();
                                 }
-                            } else if !page && depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) {
+                            } else if !page && depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) && mids_here < MAX_MIDS {
+                                mids_here += 1;
                                 out.mids += 1;
                                 next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: None });
                             } else {
@@ -955,7 +961,8 @@ fn clicks(
                             b.quit();
                             continue;
                         }
-                        if depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) {
+                        if depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) && mids_here < MAX_MIDS {
+                            mids_here += 1;
                             out.mids += 1;
                             // a sentence begun after a page of the interface goes on at the slots that changed
                             let only = if depth == 1 { m.only.clone() } else { None };
@@ -1016,7 +1023,8 @@ fn clicks(
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
                             // line, not a verb's slot): a stop like any other, too
                             let fresh = see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
-                            if depth < MAX_CLICKS && fresh {
+                            if depth < MAX_CLICKS && fresh && mids_here < MAX_MIDS {
+                                mids_here += 1;
                                 out.mids += 1;
                                 next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events.clone(), only: None });
                                 out.results.push(r);
