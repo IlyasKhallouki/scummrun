@@ -62,7 +62,9 @@
 //! * **Flags.** A stop whose set of flags (those not seen unset again somewhere) is held whole by no kept stop of
 //!   its line is new, whatever else it holds, and goes before every queue of its level, the last such stop first.
 //!   Flags are won one at a time and on different paths; the stop that has won the most is the one to go on from,
-//!   and once one stop holds them all the others' sets are within its own.
+//!   and once one stop holds them all the others' sets are within its own. With `--flag-lines` such a stop also
+//!   starts a line of its own, as a gain does (every room and input counts again from it), and every stop of
+//!   queue 0 goes before the queues, the newest first: the search works on its newest line, and walks.
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -138,6 +140,8 @@ struct Node {
     inside: bool,
     /// the flags it holds set, but those seen unset again somewhere
     flags: u32,
+    /// the last stop on the way here (or this one) whose set of flags was new in its line of gains
+    fline: usize,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -195,8 +199,9 @@ struct Search {
     /// record of anything: a dialog's choices, a door's state)
     counts: HashSet<(u64, u32)>,
     toggles: HashSet<Key>,
-    /// lines by gains alone (--lines gains)
+    /// lines by gains alone (--lines gains); a new set of flags starts a line (--flag-lines)
     gains_only: bool,
+    flag_lines: bool,
     /// the scripts' local variables: per line the values kept stops held, the values seen, the clocks, the capped
     lseen: HashSet<(u64, u64, i32)>,
     lvals: HashMap<u64, Vec<i32>>,
@@ -1278,7 +1283,46 @@ impl Search {
             }
             // --lines gains: a line is what was gained, a loss stays in its line (what it changed is new there,
             // the rest is not)
-            let (level, line) = if self.gains_only { (ever.len() as u32, line_of(&ever, &[])) } else { ((2 * ever.len() - owned.len()) as u32, line_of(&ever, &owned)) };
+            let (level, gline) = if self.gains_only { (ever.len() as u32, line_of(&ever, &[])) } else { ((2 * ever.len() - owned.len()) as u32, line_of(&ever, &owned)) };
+            // the flags the stop holds set (but those seen unset again): a count no stop of the line has held is new
+            // (a stop that holds two flags which two other stops hold one each is the first with both)
+            for c in r.changed.iter().filter(|c| c.0.kind() == K_BIT && c.1 == 0) {
+                self.toggles.insert(c.0);
+            }
+            let mut set: Vec<u64> = Vec::new();
+            let mut flags = 0u32;
+            for p in world.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && !self.toggles.contains(&p.0)) {
+                let n = p.0.a() as usize;
+                if set.len() <= n / 64 {
+                    set.resize(n / 64 + 1, 0);
+                }
+                set[n / 64] |= 1 << (n % 64);
+                flags += 1;
+            }
+            // a set of flags that no kept stop of the line holds all of: new, and followed before anything else of
+            // its level (the last such stop first: what is won one flag at a time is won on one path)
+            let within = |a: &[u64], b: &[u64]| a.iter().enumerate().all(|(i, w)| w & !b.get(i).copied().unwrap_or(0) == 0);
+            let tops = self.tops.entry(gline).or_default();
+            let mut dive = false;
+            if !tops.iter().any(|m| within(&set, m)) {
+                tops.retain(|m| !within(m, &set));
+                tops.push(set);
+                dive = true;
+            }
+            // --flag-lines: such a stop starts a line of its own, as a gain does: every room and input counts
+            // again from it (a flag is carried to where it matters by the stops that are new on the way)
+            let fline = if dive { self.nodes.len() } else { self.nodes[id].fline };
+            let line = if self.flag_lines {
+                let mut h = DefaultHasher::new();
+                (gline, fline).hash(&mut h);
+                h.finish()
+            } else {
+                gline
+            };
+            if dive {
+                novel.push(format!("flags={flags}"));
+                class = 0;
+            }
             // in the expanded stop's line and room only what changed can be new; elsewhere every atom may be
             let atoms: Vec<(Key, Val)> = if line == line0 && r.room == room00 {
                 r.changed.iter().filter(|p| self.policy.world(p.0)).copied().collect()
@@ -1333,33 +1377,6 @@ impl Search {
             if fresh {
                 novel.push("local".into());
                 class = class.min(2);
-            }
-            // the flags the stop holds set (but those seen unset again): a count no stop of the line has held is new
-            // (a stop that holds two flags which two other stops hold one each is the first with both)
-            for c in r.changed.iter().filter(|c| c.0.kind() == K_BIT && c.1 == 0) {
-                self.toggles.insert(c.0);
-            }
-            let mut set: Vec<u64> = Vec::new();
-            let mut flags = 0u32;
-            for p in world.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && !self.toggles.contains(&p.0)) {
-                let n = p.0.a() as usize;
-                if set.len() <= n / 64 {
-                    set.resize(n / 64 + 1, 0);
-                }
-                set[n / 64] |= 1 << (n % 64);
-                flags += 1;
-            }
-            // a set of flags that no kept stop of the line holds all of: new, and followed before anything else of
-            // its level (the last such stop first: what is won one flag at a time is won on one path)
-            let within = |a: &[u64], b: &[u64]| a.iter().enumerate().all(|(i, w)| w & !b.get(i).copied().unwrap_or(0) == 0);
-            let tops = self.tops.entry(line).or_default();
-            let mut dive = false;
-            if !tops.iter().any(|m| within(&set, m)) {
-                tops.retain(|m| !within(m, &set));
-                tops.push(set);
-                novel.push(format!("flags={flags}"));
-                class = 0;
-                dive = true;
             }
             for &t in &r.vis {
                 if self.sees.insert((line, r.room, t)) {
@@ -1429,10 +1446,11 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags });
+            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline });
             self.kept[class] += 1;
             self.top = self.top.max(level);
-            keep.push((i, nid, level as usize, class, dive));
+            // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
+            keep.push((i, nid, level as usize, class, dive || (self.flag_lines && class == 0)));
         }
         if let Some(f) = self.offers.as_mut() {
             let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "skipped": out.skipped, "mids": out.mids, "windows": out.windows,
@@ -1750,6 +1768,7 @@ fn main() {
         ..Default::default()
     };
     s.gains_only = opt("--lines").as_deref() == Some("gains");
+    s.flag_lines = a.iter().any(|x| x == "--flag-lines");
     if let Some(p) = opt("--guide") {
         // the guide's keys (fmi guide map): the variables among them are the ones the game's code tests
         let g: Value = serde_json::from_str(&std::fs::read_to_string(&p).expect("--guide")).expect("the guide's JSON");
@@ -1767,7 +1786,14 @@ fn main() {
     let r = read(String::new(), Vec::new(), &o, st.clone());
     let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
     s.root_owned = r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).collect();
-    let line = line_of(&[], &[]);
+    let gline = line_of(&[], &[]);
+    let line = if s.flag_lines {
+        let mut h = DefaultHasher::new();
+        (gline, 0usize).hash(&mut h);
+        h.finish()
+    } else {
+        gline
+    };
     for p in r.facts.iter().filter(|p| world_kind(p.0) || p.0.kind() == K_VAR) {
         s.seen.insert((line, p.0, p.1));
         s.seen_at.insert((line, r.room, p.0, p.1));
@@ -1784,7 +1810,7 @@ fn main() {
     for g in s.rungs.iter_mut().filter(|g| g.conds.is_empty()) {
         g.at = Some((0, 0.0));
     }
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0 });
+    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0 });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
