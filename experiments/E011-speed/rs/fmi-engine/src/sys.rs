@@ -10,8 +10,37 @@ struct PollFd {
     revents: i16,
 }
 
+#[repr(C)]
+struct RLimit {
+    cur: u64,
+    max: u64,
+}
+
+const RLIMIT_NOFILE: i32 = 7;
+
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
+    fn getrlimit(resource: i32, rlim: *mut RLimit) -> i32;
+    fn setrlimit(resource: i32, rlim: *const RLimit) -> i32;
+}
+
+/// The limit of open files raised to the hard limit: every engine is a process with a connection, and a search
+/// holds thousands of them. The limit now (unchanged where the call fails).
+pub fn raise_nofile() -> u64 {
+    let mut r = RLimit { cur: 0, max: 0 };
+    // SAFETY: one valid rlimit for the duration of each call.
+    unsafe {
+        if getrlimit(RLIMIT_NOFILE, &mut r) != 0 {
+            return 0;
+        }
+        if r.cur < r.max {
+            let want = RLimit { cur: r.max, max: r.max };
+            if setrlimit(RLIMIT_NOFILE, &want) == 0 {
+                return r.max;
+            }
+        }
+    }
+    r.cur
 }
 
 const POLLIN: i16 = 1;

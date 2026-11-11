@@ -254,6 +254,8 @@ struct Search {
     top: u32,
     /// engines being made for kept stops (counted against LIVE_MAX)
     making: usize,
+    /// the batches' wall seconds: the stops explored (side by side), committed (one by one), the kept engines made
+    wall: [f64; 3],
     live_max: usize,
     phase: [f64; 5],
     frames: u64,
@@ -269,6 +271,11 @@ struct Search {
     rungs: Vec<Rung>,
     log: Option<std::fs::File>,
     offers: Option<std::fs::File>,
+    /// OUT/rung-stops.jsonl: the line of each stop that is the first to hold a rung or a watched value, as it is
+    /// found; OUT/top.jsonl: the line of the newest stop that began a line at the top level (a run goes on from it
+    /// with --from-run OUT)
+    rung_log: Option<std::fs::File>,
+    top_path: Option<PathBuf>,
     t0: Option<Instant>,
 }
 
@@ -1975,8 +1982,10 @@ impl Search {
             let mut events = movie.clone();
             events.extend(r.events.iter().cloned());
             let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
+            let mut first_held = false;
             for w in self.watch.iter_mut() {
                 if w.2.is_none() && r.facts.val(w.0) == w.1 {
+                    first_held = true;
                     w.2 = Some((nid, secs));
                     eprintln!("[{secs:7.1}s] WATCH {}={} first held by node {nid}", w.0, w.1);
                 }
@@ -1987,6 +1996,7 @@ impl Search {
                     if ge { have >= want } else { have == want }
                 });
                 if held.count() >= g.least {
+                    first_held = true;
                     g.at = Some((nid, secs));
                     eprintln!("[{secs:7.1}s] RUNG {} first held by node {nid} (level {level}, {} trials so far)", g.name, self.trials);
                 }
@@ -2003,6 +2013,21 @@ impl Search {
                 "events": events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
             if let Some(f) = self.log.as_mut() {
                 let _ = writeln!(f, "{text}");
+            }
+            if first_held {
+                if let Some(f) = self.rung_log.as_mut() {
+                    let _ = writeln!(f, "{text}");
+                    let _ = f.flush();
+                }
+            }
+            if dive && level >= self.top {
+                if let Some(p) = &self.top_path {
+                    // written whole beside and moved in: a reader never sees half a line
+                    let tmp = p.with_extension("jsonl.new");
+                    if std::fs::write(&tmp, format!("{text}\n")).is_ok() {
+                        let _ = std::fs::rename(&tmp, p);
+                    }
+                }
             }
             let mut pending = r.own.clone();
             for &(k, old) in &self.nodes[id].pending {
@@ -2198,9 +2223,54 @@ fn main() {
         std::fs::create_dir_all(&out).expect("OUT");
         let n: usize = a[2].parse().expect("N");
         let host = Host::new(HostCfg::from_env()).expect("the host");
-        let mut e = host
-            .boot(&BootCfg { seed: 1, events: Vec::new(), frame: None, dump_locals: true, lean: true, out_dir: eng_dir(&out) })
-            .expect("the boot");
+        // `--from NODES ID`: at a kept stop instead of the boot's first frame
+        let (events, frame) = match opt("--from") {
+            Some(nodes) => {
+                let id: u64 = a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID");
+                let text = std::fs::read_to_string(&nodes).expect("--from NODES");
+                let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
+                (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect::<Vec<Event>>(), line["frame"].as_u64())
+            }
+            None => (Vec::new(), None),
+        };
+        let mut e = host.boot(&BootCfg { seed: 1, events, frame, dump_locals: true, lean: true, out_dir: eng_dir(&out) }).expect("the boot");
+        eprintln!("engine {} at frame {}: {} kB resident", e.pid(), e.status().frame, std::fs::read_to_string(format!("/proc/{}/statm", e.pid())).ok().and_then(|x| x.split(' ').nth(1).and_then(|p| p.parse::<u64>().ok())).unwrap_or(0) * 4);
+        if let Some(threads) = a.get(3).and_then(|x| x.parse::<usize>().ok()) {
+            // `direct forkbench OUT N THREADS`: N forks (each run one frame and quit) on each of THREADS threads at
+            // once, every thread from an engine of its own, all of one family: what a fork costs side by side
+            let parents: Vec<Mutex<Option<Box<dyn Engine>>>> = (0..threads).map(|_| Mutex::new(Some(e.fork().expect("fork")))).collect();
+            let t0 = Instant::now();
+            let sums: Vec<(f64, f64)> = std::thread::scope(|sc| {
+                let hs: Vec<_> = parents
+                    .iter()
+                    .map(|p| {
+                        sc.spawn(move || {
+                            let mut me = p.lock().unwrap().take().unwrap();
+                            let f0 = me.status().frame;
+                            let (mut fork, mut rest) = (0f64, 0f64);
+                            for _ in 0..n {
+                                let t = Instant::now();
+                                let mut b = me.fork().expect("fork");
+                                fork += t.elapsed().as_secs_f64();
+                                let t = Instant::now();
+                                let _ = b.run(&RunSpec { frame: Some(f0 + 1), ..Default::default() });
+                                b.quit();
+                                rest += t.elapsed().as_secs_f64();
+                            }
+                            me.quit();
+                            (fork, rest)
+                        })
+                    })
+                    .collect();
+                hs.into_iter().map(|h| h.join().unwrap()).collect()
+            });
+            let wall = t0.elapsed().as_secs_f64();
+            let total = (threads * n) as f64;
+            println!("{}", json!({"threads": threads, "n": n, "forks_per_s": (total / wall).round(),
+                "ms": {"fork": (sums.iter().map(|x| x.0).sum::<f64>() * 1e6 / total).round() / 1e3, "run_1_frame_and_quit": (sums.iter().map(|x| x.1).sum::<f64>() * 1e6 / total).round() / 1e3}}));
+            e.quit();
+            return;
+        }
         let f0 = e.status().frame;
         let mut t = [0f64; 6];
         for _ in 0..n {
@@ -2316,11 +2386,18 @@ fn main() {
     } else {
         vec![Event { frame: 1, what: Input::Skips { text: true, cutscenes: true, spare: None } }]
     };
-    // --from NODES ID (a measurement aid): the search starts at that kept stop of another run, not at the boot
-    let from: Option<(Vec<Event>, u64, Vec<Key>)> = opt("--from").map(|nodes| {
-        let id: u64 = a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID");
+    // --from NODES ID (a measurement aid): the search starts at that kept stop of another run, not at the boot.
+    // --from-run DIR: at the stop of DIR/top.jsonl (the newest stop that began a line at that run's top level), with
+    // that run's ways (DIR/edges.jsonl) unless --edges names others
+    let from_run: Option<PathBuf> = opt("--from-run").map(PathBuf::from);
+    let from_at: Option<(String, Option<u64>)> = match (&from_run, opt("--from")) {
+        (Some(d), _) => Some((d.join("top.jsonl").to_string_lossy().into_owned(), None)),
+        (None, Some(nodes)) => Some((nodes, Some(a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID")))),
+        (None, None) => None,
+    };
+    let from: Option<(Vec<Event>, u64, Vec<Key>)> = from_at.map(|(nodes, id)| {
         let text = std::fs::read_to_string(&nodes).expect("--from NODES");
-        let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
+        let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| id.is_none() || v["id"].as_u64() == id).expect("the node");
         let news = line["news"].as_array().map(|v| v.iter().filter_map(|x| x.as_str()).map(Key::parse).collect()).unwrap_or_default();
         (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect(), line["frame"].as_u64().unwrap(), news)
     });
@@ -2337,6 +2414,8 @@ fn main() {
     let mut s = Search {
         log: Some(std::fs::File::create(out.join("nodes.jsonl")).expect("nodes.jsonl")),
         offers: Some(std::fs::File::create(out.join("offers.jsonl")).expect("offers.jsonl")),
+        rung_log: Some(std::fs::File::create(out.join("rung-stops.jsonl")).expect("rung-stops.jsonl")),
+        top_path: Some(out.join("top.jsonl")),
         t0: Some(t0),
         live_max: LIVE_MAX.max(4 * cfg.workers),
         ..Default::default()
@@ -2350,7 +2429,8 @@ fn main() {
             s.mentions = mentions_of(Path::new(&d));
         }
         // --edges FILE: the ways from room to room an earlier run saw (its OUT/edges.jsonl)
-        if let Some(p) = opt("--edges") {
+        let edges_file = opt("--edges").or_else(|| from_run.as_ref().map(|d| d.join("edges.jsonl").to_string_lossy().into_owned()).filter(|p| Path::new(p).exists()));
+        if let Some(p) = edges_file {
             for v in std::fs::read_to_string(&p).expect("--edges").lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()) {
                 if let (Some(a), Some(b), Some(h)) = (v["from"].as_i64(), v["to"].as_i64(), v["how"].as_str().and_then(hits_of)) {
                     if v["failed"].as_bool() == Some(true) {
@@ -2433,15 +2513,18 @@ fn main() {
     s.queues[0][0].push_back(0);
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
+    // --stops N: the run ends after N stops are expanded (a measure that is the same on any machine)
+    let max_stops: Option<u64> = opt("--stops").map(|v| v.parse().expect("--stops N"));
     let (mut last, mut printed) = (0u64, Instant::now());
     type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool, Vec<Key>);
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
     type Parent = (Box<dyn Engine>, Vec<(usize, Vec<Event>, u64)>);
-    while t0.elapsed() < limit {
+    while t0.elapsed() < limit && max_stops.map_or(true, |n| s.expanded < n) {
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
         let at_once = if cfg.at_once > 0 { cfg.at_once } else { (cfg.workers / cfg.slices.max(1)).max(1) };
-        while batch.len() < at_once * cfg.batch {
+        let room_left = max_stops.map_or(usize::MAX, |n| (n - s.expanded) as usize);
+        while batch.len() < (at_once * cfg.batch).min(room_left) {
             // the highest level first and in it the first queue, over the first queues of every level; then the same
             // over the later ones
             // with --flag-lines the newest line's stops go before any older line's (a line is as new as the stop
@@ -2576,6 +2659,9 @@ fn main() {
         });
         s.making = 0;
         trace(&format!("batch of {n}: explored in {t_explored:.1} s, committed in {:.1} s, engines in {:.1} s", t_committed - t_explored, t_batch.elapsed().as_secs_f64() - t_committed));
+        s.wall[0] += t_explored;
+        s.wall[1] += t_committed - t_explored;
+        s.wall[2] += t_batch.elapsed().as_secs_f64() - t_committed;
         for (nid, b) in made.into_inner().unwrap() {
             s.live.insert(nid, b);
         }
@@ -2601,6 +2687,7 @@ fn main() {
         "expanded": s.expanded, "trials": s.trials, "skipped": s.skipped, "refused": s.refused, "not_idle": s.not_idle, "rooms": s.rooms,
         "max_depth": depth, "boots": s.boots, "top_level": s.top,
         "trial_seconds": {"fork": s.phase[0], "inputs": s.phase[1], "run": s.phase[2], "read": s.phase[3], "quit": s.phase[4]}, "trial_frames": s.frames,
+        "batch_seconds": {"explore": s.wall[0], "commit": s.wall[1], "engines": s.wall[2]},
         "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
         "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(),
         "ends": s.ends.iter().map(|(n, x)| json!([n, x])).collect::<Vec<Value>>(),

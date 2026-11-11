@@ -349,6 +349,7 @@ static SEQ: AtomicU64 = AtomicU64::new(0);
 
 impl Host {
     pub fn new(cfg: HostCfg) -> std::io::Result<Host> {
+        sys::raise_nofile();
         Ok(Host { cfg: Arc::new(cfg) })
     }
 
