@@ -20,8 +20,9 @@
 //!   world that fewer than MOTION_TRIES stops of that level, room and walk box saw change, the inputs are tried again
 //!   from there (a door a timer opens is open only then, and ego must stand near it; a room's own motion is tried a
 //!   few times from each part of the room, not at every stop).
-//! * **A click that changes only what the interface shows** (the game idle again LEAD frames on and still so CALM
-//!   frames later, ego where it stood, the world the same) is no stop: it is clicked on from. Where it changed one
+//! * **A click that changes only what the interface shows** (the bridge idle again LEAD frames on and still so CALM
+//!   frames later: no script of the click's runs and no actor talks; ego where it stood, the world the same) is no
+//!   stop: it is clicked on from. Where it changed one
 //!   slot it is the start or the middle of a sentence, a stop to click on from like a half-made one. Where it
 //!   changed several (another page of the interface) and came from the round's stop, it is clicked on from at the
 //!   same depth: at the slots it changed, at the slots that start a sentence (and from that sentence at the slots
@@ -213,6 +214,10 @@ struct Cfg {
     out: PathBuf,
     horizon: u64,
     workers: usize,
+    /// the forks a round's first clicks are dealt to, side by side; and the stops of one batch for each stop
+    /// expanded at once (workers / slices of them)
+    slices: usize,
+    batch: usize,
 }
 
 static DIRS: AtomicU64 = AtomicU64::new(0);
@@ -413,9 +418,22 @@ struct Mid {
     only: Option<Arc<HashSet<(i32, i32, String)>>>,
 }
 
+/// A stop that is a window (the module's text, "After an input"): its engine, its round's name, its events, the keys
+/// its input changed (with their old values), its cell and the keys that came back.
+struct Cand {
+    engine: Box<dyn Engine>,
+    name: String,
+    events: Vec<Event>,
+    keys: Vec<(Key, Val)>,
+    cell: u64,
+    back: Vec<Key>,
+}
+
 /// What a stop's trials gave.
 #[derive(Default)]
 struct Out {
+    /// the windows found in a round, for the stop's expansion to follow or not
+    cands: Vec<Cand>,
     results: Vec<Res>,
     ends: Vec<String>,
     trials: u64,
@@ -442,6 +460,33 @@ struct Out {
     /// the frames they ran
     phase: [f64; 5],
     frames: u64,
+}
+
+impl Out {
+    /// Another part of the same stop's trials, after this one.
+    fn absorb(&mut self, o: Out) {
+        self.cands.extend(o.cands);
+        self.results.extend(o.results);
+        self.ends.extend(o.ends);
+        self.trials += o.trials;
+        self.refused += o.refused;
+        self.not_idle += o.not_idle;
+        self.mids += o.mids;
+        self.windows += o.windows;
+        self.skipped += o.skipped;
+        self.followed.extend(o.followed);
+        if self.offer.is_null() {
+            self.offer = o.offer;
+        }
+        self.iface_vars.extend(o.iface_vars);
+        self.clocks.extend(o.clocks);
+        self.ambient.extend(o.ambient);
+        self.noise.extend(o.noise);
+        for (a, b) in self.phase.iter_mut().zip(o.phase.iter()) {
+            *a += b;
+        }
+        self.frames += o.frames;
+    }
 }
 
 /// A line on stderr when DIRECT_TRACE is set (a measurement aid).
@@ -496,8 +541,8 @@ fn clicks(
     pre: &str,
     lead: &[Event],
     motion: Option<&HashSet<Key>>,
-    echo: Option<&HashSet<Key>>,
     carry: &[(Key, Val)],
+    part: (usize, usize),
     snap: &Snap<'_>,
     cfg: &Cfg,
     out: &mut Out,
@@ -508,17 +553,14 @@ fn clicks(
     let sentence = r0.facts.val(Key::var(afford::VAR_SENTENCE_SCRIPT as u64)) as i32;
     let input0 = r0.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32;
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
-    let first = out.results.len();
     let mut seen_mid: HashSet<u64> = HashSet::from([r0.mid()]);
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None }];
-    // the stops that are windows (the module's text, "After an input"): their engines, names, events and changed keys
-    let mut windows: Vec<(Box<dyn Engine>, String, Vec<Event>, Vec<(Key, Val)>)> = Vec::new();
+    // the stops that are windows (the module's text, "After an input"), MAX_WINDOWS of them at most
+    let mut found = 0;
     // the twin: a copy of the round's stop to fork it from, the fork run on, and its world at the frames asked
     let mut twin_src: Option<Box<dyn Engine>> = if motion.is_some() { Some(e.fork()?) } else { None };
     let mut twin: Option<Box<dyn Engine>> = None;
     let mut twin_at: HashMap<u64, Option<Facts>> = HashMap::new();
-    // the windows this round follows, per cell and key
-    let mut mine: HashMap<(u64, Key), u32> = HashMap::new();
     // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
     // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
     // verb), or gave that stop again (it does nothing)
@@ -530,6 +572,7 @@ fn clicks(
         let mut next: Vec<Mid> = Vec::new();
         let mut work: VecDeque<Mid> = frontier.into_iter().collect();
         while let Some(mut m) = work.pop_front() {
+            let own = m.engine.is_none();
             let me: &mut Box<dyn Engine> = match m.engine.as_mut() {
                 Some(x) => x,
                 None => &mut *e,
@@ -583,7 +626,21 @@ fn clicks(
                     }
                 }
             }
-            for p in &points {
+            // this fork's share of the round's first clicks; the other forks' slots are clicked too, only for what
+            // the click teaches (the interface it leaves): no stop and no sentence comes of them here
+            let mut shadows: Vec<bool> = vec![false; points.len()];
+            if own && part.1 > 1 {
+                let all = std::mem::take(&mut points);
+                shadows.clear();
+                for (j, p) in all.into_iter().enumerate() {
+                    let share = j % part.1 == part.0;
+                    if share || matches!(p.hit, Hit::Verb { .. }) {
+                        points.push(p);
+                        shadows.push(!share);
+                    }
+                }
+            }
+            for (p, &shadow) in points.iter().zip(shadows.iter()) {
                 if depth >= 2 && (skip.as_ref().is_some_and(|s| s.contains(&p.hit)) || shifters.contains(&p.hit)) {
                     out.skipped += 1;
                     continue;
@@ -641,7 +698,7 @@ fn clicks(
                     // or only what the interface shows changed, and CALM frames on it still is so (a sentence that is
                     // about to run shows too): clicked on from as well
                     let world_same = |x: &Obs| !mfacts.diff(&facts_of(x)).iter().any(|d| world_kind(d.0));
-                    let mut shows = !half && ob.ego_pos == mego && iface(&ob) != m.iface && world_same(&ob);
+                    let mut shows = !half && early.idle.is_some() && ob.ego_pos == mego && iface(&ob) != m.iface && world_same(&ob);
                     if shows {
                         let shown3 = iface(&ob);
                         match go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
@@ -653,7 +710,7 @@ fn clicks(
                             Ok(st2) => {
                                 ran_on = true;
                                 let ob2 = b.obs(&NAMES)?;
-                                shows = (st2.idle.is_some() || takes_click(&st2)) && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && world_same(&ob2);
+                                shows = st2.idle.is_some() && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && world_same(&ob2);
                                 if shows {
                                     ob = ob2;
                                     at = st2;
@@ -674,6 +731,14 @@ fn clicks(
                             slots.dedup();
                             let page = slots.len() >= 2;
                             trace(&format!("    shows {} depth {depth} ({} slots changed)", r.name, slots.len()));
+                            if shadow {
+                                if page && m.only.is_none() {
+                                    shifters.insert(p.hit);
+                                }
+                                seen_mid.insert(r.mid());
+                                b.quit();
+                                continue;
+                            }
                             if page && depth == 1 {
                                 if m.only.is_none() {
                                     shifters.insert(p.hit);
@@ -700,6 +765,11 @@ fn clicks(
                                 learned.insert(p.hit);
                             }
                         }
+                        if shadow {
+                            seen_mid.insert(r.mid());
+                            b.quit();
+                            continue;
+                        }
                         if depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
                             out.mids += 1;
                             // a sentence begun after a page of the interface goes on at the slots that changed
@@ -710,6 +780,10 @@ fn clicks(
                         }
                         continue;
                     }
+                }
+                if shadow {
+                    b.quit();
+                    continue;
                 }
                 if !ran_on {
                     if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
@@ -789,18 +863,13 @@ fn clicks(
                                 }
                                 pb.quit();
                             }
-                            if !back.is_empty() && windows.len() < MAX_WINDOWS {
-                                // a window: followed while one of its keys was followed from this cell fewer than
-                                // WINDOW_TRIES times
+                            if !back.is_empty() && found < MAX_WINDOWS {
+                                // a window, while one of its keys was followed from this cell fewer than
+                                // WINDOW_TRIES times: for the stop's expansion to follow
                                 let c = cell(r.room, r.iface, &snap.policy.world_of(&r.facts), snap.ambient);
-                                let tries = |k: Key| snap.wins.get(&(c, k)).copied().unwrap_or(0) + mine.get(&(c, k)).copied().unwrap_or(0);
-                                if back.iter().any(|&k| tries(k) < WINDOW_TRIES) {
-                                    trace(&format!("    window at {}: cell {c:x} {}", r.name, back.iter().map(|k| format!("{k}({}{})", tries(*k), if snap.ambient.contains(k) { "a" } else { "" })).collect::<Vec<_>>().join(" ")));
-                                    for &k in &back {
-                                        *mine.entry((c, k)).or_default() += 1;
-                                        out.followed.push((c, k));
-                                    }
-                                    windows.push((b, format!("{}>", r.name), r.events.clone(), touched.clone()));
+                                if back.iter().any(|&k| snap.wins.get(&(c, k)).copied().unwrap_or(0) < WINDOW_TRIES) {
+                                    found += 1;
+                                    out.cands.push(Cand { engine: b, name: format!("{}>", r.name), events: r.events.clone(), keys: touched.clone(), cell: c, back });
                                     out.results.push(r);
                                     continue;
                                 }
@@ -835,33 +904,70 @@ fn clicks(
     if let Some(t) = twin_src.take() {
         t.quit();
     }
-    // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
-    // only (in a window's round, or after a wait, an earlier input's effect lands in every trial), over its first
-    // stops (not those read PROBE frames on), and never a variable the stop's waits moved
-    if let Some(moving) = echo {
-        let made: Vec<&Res> = out.results[first..].iter().filter(|r| !r.name.ends_with('~')).collect();
-        if made.len() >= 10 {
-            let mut changed: HashMap<Key, usize> = HashMap::new();
-            for r in &made {
-                for (k, _, _) in r0.facts.diff(&r.facts) {
-                    if k.kind() == K_VAR && !moving.contains(&k) {
-                        *changed.entry(k).or_default() += 1;
-                    }
+    Ok(())
+}
+
+/// One round of inputs from the engine's stop (`clicks`), its first clicks dealt to `cfg.slices` forks of the stop
+/// side by side; their results one after the other, so a round is the same every time.
+fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&HashSet<Key>>, carry: &[(Key, Val)], snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
+    let n = cfg.slices.max(1);
+    if n == 1 {
+        let mut out = Out::default();
+        clicks(e, pre, lead, motion, carry, (0, 1), snap, cfg, &mut out)?;
+        return Ok(out);
+    }
+    let mut forks: Vec<Box<dyn Engine>> = Vec::new();
+    for _ in 0..n {
+        match e.fork() {
+            Ok(f) => forks.push(f),
+            Err(x) => {
+                for f in forks {
+                    f.quit();
                 }
+                return Err(x);
             }
-            let n = made.len();
-            out.iface_vars.extend(changed.into_iter().filter(|&(_, c)| c * 5 >= n).map(|(k, _)| k));
         }
     }
-    // the windows: the inputs from each, with no window found inside one
-    for (mut b, name, events, keys) in windows {
-        out.windows += 1;
-        trace(&format!("    window {name} ({} trials so far)", out.trials));
-        let r = clicks(&mut b, &name, &events, None, None, &keys, snap, cfg, out);
-        b.quit();
-        r?;
+    let parts: Vec<EResult<Out>> = std::thread::scope(|sc| {
+        let hs: Vec<_> = forks
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut f)| {
+                sc.spawn(move || {
+                    let mut out = Out::default();
+                    let r = clicks(&mut f, pre, lead, motion, carry, (i, n), snap, cfg, &mut out);
+                    f.quit();
+                    match r {
+                        Ok(()) => Ok(out),
+                        Err(x) => {
+                            for c in out.cands {
+                                c.engine.quit();
+                            }
+                            Err(x)
+                        }
+                    }
+                })
+            })
+            .collect();
+        hs.into_iter().map(|h| h.join().expect("a round's part")).collect()
+    });
+    let mut out = Out::default();
+    let mut bad = None;
+    for p in parts {
+        match p {
+            Ok(o) => out.absorb(o),
+            Err(x) => bad = Some(x),
+        }
     }
-    Ok(())
+    match bad {
+        None => Ok(out),
+        Some(x) => {
+            for c in out.cands {
+                c.engine.quit();
+            }
+            Err(x)
+        }
+    }
 }
 
 /// What `explore` reads of the search: the rooms' motion at the batch's start.
@@ -927,13 +1033,62 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         out.noise = out.ambient.iter().filter(|k| !pending.iter().any(|p| p.0 == **k)).copied().collect();
     }
     trace(&format!("  room {} waits done, {} moved", r0.room, waited.len()));
-    clicks(e, "", &[], Some(&motion), Some(&moving), &[], snap, cfg, &mut out)?;
-    trace(&format!("  room {} round done: {} trials, {} windows", r0.room, out.trials, out.windows));
+    let mut base = round(e, "", &[], Some(&motion), &[], snap, cfg)?;
+    let cands = std::mem::take(&mut base.cands);
+    let first = out.results.len();
+    out.absorb(base);
+    trace(&format!("  room {} round done: {} trials, {} windows found", r0.room, out.trials, cands.len()));
+    // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
+    // only (in a window's round, or after a wait, an earlier input's effect lands in every trial), over its first
+    // stops (not those read PROBE frames on), and never a variable the stop's waits moved
+    {
+        let made: Vec<&Res> = out.results[first..].iter().filter(|r| !r.name.ends_with('~')).collect();
+        if made.len() >= 10 {
+            let mut changed: HashMap<Key, usize> = HashMap::new();
+            for r in &made {
+                for (k, _, _) in r0.facts.diff(&r.facts) {
+                    if k.kind() == K_VAR && !moving.contains(&k) {
+                        *changed.entry(k).or_default() += 1;
+                    }
+                }
+            }
+            let n = made.len();
+            out.iface_vars.extend(changed.into_iter().filter(|&(_, c)| c * 5 >= n).map(|(k, _)| k));
+        }
+    }
+    // the windows: the first MAX_WINDOWS whose cell has tries left; the inputs from each, with no window found
+    // inside one
+    let mut mine: HashMap<(u64, Key), u32> = HashMap::new();
+    let mut bad = None;
+    for c in cands {
+        let mut b = c.engine;
+        let fresh = c.back.iter().any(|&k| snap.wins.get(&(c.cell, k)).copied().unwrap_or(0) + mine.get(&(c.cell, k)).copied().unwrap_or(0) < WINDOW_TRIES);
+        if bad.is_none() && fresh && (out.windows as usize) < MAX_WINDOWS {
+            for &k in &c.back {
+                *mine.entry((c.cell, k)).or_default() += 1;
+                out.followed.push((c.cell, k));
+            }
+            out.windows += 1;
+            trace(&format!("    window {} ({} trials so far)", c.name, out.trials));
+            match round(&mut b, &c.name, &c.events, None, &c.keys, snap, cfg) {
+                Ok(o) => out.absorb(o),
+                Err(x) => bad = Some(x),
+            }
+        }
+        b.quit();
+    }
     // where the world moved by itself (and few stops of this room and level saw that): the inputs again from there
     for (n, mut b) in waited {
-        let r = clicks(&mut b, &format!("wait{n}+"), &[], None, None, &[], snap, cfg, &mut out);
+        if bad.is_none() {
+            match round(&mut b, &format!("wait{n}+"), &[], None, &[], snap, cfg) {
+                Ok(o) => out.absorb(o),
+                Err(x) => bad = Some(x),
+            }
+        }
         b.quit();
-        r?;
+    }
+    if let Some(x) = bad {
+        return Err(x);
     }
     for r in out.results.iter_mut() {
         r.changed = r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) || d.0.kind() == K_VAR).map(|d| (d.0, d.2)).collect();
@@ -1198,6 +1353,7 @@ fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
         println!("  actor {} at ({}, {}) moving {}", a.id, a.x, a.y, a.moving);
     }
     println!("  targets: {}", of.targets.iter().map(|p| format!("{}@({},{})", p.hit.name(), p.x, p.y)).collect::<Vec<_>>().join(" "));
+    println!("  verbs: {}", of.verbs.iter().map(|p| format!("{}@({},{})", p.hit.name(), p.x, p.y)).collect::<Vec<_>>().join(" "));
     if let Ok(bx) = e.boxes() {
         for (i, w) in bx.boxes.iter().enumerate() {
             println!("  box {i} flags {:#x} {:?} {:?} {:?} {:?}", w.flags, w.ul, w.ur, w.lr, w.ll);
@@ -1386,6 +1542,8 @@ fn main() {
         out: out.clone(),
         horizon: opt("--horizon").map(|v| v.parse().unwrap()).unwrap_or(1600),
         workers: opt("--workers").map(|v| v.parse().unwrap()).unwrap_or(6),
+        slices: opt("--slices").map(|v| v.parse().unwrap()).unwrap_or(1),
+        batch: opt("--batch").map(|v| v.parse().unwrap()).unwrap_or(BATCH),
     };
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let root_events = if a.iter().any(|x| x == "--no-skips") {
@@ -1461,7 +1619,8 @@ fn main() {
     while t0.elapsed() < limit {
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
-        while batch.len() < cfg.workers * BATCH {
+        let at_once = (cfg.workers / cfg.slices.max(1)).max(1);
+        while batch.len() < at_once * cfg.batch {
             // the highest level first and in it the first queue, over the first queues of every level; then the same
             // over the later ones
             let first = s.queues.iter_mut().rev().find_map(|q| q[..FIRST_QUEUES].iter_mut().find_map(|c| c.pop_front()));
@@ -1478,7 +1637,7 @@ fn main() {
         let done: Vec<Mutex<Option<Done>>> = (0..n).map(|_| Mutex::new(None)).collect();
         let next = AtomicUsize::new(0);
         std::thread::scope(|sc| {
-            for _ in 0..cfg.workers.min(n) {
+            for _ in 0..at_once.min(n) {
                 sc.spawn(|| loop {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     if i >= n {
