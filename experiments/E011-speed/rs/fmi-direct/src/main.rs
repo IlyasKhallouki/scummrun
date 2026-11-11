@@ -119,11 +119,11 @@ const CAM_BUCKET: i32 = 64;
 /// The floor clicks' grid over the main screen: the columns, and the rows in eighths of its height.
 const FLOOR_X: [i32; 7] = [6, 58, 110, 160, 210, 262, 313];
 const FLOOR_Y: [i32; 4] = [3, 5, 7, 8];
-/// Engines kept alive for stops waiting in a queue; the others are booted again from their movies.
-const LIVE_MAX: usize = 32;
-/// The queues (the module's text, "Kept"), and the last one whose stops get a kept engine.
+/// Engines kept alive, at least: those of the stops expanded last. A stop's engine is made when its turn comes, as
+/// a fork of the nearest stop on its way whose engine is kept, with the events since; from the boot where none is.
+const LIVE_MAX: usize = 64;
+/// The queues (the module's text, "Kept").
 const QUEUES: usize = 5;
-const LIVE_QUEUES: usize = 3;
 /// The queues expanded at every level, the highest first, before any level's later ones.
 const FIRST_QUEUES: usize = 4;
 /// `--go`: the rooms walked to from a stop that has won something, and the rooms a walk may cross.
@@ -131,8 +131,6 @@ const GO_ROOMS: usize = 6;
 const GO_HOPS: usize = 14;
 /// Floor clicks a walk may make in one room to bring a thing onto the screen.
 const GO_SCROLLS: usize = 8;
-/// The kept stops of one expanded stop that get a kept engine.
-const LIVE_EACH: usize = 8;
 /// Half-made stops clicked on from in one round of one fork, at most: where a room makes one of every verb and thing
 /// (it drops the sentence and shows it), the round stays a round. The shallow ones come first.
 const MAX_MIDS: usize = 150;
@@ -213,6 +211,10 @@ struct Search {
     /// per line: the largest sets of flags kept stops hold (none within another), as bits by the flag's number
     tops: HashMap<u64, Vec<Vec<u64>>>,
     live: HashMap<usize, Box<dyn Engine>>,
+    /// the engines of expanded stops, each with the count at its last use: a stop that comes of one of them, or of
+    /// a stop that does, is made from it
+    parents: HashMap<usize, (Arc<Mutex<Box<dyn Engine>>>, u64)>,
+    stamp: u64,
     /// what the kept stops of each line hold (the first field is the line)
     seen: HashSet<(u64, Key, Val)>,
     seen_at: HashSet<(u64, i32, Key, Val)>,
@@ -256,12 +258,13 @@ struct Search {
     /// the highest level of a kept stop
     top: u32,
     /// engines being made for kept stops (counted against LIVE_MAX)
-    making: usize,
     /// the batches' wall seconds: the stops explored (side by side), committed (one by one), the kept engines made
     wall: [f64; 3],
     /// the commit's seconds by part: the world and what is owned, the flags, the atoms, the rest of what is new, the
     /// cell, a kept stop's line and node
     ct: [f64; 6],
+    /// the expansions' wall seconds by part (`Out::xt`), over all stops
+    xt: [f64; 7],
     live_max: usize,
     phase: [f64; 5],
     frames: u64,
@@ -369,6 +372,60 @@ struct Res {
     /// the local variables of the scripts that run at the stop: (script and index hashed, value); after `explore`
     /// only those that differ from the expanded stop's
     locals: Vec<(u64, i32)>,
+    /// once the trial is done (`slim`): what the stop holds other than the expanded stop, each key with its value
+    /// there (absent: 0) and here (None: absent). `facts` is empty from then on: a stop's facts are 400 kB, a round
+    /// has thousands of results, and what is asked of a result afterwards is its difference
+    delta: Vec<(Key, Val, Option<Val>)>,
+}
+
+/// What `r` holds other than `base`, in the keys' order: (key, the value in `base` or 0, the value in `r` or None).
+fn delta_of(base: &Facts, r: &Facts) -> Vec<(Key, Val, Option<Val>)> {
+    let (a, b) = (&base.0, &r.0);
+    let (mut i, mut j, mut out) = (0, 0, Vec::new());
+    while i < a.len() || j < b.len() {
+        if j >= b.len() || (i < a.len() && a[i].0 < b[j].0) {
+            out.push((a[i].0, a[i].1, None));
+            i += 1;
+        } else if i >= a.len() || b[j].0 < a[i].0 {
+            out.push((b[j].0, 0, Some(b[j].1)));
+            j += 1;
+        } else {
+            if a[i].1 != b[j].1 {
+                out.push((a[i].0, a[i].1, Some(b[j].1)));
+            }
+            i += 1;
+            j += 1;
+        }
+    }
+    out
+}
+
+/// `base` with a `delta_of` applied: the facts the delta was made from.
+fn patched(base: &Facts, d: &[(Key, Val, Option<Val>)]) -> Facts {
+    let a = &base.0;
+    let (mut i, mut j, mut out) = (0, 0, Vec::with_capacity(a.len() + d.len()));
+    while i < a.len() || j < d.len() {
+        if j >= d.len() || (i < a.len() && a[i].0 < d[j].0) {
+            out.push(a[i]);
+            i += 1;
+        } else {
+            if let Some(v) = d[j].2 {
+                out.push((d[j].0, v));
+            }
+            if i < a.len() && a[i].0 == d[j].0 {
+                i += 1;
+            }
+            j += 1;
+        }
+    }
+    Facts(out)
+}
+
+/// A trial's result once the trial is done with it: its difference from the expanded stop, and no facts.
+fn slim(mut r: Res, base: &Facts) -> Res {
+    r.delta = delta_of(base, &r.facts);
+    r.facts = Facts(Vec::new());
+    r
 }
 
 fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
@@ -396,6 +453,7 @@ fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
         own: Vec::new(),
         inside: false,
         locals: locals_of(o),
+        delta: Vec::new(),
         facts,
         st,
     }
@@ -642,6 +700,11 @@ struct Out {
     /// the frames they ran
     phase: [f64; 5],
     frames: u64,
+    /// the expansion's wall seconds: the waits, the stop's round, the windows' rounds, the rounds after a wait, the
+    /// walks; and of all those rounds, the stops worked on one by one and those side by side
+    xt: [f64; 7],
+    /// the expanded stop's facts: a result's are these with its `delta`
+    base: Facts,
 }
 
 impl Search {
@@ -713,6 +776,9 @@ impl Out {
         for (a, b) in self.phase.iter_mut().zip(o.phase.iter()) {
             *a += b;
         }
+        for (a, b) in self.xt.iter_mut().zip(o.xt.iter()) {
+            *a += b;
+        }
         self.frames += o.frames;
     }
 }
@@ -760,6 +826,7 @@ fn clicks(
     motion: Option<&HashSet<Key>>,
     carry: &[(Key, Val)],
     lown: &HashSet<u64>,
+    base: &Facts,
     snap: &Snap<'_>,
     cfg: &Cfg,
     out: &mut Out,
@@ -1071,7 +1138,7 @@ fn clicks(
                             // line, not a verb's slot): a stop like any other, too
                             let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events.clone() };
                             acts.push(Act::Half { cand, only: None, always: true });
-                            out.results.push(r);
+                            out.results.push(slim(r, base));
                             continue;
                         } else {
                             // what the input changed: the stop against the twin at its frame (each with its old value)
@@ -1103,7 +1170,7 @@ fn clicks(
                                         r2.own = touched.clone();
                                         back = touched.iter().filter(|&&(k, old)| r2.facts.val(k) == old).map(|t| t.0).collect();
                                         let room2 = r2.room;
-                                        out.results.push(r2);
+                                        out.results.push(slim(r2, base));
                                         if back.is_empty() && room2 == r0.room && go(&mut pb, RunSpec { frame: Some(at + PROBE_LONG), ..Default::default() })?.is_ok() {
                                             let w3 = pb.facts()?;
                                             back = touched.iter().filter(|&&(k, old)| w3.val(k) == old).map(|t| t.0).collect();
@@ -1119,11 +1186,11 @@ fn clicks(
                                 let c = cell(r.room, r.iface, &snap.policy.world_of(&r.facts), snap.ambient);
                                 if back.iter().any(|&k| snap.wins.get(&(c, k)).copied().unwrap_or(0) < WINDOW_TRIES) {
                                     acts.push(Act::Window(Cand { engine: b, name: format!("{}>", r.name), events: r.events.clone(), keys: touched.clone(), cell: c, back }));
-                                    out.results.push(r);
+                                    out.results.push(slim(r, base));
                                     continue;
                                 }
                             }
-                            out.results.push(r);
+                            out.results.push(slim(r, base));
                         }
                     }
                     Played::Ended(st) => out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason)),
@@ -1149,6 +1216,7 @@ fn clicks(
             let n = if threads == 1 || depth == 1 || (depth == 2 && skip.is_none()) { 1 } else { work.len() };
             let (group, mut engines): (Vec<MidAt>, Vec<Option<Box<dyn Engine>>>) =
                 work.drain(..n).map(|m| (MidAt { clicks: m.clicks, events: m.events, iface: m.iface, only: m.only }, m.engine)).unzip();
+            let tg = Instant::now();
             let outs: Vec<EResult<MidOut>> = if n == 1 {
                 let r = match engines[0].as_mut() {
                     Some(x) => task(x, &group[0], depth, &skip, &shifters, &first_gave),
@@ -1178,6 +1246,7 @@ fn clicks(
             for x in engines.drain(..).flatten() {
                 x.quit();
             }
+            out.xt[if n == 1 { 5 } else { 6 }] += tg.elapsed().as_secs_f64();
             // in the round's order: what each stop left for the round
             let mut bad: Option<EngineError> = None;
             for mo in outs {
@@ -1285,9 +1354,9 @@ fn clicks(
 
 /// One round of inputs from the engine's stop (`clicks`). Its half-made stops are worked on by `cfg.slices` threads
 /// side by side and read in the round's order, so a round is the same every time and with any number of threads.
-fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&HashSet<Key>>, carry: &[(Key, Val)], lown: &HashSet<u64>, snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
+fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&HashSet<Key>>, carry: &[(Key, Val)], lown: &HashSet<u64>, base: &Facts, snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
     let mut out = Out::default();
-    match clicks(e, pre, lead, motion, carry, lown, snap, cfg, &mut out) {
+    match clicks(e, pre, lead, motion, carry, lown, base, snap, cfg, &mut out) {
         Ok(()) => Ok(out),
         Err(x) => {
             for c in out.cands {
@@ -1682,13 +1751,14 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0.clone());
-    let mut out = Out { room: r0.room, walkbox: r0.walkbox, ..Default::default() };
+    let mut out = Out { room: r0.room, walkbox: r0.walkbox, base: r0.facts.clone(), ..Default::default() };
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     // the game's own moves: no input for a while. What they move is the stop's own motion; a variable that takes two
     // values or more over them is a clock
     let known = |k: Key| snap.motion.get(&(level, r0.room, r0.walkbox, k)).is_some_and(|&c| c >= MOTION_TRIES);
     let mut waited: Vec<(u64, Box<dyn Engine>)> = Vec::new();
     let mut values: HashMap<Key, Vec<Val>> = HashMap::new();
+    let tx = Instant::now();
     for n in WAITS {
         let mut b = e.fork()?;
         out.trials += 1;
@@ -1710,7 +1780,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                             moved |= !known(k);
                         }
                     }
-                    out.results.push(r);
+                    out.results.push(slim(r, &r0.facts));
                     if moved {
                         waited.push((n, b));
                         continue;
@@ -1731,15 +1801,18 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         out.noise = out.ambient.iter().filter(|k| !pending.iter().any(|p| p.0 == **k)).copied().collect();
     }
     trace(&format!("  room {} waits done, {} moved", r0.room, waited.len()));
+    out.xt[0] += tx.elapsed().as_secs_f64();
+    let tx = Instant::now();
     // the scripts' locals the stop's own waits moved: its clocks, whatever the search knows of them yet
     let lown: HashSet<u64> = {
         let at0: HashMap<u64, i32> = r0.locals.iter().copied().collect();
         out.results.iter().flat_map(|r| r.locals.iter()).filter(|l| at0.get(&l.0) != Some(&l.1)).map(|l| l.0).collect()
     };
-    let mut base = round(e, "", &[], Some(&motion), &[], &lown, snap, cfg)?;
-    let cands = std::mem::take(&mut base.cands);
+    let mut round0 = round(e, "", &[], Some(&motion), &[], &lown, &r0.facts, snap, cfg)?;
+    let cands = std::mem::take(&mut round0.cands);
     let first = out.results.len();
-    out.absorb(base);
+    out.absorb(round0);
+    out.xt[1] += tx.elapsed().as_secs_f64();
     trace(&format!("  room {} round done: {} trials, {} windows found", r0.room, out.trials, cands.len()));
     // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
     // only (in a window's round, or after a wait, an earlier input's effect lands in every trial), over its first
@@ -1749,13 +1822,13 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     {
         let made: Vec<&Res> = out.results[first..]
             .iter()
-            .filter(|r| !r.name.ends_with('~') && !r0.facts.diff(&r.facts).iter().any(|d| world_kind(d.0)))
+            .filter(|r| !r.name.ends_with('~') && !r.delta.iter().any(|d| world_kind(d.0) && d.1 != d.2.unwrap_or(0)))
             .collect();
         if made.len() >= 10 {
             let mut changed: HashMap<Key, usize> = HashMap::new();
             for r in &made {
-                for (k, _, _) in r0.facts.diff(&r.facts) {
-                    if k.kind() == K_VAR && !moving.contains(&k) {
+                for &(k, old, new) in &r.delta {
+                    if k.kind() == K_VAR && old != new.unwrap_or(0) && !moving.contains(&k) {
                         *changed.entry(k).or_default() += 1;
                     }
                 }
@@ -1768,6 +1841,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     // inside one
     let mut mine: HashMap<(u64, Key), u32> = HashMap::new();
     let mut bad = None;
+    let tx = Instant::now();
     for c in cands {
         let mut b = c.engine;
         let fresh = c.back.iter().any(|&k| snap.wins.get(&(c.cell, k)).copied().unwrap_or(0) + mine.get(&(c.cell, k)).copied().unwrap_or(0) < WINDOW_TRIES);
@@ -1778,17 +1852,19 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
             }
             out.windows += 1;
             trace(&format!("    window {} ({} trials so far)", c.name, out.trials));
-            match round(&mut b, &c.name, &c.events, None, &c.keys, &lown, snap, cfg) {
+            match round(&mut b, &c.name, &c.events, None, &c.keys, &lown, &r0.facts, snap, cfg) {
                 Ok(o) => out.absorb(o),
                 Err(x) => bad = Some(x),
             }
         }
         b.quit();
     }
+    out.xt[2] += tx.elapsed().as_secs_f64();
+    let tx = Instant::now();
     // where the world moved by itself (and few stops of this room and level saw that): the inputs again from there
     for (n, mut b) in waited {
         if bad.is_none() {
-            match round(&mut b, &format!("wait{n}+"), &[], None, &[], &lown, snap, cfg) {
+            match round(&mut b, &format!("wait{n}+"), &[], None, &[], &lown, &r0.facts, snap, cfg) {
                 Ok(o) => out.absorb(o),
                 Err(x) => bad = Some(x),
             }
@@ -1798,6 +1874,8 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     if let Some(x) = bad {
         return Err(x);
     }
+    out.xt[3] += tx.elapsed().as_secs_f64();
+    let tx = Instant::now();
     // --go: the stop has won something (an object, a flag). Where the scripts name it, there it is asked for: a
     // walk to each such room over the clicks seen to lead from room to room, one trial a walk; the nearest room's
     // stop last, so that it is the first to be expanded. The walk through every room stays, for what the scripts
@@ -1819,13 +1897,14 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         for w in ways.iter().rev() {
             out.trials += 1;
             if let Some(r) = walk(e, w, ego, cfg, &mut out.bad)? {
-                out.results.push(r);
+                out.results.push(slim(r, &r0.facts));
             }
         }
     }
+    out.xt[4] += tx.elapsed().as_secs_f64();
     let locals0: HashMap<u64, i32> = r0.locals.iter().copied().collect();
     for r in out.results.iter_mut() {
-        r.changed = r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) || d.0.kind() == K_VAR).map(|d| (d.0, d.2)).collect();
+        r.changed = r.delta.iter().filter(|d| (world_kind(d.0) || d.0.kind() == K_VAR) && d.1 != d.2.unwrap_or(0)).map(|d| (d.0, d.2.unwrap_or(0))).collect();
         r.locals.retain(|l| locals0.get(&l.0) != Some(&l.1));
         if r.name.starts_with("wait") && !r.name.contains('+') {
             // what a run with no input moved
@@ -1852,9 +1931,9 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     Ok(out)
 }
 
-/// A kept stop's engine: a fork of its parent's, the trial's events again (the engine is deterministic).
-fn remake(e: &mut Box<dyn Engine>, events: &[Event], frame: u64) -> EResult<Box<dyn Engine>> {
-    let mut b = e.fork()?;
+/// A kept stop's engine from a fork of a stop on its way: the events since that stop again, and the run to the
+/// stop's frame (the engine is deterministic).
+fn replay(mut b: Box<dyn Engine>, events: &[Event], frame: u64) -> EResult<Box<dyn Engine>> {
     let run = (|| -> EResult<()> {
         let mut i = 0;
         while i < events.len() {
@@ -1884,7 +1963,7 @@ fn remake(e: &mut Box<dyn Engine>, events: &[Event], frame: u64) -> EResult<Box<
 impl Search {
     /// One expanded stop's results committed: the kept stops made nodes and queued. Returns each kept stop to make an
     /// engine for: (the node, its events past the parent's, its frame).
-    fn commit(&mut self, id: usize, out: Out) -> Vec<(usize, Vec<Event>, u64)> {
+    fn commit(&mut self, id: usize, out: Out) {
         let room0 = out.room;
         let level0 = self.nodes[id].level;
         for &k in &out.ambient {
@@ -1902,6 +1981,9 @@ impl Search {
         self.skipped += out.skipped;
         self.frames += out.frames;
         for (a, b) in self.phase.iter_mut().zip(out.phase.iter()) {
+            *a += b;
+        }
+        for (a, b) in self.xt.iter_mut().zip(out.xt.iter()) {
             *a += b;
         }
         self.refused += out.refused;
@@ -1928,11 +2010,12 @@ impl Search {
         let mut keep: Vec<(usize, usize, usize, usize, bool)> = Vec::new(); // (result, node, level, queue, to the stack)
         for (i, r) in results.iter().enumerate() {
             let tc = Instant::now();
-            let world = self.policy.world_of(&r.facts);
+            let facts = patched(&out.base, &r.delta);
+            let world = self.policy.world_of(&facts);
             let mut novel: Vec<String> = Vec::new();
             let mut class = QUEUES;
-            let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
-            let owned: Vec<u32> = r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect();
+            let ego = facts.val(Key::pack(K_EGO, 0, 0, 0));
+            let owned: Vec<u32> = facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect();
             let mut ever = ever0.clone();
             for &o in &owned {
                 if let Err(at) = ever.binary_search(&o) {
@@ -2108,7 +2191,7 @@ impl Search {
             let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
             let mut first_held = false;
             for w in self.watch.iter_mut() {
-                if w.2.is_none() && r.facts.val(w.0) == w.1 {
+                if w.2.is_none() && facts.val(w.0) == w.1 {
                     first_held = true;
                     w.2 = Some((nid, secs));
                     eprintln!("[{secs:7.1}s] WATCH {}={} first held by node {nid}", w.0, w.1);
@@ -2116,7 +2199,7 @@ impl Search {
             }
             for g in self.rungs.iter_mut().filter(|g| g.at.is_none()) {
                 let held = g.conds.iter().filter(|&&(k, ge, v)| {
-                    let (have, want) = (r.facts.val(k), v.unwrap_or(ego));
+                    let (have, want) = (facts.val(k), v.unwrap_or(ego));
                     if ge { have >= want } else { have == want }
                 });
                 if held.count() >= g.least {
@@ -2168,7 +2251,7 @@ impl Search {
             }
             let mut pending = r.own.clone();
             for &(k, old) in &self.nodes[id].pending {
-                if r.facts.val(k) != old && !pending.iter().any(|p| p.0 == k) {
+                if facts.val(k) != old && !pending.iter().any(|p| p.0 == k) {
                     pending.push((k, old));
                 }
             }
@@ -2185,8 +2268,7 @@ impl Search {
             let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "skipped": out.skipped, "mids": out.mids, "windows": out.windows,
                 "stops": results.len(), "kept": keep.len(), "refused": out.refused, "not_idle": out.not_idle}));
         }
-        let mut make = Vec::new();
-        for (i, nid, level, class, dive) in keep {
+        for (_, nid, level, class, dive) in keep {
             if self.queues.len() <= level {
                 self.queues.resize_with(level + 1, Default::default);
             }
@@ -2198,19 +2280,7 @@ impl Search {
             } else {
                 self.queues[level][class].push_back(nid);
             }
-            if class < LIVE_QUEUES {
-                make.push((nid, results[i].events.clone(), results[i].st.frame));
-            }
         }
-        // a kept engine for LIVE_EACH of them: the last ones where the newest stop is taken first, else the first
-        if make.len() > LIVE_EACH {
-            if self.flag_lines {
-                make.drain(..make.len() - LIVE_EACH);
-            } else {
-                make.truncate(LIVE_EACH);
-            }
-        }
-        make
     }
 
     fn progress(&self, last: &mut u64, dt: f64) {
@@ -2542,7 +2612,7 @@ fn main() {
         rung_log: Some(std::fs::File::create(out.join("rung-stops.jsonl")).expect("rung-stops.jsonl")),
         top_path: Some(out.join("top.jsonl")),
         t0: Some(t0),
-        live_max: LIVE_MAX.max(4 * cfg.workers),
+        live_max: LIVE_MAX.max(8 * cfg.workers),
         ..Default::default()
     };
     s.gains_only = opt("--lines").as_deref() == Some("gains");
@@ -2647,9 +2717,8 @@ fn main() {
     // --stops N: the run ends after N stops are expanded (a measure that is the same on any machine)
     let max_stops: Option<u64> = opt("--stops").map(|v| v.parse().expect("--stops N"));
     let (mut last, mut printed) = (0u64, Instant::now());
-    type Job = (usize, Option<Box<dyn Engine>>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool, Vec<Key>);
+    type Job = (usize, Option<Box<dyn Engine>>, Option<Arc<Mutex<Box<dyn Engine>>>>, Vec<Event>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool, Vec<Key>);
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
-    type Parent = (Box<dyn Engine>, Vec<(usize, Vec<Event>, u64)>);
     while t0.elapsed() < limit && max_stops.map_or(true, |n| s.expanded < n) {
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
@@ -2714,9 +2783,29 @@ fn main() {
             };
             let Some(id) = first.or_else(last) else { break };
             let live = s.live.remove(&id);
-            let movie = if live.is_some() { Vec::new() } else { s.movie(id) };
+            // the nearest stop on its way whose engine is kept, and the events since (for a boot: the whole movie)
+            let (mut src, mut since, mut movie) = (None, Vec::new(), Vec::new());
+            if live.is_none() {
+                let mut chain = vec![id];
+                loop {
+                    let p = s.nodes[*chain.last().unwrap()].parent;
+                    if p == usize::MAX {
+                        break;
+                    }
+                    s.stamp += 1;
+                    let now = s.stamp;
+                    if let Some(x) = s.parents.get_mut(&p) {
+                        x.1 = now;
+                        src = Some(x.0.clone());
+                        break;
+                    }
+                    chain.push(p);
+                }
+                since = chain.iter().rev().flat_map(|&i| s.nodes[i].events.iter().cloned()).collect();
+                movie = s.movie(id);
+            }
             let n = &s.nodes[id];
-            batch.push(Mutex::new(Some((id, live, movie, n.frame, n.level, n.pending.clone(), n.inside, if s.go { n.news.clone() } else { Vec::new() }))));
+            batch.push(Mutex::new(Some((id, live, src, since, movie, n.frame, n.level, n.pending.clone(), n.inside, if s.go { n.news.clone() } else { Vec::new() }))));
         }
         if batch.is_empty() {
             break;
@@ -2734,11 +2823,27 @@ fn main() {
                     if i >= n {
                         break;
                     }
-                    let (id, engine, events, frame, level, pending, inside, news) = batch[i].lock().unwrap().take().unwrap();
-                    let booted = engine.is_none();
-                    let e = match engine {
-                        Some(e) => Ok(e),
-                        None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(&cfg.out) }),
+                    let (id, engine, src, since, movie, frame, level, pending, inside, news) = batch[i].lock().unwrap().take().unwrap();
+                    let boot = || host.boot(&BootCfg { seed: 1, events: movie.clone(), frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(&cfg.out) });
+                    let mut booted = false;
+                    let e = match (engine, src) {
+                        (Some(e), _) => Ok(e),
+                        (None, Some(src)) => {
+                            // the fork under the kept engine's lock (other stops of the batch come of it too), the
+                            // events since on the fork
+                            let forked = src.lock().unwrap().fork();
+                            match forked.and_then(|b| replay(b, &since, frame)) {
+                                Ok(b) => Ok(b),
+                                Err(_) => {
+                                    booted = true;
+                                    boot()
+                                }
+                            }
+                        }
+                        (None, None) => {
+                            booted = true;
+                            boot()
+                        }
                     };
                     let r = match e {
                         Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &pending, inside, &news, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
@@ -2755,56 +2860,34 @@ fn main() {
             }
         });
         let t_explored = t_batch.elapsed().as_secs_f64();
-        // in the batch's order: committed
-        let mut parents: Vec<Mutex<Option<Parent>>> = Vec::new();
+        // in the batch's order: committed; the expanded stop's engine is kept for the stops that come of it
         for d in done {
             let (id, r, booted) = d.into_inner().unwrap().expect("every stop of the batch explored");
             s.boots += booted as u64;
             s.expanded += 1;
             match r {
                 Ok((e, out)) => {
-                    let make = s.commit(id, out);
-                    parents.push(Mutex::new(Some((e, make))));
+                    s.commit(id, out);
+                    s.stamp += 1;
+                    s.parents.insert(id, (Arc::new(Mutex::new(e)), s.stamp));
                 }
                 Err(x) => eprintln!("node {id}: {x}"),
             }
         }
         let t_committed = t_batch.elapsed().as_secs_f64();
-        // side by side: the kept stops' engines, each a fork of its parent's
-        let made: Mutex<Vec<(usize, Box<dyn Engine>)>> = Mutex::new(Vec::new());
-        let next = AtomicUsize::new(0);
-        std::thread::scope(|sc| {
-            for _ in 0..cfg.workers.min(parents.len()) {
-                sc.spawn(|| loop {
-                    let i = next.fetch_add(1, Ordering::Relaxed);
-                    if i >= parents.len() {
-                        break;
-                    }
-                    let (mut e, make) = parents[i].lock().unwrap().take().unwrap();
-                    for (nid, events, frame) in make {
-                        if let Ok(b) = remake(&mut e, &events, frame) {
-                            made.lock().unwrap().push((nid, b));
-                        }
-                    }
-                    e.quit();
-                });
+        // the engines used longest ago go when there are too many
+        while s.parents.len() > s.live_max {
+            let Some(old) = s.parents.iter().min_by_key(|x| x.1 .1).map(|x| *x.0) else { break };
+            if let Some((a, _)) = s.parents.remove(&old) {
+                if let Ok(m) = Arc::try_unwrap(a) {
+                    m.into_inner().unwrap().quit();
+                }
             }
-        });
-        s.making = 0;
+        }
         trace(&format!("batch of {n}: explored in {t_explored:.1} s, committed in {:.1} s, engines in {:.1} s", t_committed - t_explored, t_batch.elapsed().as_secs_f64() - t_committed));
         s.wall[0] += t_explored;
         s.wall[1] += t_committed - t_explored;
         s.wall[2] += t_batch.elapsed().as_secs_f64() - t_committed;
-        for (nid, b) in made.into_inner().unwrap() {
-            s.live.insert(nid, b);
-        }
-        // the oldest kept engines go when there are too many: their stops wait longest
-        while s.live.len() > s.live_max {
-            let Some(&old) = s.live.keys().min() else { break };
-            if let Some(e) = s.live.remove(&old) {
-                e.quit();
-            }
-        }
         if printed.elapsed() >= Duration::from_secs(10) {
             s.progress(&mut last, printed.elapsed().as_secs_f64());
             printed = Instant::now();
@@ -2815,12 +2898,18 @@ fn main() {
     for e in live {
         e.quit();
     }
+    for (_, (a, _)) in s.parents.drain() {
+        if let Ok(m) = Arc::try_unwrap(a) {
+            m.into_inner().unwrap().quit();
+        }
+    }
     let depth = s.nodes.iter().map(|n| n.depth).max().unwrap_or(0);
     let sum = json!({"seconds": t0.elapsed().as_secs_f64(), "workers": cfg.workers, "kept": s.nodes.len(), "by_queue": s.kept,
         "expanded": s.expanded, "trials": s.trials, "skipped": s.skipped, "refused": s.refused, "not_idle": s.not_idle, "rooms": s.rooms,
         "max_depth": depth, "boots": s.boots, "top_level": s.top,
         "trial_seconds": {"fork": s.phase[0], "inputs": s.phase[1], "run": s.phase[2], "read": s.phase[3], "quit": s.phase[4]}, "trial_frames": s.frames,
         "batch_seconds": {"explore": s.wall[0], "commit": s.wall[1], "engines": s.wall[2]},
+        "explore_seconds": {"waits": s.xt[0], "round": s.xt[1], "windows": s.xt[2], "after_waits": s.xt[3], "walks": s.xt[4], "one_by_one": s.xt[5], "side_by_side": s.xt[6]},
         "commit_seconds": {"world": s.ct[0], "flags": s.ct[1], "atoms": s.ct[2], "new": s.ct[3], "cell": s.ct[4], "kept": s.ct[5]},
         "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
         "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(),
