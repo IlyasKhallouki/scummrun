@@ -51,7 +51,7 @@ source experiments/E027-direct/run/env.sh
 game_ok || true
 env \$ON \$MI /var/tmp/fast-mi/target-direct7/fast/direct $VMOUT/$name --minutes $minutes --workers ${WORKERS:-28} \\
   --slices ${SLICES:-7} --batch 1 --at-once ${AT_ONCE:-4} --guide \$GUIDE27 --rungs \$RUNGS27 ${watch:+--watch $watch} \\
-  --lines gains --flag-lines --go $FROM > $VMOUT/$name/out.txt 2> $VMOUT/$name/err.txt
+  --lines gains --flag-lines --shares --go $FROM > $VMOUT/$name/out.txt 2> $VMOUT/$name/err.txt
 rm -rf $VMOUT/$name/eng
 RUN
     T=30 on "chmod +x $VMOUT/$name-run.sh; nohup setsid $VMOUT/$name-run.sh > $VMOUT/$name/launch.txt 2>&1 < /dev/null & exit 0"

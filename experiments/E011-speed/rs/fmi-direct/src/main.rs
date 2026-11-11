@@ -4,8 +4,11 @@
 //! stop that holds something new is kept and expanded in turn. The engine is the model: the scripts are read only for
 //! the guide's keys (which variables the game's code tests), never for what an input does.
 //!
-//!   direct OUT [--minutes M] [--workers W] [--horizon H] [--no-skips] [--guide FILE] [--rungs FILE] [--watch KEY=V,..]
-//!   direct verify NODES.jsonl ID OUT [KEY=V,..]
+//!   direct OUT [--minutes M] [--stops N] [--workers W] [--slices S] [--at-once A] [--horizon H] [--no-skips]
+//!              [--guide FILE] [--rungs FILE] [--watch KEY=V,..] [--lines gains] [--flag-lines] [--shares] [--go]
+//!              [--from NODES ID | --from-run DIR] [--edges FILE] [--news KEY,..]
+//!   direct verify NODES.jsonl ID OUT [KEY=V,..]      (a kept stop replayed from boot in a fresh engine)
+//!   direct show | seq | forkbench ...                (measurement tools)
 //!
 //! * **Inputs** are click sequences, found breadth first at a stop (`clicks`). The clickable points are afford's offer
 //!   (the visible verb slots, the objects and actors the hit test answers) and a grid of floor points. A click that
@@ -27,7 +30,18 @@
 //!   slot it is the start or the middle of a sentence, a stop to click on from like a half-made one. Where it
 //!   changed several (another page of the interface) and came from the round's stop, it is clicked on from at the
 //!   same depth: at the slots it changed, at the slots that start a sentence (and from that sentence at the slots
-//!   it changed), and at the slots that change the page again. Inside a sentence the page is not changed.
+//!   it changed), and at the slots that change the page again. Inside a sentence the page is not changed. What a
+//!   slot shows is the engine's to say: a slot that shows an image has the image's hash for its name (engine
+//!   svm-e027, patch 0011), so a page of images is a page; and after a page a slot that shows an image some slot
+//!   showed on a page before is the same thing in another place, and is not clicked. A slot's click after which
+//!   the interface is another, ego stands where it stood and the world is the no-input twin's at the same frame
+//!   is a sentence half made too, whatever scripts ran (an object's own script runs for its slot).
+//! * **A round** is all that from one stop. It is one list of half-made stops, each clicked on from once (at most
+//!   MAX_MIDS of them, counted apart for those a page led to: a guard for a room that leaves one for every click).
+//!   A half-made stop's clicks read the round's lists and write none; what the round decides (which stops are
+//!   clicked on from, which windows are followed, what the slots teach) is applied in the round's order. So the
+//!   stops that no stop before them can change, and a single stop's clicks, run on `--slices` threads, and a round
+//!   is the same with any number of them. A trial's result keeps what differs from the expanded stop, not its facts.
 //! * **After an input.** A trial's stop is set against a twin: a fork of the expanded stop run to the same frame
 //!   with no input. Where they differ in a key of the world, the input changed it, and the trial is run PROBE frames
 //!   on with no input. The stop reached there is one more stop to keep (an effect that lands after the first stop: a
@@ -68,17 +82,28 @@
 //!   starts a line of its own, as a gain does (every room and input counts again from it), and every stop of
 //!   queue 0 goes on the stack. The newest line's stops go before any older line's: its stack's newest stop
 //!   first, then its queues 1 to 3 in their own order. The search works on its newest line, walks through it,
-//!   then goes through what it saw there, and only then turns to the line before.
+//!   then goes through what it saw there, and only then turns to the line before. With `--shares` the lines take
+//!   turns instead: the highest level's newest line every second turn, the next every fourth, and so on (a line
+//!   entered on the way, with much in it, had every turn otherwise); and a stop at the end of a walk the search
+//!   made has its turn before any line's.
 //! * **Where to go (`--go`).** A stop that begins a line has won something: an object, a flag. The scripts name
 //!   it somewhere (an owner asked for, the other object of a sentence, a flag tested): from that stop one walk is
 //!   made to each of the nearest GO_ROOMS rooms whose scripts do, over the clicks that were seen to lead from room
 //!   to room, one trial a walk. Those stops are expanded first. The scripts advise only: a walk that fails, or a
-//!   room that holds nothing, costs a trial or a stop, and the walk through every room stays.
-//! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
-//!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
+//!   room that holds nothing, costs a trial or a stop, and the walk through every room stays. A way is a click
+//!   seen to lead from a room to another and not to where the stop comes with no input; where none was seen, an
+//!   object whose own code leads ego to the other room. A way whose clicks did not lead on is forgotten until it
+//!   is seen again, and the walk leaves the stop where it stands: what the way asks for is asked there.
+//! * **Order.** Stops are taken from the queues a batch at a time (`--at-once`) and expanded side by side, each
+//!   from the search's state at the batch's start; their results are committed in the batch's order. A run is the
+//!   same every time. An expanded stop's engine is kept (the one used longest ago goes first); a stop's engine is
+//!   a fork of the nearest kept one on its way with the events since, and a boot from its movie where none is.
 //!
-//! OUT/nodes.jsonl holds one line per kept stop (its parent, clicks and movie, so it replays from boot); offers.jsonl
-//! one line per expanded stop. The rungs file is the evaluation's: the search never reads it for a choice.
+//! OUT/nodes.jsonl holds one line per kept stop: the stop it came from and its own trial's events (its movie from
+//! boot is theirs one after the other, down from the first line); rung-stops.jsonl the whole line of each stop that
+//! first held a rung or a watched value; top.jsonl the newest stop that began a line at the top level (`--from-run`
+//! starts there); edges.jsonl the ways; offers.jsonl one line per expanded stop. The rungs file is the evaluation's:
+//! the search never reads it for a choice.
 
 use fmi_core::*;
 use fmi_engine::{Host, HostCfg};
