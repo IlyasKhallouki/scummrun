@@ -353,13 +353,17 @@ fn world_kind(k: Key) -> bool {
 
 const NAMES: ObsReq = ObsReq { objects: None, names: true, exact: false };
 
-/// What the interface shows at a stop: the visible verb slots with their ids and texts (the verbs, the inventory's
-/// names, the sentence being composed, a dialog's choices). Only the hash is kept: no game text leaves the process.
+/// What the interface is at a stop: the visible verb slots with their ids and texts (the verbs, the inventory's
+/// names or images, the sentence being composed, a dialog's choices), and which scripts take a click and run a
+/// sentence. Only the hash is kept: no game text leaves the process.
 fn iface(o: &Obs) -> u64 {
     let mut v: Vec<(i32, i32, &str)> = o.verbs.iter().map(|x| (x.slot, x.id, x.name.as_deref().unwrap_or(""))).collect();
     v.sort_unstable();
     let mut h = DefaultHasher::new();
     v.hash(&mut h);
+    // and the scripts that take the clicks and run the sentences (the engine's two variables for them): where a
+    // room puts its own in their place, a click does another thing there, whatever the slots show
+    (o.vars.get(afford::VAR_VERB_SCRIPT).copied(), o.vars.get(afford::VAR_SENTENCE_SCRIPT).copied()).hash(&mut h);
     h.finish()
 }
 
