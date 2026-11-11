@@ -1,0 +1,53 @@
+{
+ "run": "vm11",
+ "tree": "8eda68f",
+ "workers": 28,
+ "stopped_at_s": 2043,
+ "rungs": [
+  {
+   "rung": "P2",
+   "node": 1231,
+   "keys": "bit:72=1",
+   "clicks": 9,
+   "t": 35.5,
+   "replayed_from_boot": true
+  },
+  {
+   "rung": "P1",
+   "node": 1679,
+   "keys": "owner:566=1",
+   "clicks": 9,
+   "t": 37.2,
+   "replayed_from_boot": true
+  },
+  {
+   "rung": "P3",
+   "node": 34329,
+   "keys": "bit:65=1",
+   "clicks": 140,
+   "t": 1321.8,
+   "replayed_from_boot": true
+  },
+  {
+   "rung": "P4",
+   "node": 37134,
+   "keys": "owner:396=1,owner:388=1,bit:98=1",
+   "clicks": 151,
+   "t": 1457.6,
+   "replayed_from_boot": true
+  },
+  {
+   "rung": "P6",
+   "node": 44930,
+   "keys": "var:196=1",
+   "clicks": 176,
+   "t": 1882.3,
+   "replayed_from_boot": true
+  }
+ ],
+ "other": {
+  "owner:568=1": 674.9,
+  "room 59 and 43 (past room 57)": 877.8,
+  "rooms": 47
+ }
+}
