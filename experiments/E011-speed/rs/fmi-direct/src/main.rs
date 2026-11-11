@@ -20,6 +20,12 @@
 //!   world that fewer than MOTION_TRIES stops of that level, room and walk box saw change, the inputs are tried again
 //!   from there (a door a timer opens is open only then, and ego must stand near it; a room's own motion is tried a
 //!   few times from each part of the room, not at every stop).
+//! * **A click that changes only what the interface shows** (the game idle again LEAD frames on and still so CALM
+//!   frames later, ego where it stood, the world the same) is no stop: it is clicked on from. Where it changed one
+//!   slot it is the start or the middle of a sentence, a stop to click on from like a half-made one. Where it
+//!   changed several (another page of the interface) and came from the round's stop, it is clicked on from at the
+//!   same depth: at the slots it changed, at the slots that start a sentence (and from that sentence at the slots
+//!   it changed), and at the slots that change the page again. Inside a sentence the page is not changed.
 //! * **After an input.** A trial's stop is set against a twin: a fork of the expanded stop run to the same frame
 //!   with no input. Where they differ in a key of the world, the input changed it, and the trial is run PROBE frames
 //!   on with no input. The stop reached there is one more stop to keep (an effect that lands after the first stop: a
@@ -63,7 +69,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// The longest click sequence of one input (the inventory scrolled, a verb and two objects).
@@ -401,6 +407,10 @@ struct Mid {
     events: Vec<Event>,
     /// what the interface shows there
     iface: u64,
+    /// after a click that changed only what the interface shows (the module's text, "Inputs"): the slots shown
+    /// before it. From such a stop only the slots that changed are clicked, and the slots that start a sentence;
+    /// from the sentence only those that changed
+    only: Option<Arc<HashSet<(i32, i32, String)>>>,
 }
 
 /// What a stop's trials gave.
@@ -500,7 +510,7 @@ fn clicks(
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
     let first = out.results.len();
     let mut seen_mid: HashSet<u64> = HashSet::from([r0.mid()]);
-    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface }];
+    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None }];
     // the stops that are windows (the module's text, "After an input"): their engines, names, events and changed keys
     let mut windows: Vec<(Box<dyn Engine>, String, Vec<Event>, Vec<(Key, Val)>)> = Vec::new();
     // the twin: a copy of the round's stop to fork it from, the fork run on, and its world at the frames asked
@@ -514,14 +524,19 @@ fn clicks(
     // verb), or gave that stop again (it does nothing)
     let mut first_gave: HashMap<Hit, u64> = HashMap::new();
     let mut skip: Option<HashSet<Hit>> = None;
+    // the slots whose click from the round's stop changed only what the interface shows
+    let mut shifters: HashSet<Hit> = HashSet::new();
     for depth in 1..=MAX_CLICKS {
         let mut next: Vec<Mid> = Vec::new();
-        for mut m in frontier {
+        let mut work: VecDeque<Mid> = frontier.into_iter().collect();
+        while let Some(mut m) = work.pop_front() {
             let me: &mut Box<dyn Engine> = match m.engine.as_mut() {
                 Some(x) => x,
                 None => &mut *e,
             };
-            let o = me.obs(&ObsReq::default())?;
+            let o = me.obs(&NAMES)?;
+            let mfacts = facts_of(&o);
+            let shown: Arc<HashSet<(i32, i32, String)>> = Arc::new(o.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect());
             let of = afford::offer_cfg(me, &o, false, true)?;
             let park = park_point(me)?;
             // the trials' forks record their slot runs and start with empty logs
@@ -529,12 +544,31 @@ fn clicks(
             me.runs()?;
             let _ = me.input_log();
             let mf = me.status().frame;
-            let learn = depth == 2 && skip.is_none();
+            let learn = depth == 2 && skip.is_none() && m.only.is_none();
             let mut learned: HashSet<Hit> = HashSet::new();
             let mego = o.ego_pos;
-            let mut points: Vec<Point> = of.verbs.clone();
-            points.extend(of.targets.iter().copied());
-            if depth == 1 {
+            let mut points: Vec<Point> = match &m.only {
+                None => {
+                    let mut v = of.verbs.clone();
+                    v.extend(of.targets.iter().copied());
+                    v
+                }
+                // after an interface-only click: the slots that changed; at the round's depth also the slots that
+                // start a sentence and those that change the interface again
+                Some(before) => of
+                    .verbs
+                    .iter()
+                    .filter(|p| match p.hit {
+                        Hit::Verb { slot, id } => {
+                            shown.iter().any(|x| x.0 == slot && x.1 == id && !before.contains(x))
+                                || (depth == 1 && (first_gave.contains_key(&p.hit) || shifters.contains(&p.hit)))
+                        }
+                        _ => false,
+                    })
+                    .copied()
+                    .collect(),
+            };
+            if depth == 1 && m.only.is_none() {
                 if out.offer.is_null() {
                     out.offer = of.json();
                 }
@@ -550,7 +584,7 @@ fn clicks(
                 }
             }
             for p in &points {
-                if depth >= 2 && skip.as_ref().is_some_and(|s| s.contains(&p.hit)) {
+                if depth >= 2 && (skip.as_ref().is_some_and(|s| s.contains(&p.hit)) || shifters.contains(&p.hit)) {
                     out.skipped += 1;
                     continue;
                 }
@@ -594,18 +628,72 @@ fn clicks(
                 // a sentence half made shows at once (the game is idle again, ego stands where it stood, only the
                 // input script ran): the stop to click on from is this one, LEAD frames after the click
                 let mut settled_half: Option<bool> = None;
+                let mut ran_on = false;
                 if (early.idle.is_some() || takes_click(&early)) && early.mv.unwrap_or(0) == 0 {
-                    let ob = b.obs(&NAMES)?;
+                    let mut ob = b.obs(&NAMES)?;
+                    let mut at = early.clone();
                     let half = ob.ego_pos == mego && {
                         let runs = b.runs()?;
                         let input = [input0, facts_of(&ob).val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32];
                         afford::composing(early.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
                     };
                     settled_half = Some(half);
-                    if half {
-                        let r = read(name_of(pre, &cl), events, &ob, early);
+                    // or only what the interface shows changed, and CALM frames on it still is so (a sentence that is
+                    // about to run shows too): clicked on from as well
+                    let world_same = |x: &Obs| !mfacts.diff(&facts_of(x)).iter().any(|d| world_kind(d.0));
+                    let mut shows = !half && ob.ego_pos == mego && iface(&ob) != m.iface && world_same(&ob);
+                    if shows {
+                        let shown3 = iface(&ob);
+                        match go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
+                            Err(st) => {
+                                out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
+                                b.quit();
+                                continue;
+                            }
+                            Ok(st2) => {
+                                ran_on = true;
+                                let ob2 = b.obs(&NAMES)?;
+                                shows = (st2.idle.is_some() || takes_click(&st2)) && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && world_same(&ob2);
+                                if shows {
+                                    ob = ob2;
+                                    at = st2;
+                                }
+                            }
+                        }
+                    }
+                    if half || shows {
+                        let r = read(name_of(pre, &cl), events, &ob, at);
                         out.phase[2] += t.elapsed().as_secs_f64();
-                        if matches!(p.hit, Hit::Verb { .. }) {
+                        if shows {
+                            // a page of the interface (several slots changed) from the round's stop: clicked on from
+                            // at the same depth, at the slots that changed. Else the start or the middle of a
+                            // sentence: a stop to click on from like any other
+                            let now: HashSet<(i32, i32, String)> = ob.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect();
+                            let mut slots: Vec<i32> = now.symmetric_difference(&shown).map(|x| x.0).collect();
+                            slots.sort_unstable();
+                            slots.dedup();
+                            let page = slots.len() >= 2;
+                            trace(&format!("    shows {} depth {depth} ({} slots changed)", r.name, slots.len()));
+                            if page && depth == 1 {
+                                if m.only.is_none() {
+                                    shifters.insert(p.hit);
+                                }
+                                if seen_mid.insert(r.mid()) {
+                                    out.mids += 1;
+                                    let before = m.only.clone().unwrap_or_else(|| shown.clone());
+                                    work.push_back(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: Some(before) });
+                                } else {
+                                    b.quit();
+                                }
+                            } else if !page && depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
+                                out.mids += 1;
+                                next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: None });
+                            } else {
+                                b.quit();
+                            }
+                            continue;
+                        }
+                        if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                             if depth == 1 {
                                 first_gave.insert(p.hit, r.iface);
                             } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
@@ -614,17 +702,21 @@ fn clicks(
                         }
                         if depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
                             out.mids += 1;
-                            next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events });
+                            // a sentence begun after a page of the interface goes on at the slots that changed
+                            let only = if depth == 1 { m.only.clone() } else { None };
+                            next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only });
                         } else {
                             b.quit();
                         }
                         continue;
                     }
                 }
-                if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
-                    out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
-                    b.quit();
-                    continue;
+                if !ran_on {
+                    if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
+                        out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
+                        b.quit();
+                        continue;
+                    }
                 }
                 let played = calm(&mut b, mf, cfg.horizon, ego)?;
                 out.phase[2] += t.elapsed().as_secs_f64();
@@ -645,7 +737,7 @@ fn clicks(
                         };
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
-                            if matches!(p.hit, Hit::Verb { .. }) {
+                            if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                                 if depth == 1 {
                                     first_gave.insert(p.hit, r.iface);
                                 } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
@@ -655,7 +747,7 @@ fn clicks(
                             // a stop to click on from; at the last click's depth it is no stop at all
                             if depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
                                 out.mids += 1;
-                                next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events });
+                                next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: None });
                                 continue;
                             }
                         } else {
