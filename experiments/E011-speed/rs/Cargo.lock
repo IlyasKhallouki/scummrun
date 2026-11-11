@@ -127,6 +127,16 @@ name = "fmi-core"
 version = "0.1.0"
 
 [[package]]
+name = "fmi-direct"
+version = "0.1.0"
+dependencies = [
+ "fmi-core",
+ "fmi-engine",
+ "fmi-explore",
+ "serde_json",
+]
+
+[[package]]
 name = "fmi-engine"
 version = "0.1.0"
 dependencies = [

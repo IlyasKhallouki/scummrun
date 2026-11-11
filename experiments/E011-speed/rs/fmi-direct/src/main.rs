@@ -20,10 +20,11 @@
 //!   world that fewer than MOTION_TRIES stops of that level, room and walk box saw change, the inputs are tried again
 //!   from there (a door a timer opens is open only then, and ego must stand near it; a room's own motion is tried a
 //!   few times from each part of the room, not at every stop).
-//! * **After an input.** Where a trial's stop differs from the expanded stop's in a key of the world that no wait
-//!   in that room has moved (the room's motion), the trial is run PROBE frames on with no input. The stop reached there is one more stop to
-//!   keep (an effect that lands after the first stop: a count the game raises when its actor has landed). And where a
-//!   key the input changed is back at its old value there, the first stop is a window that closes by itself: the
+//! * **After an input.** A trial's stop is set against a twin: a fork of the expanded stop run to the same frame
+//!   with no input. Where they differ in a key of the world, the input changed it, and the trial is run PROBE frames
+//!   on with no input. The stop reached there is one more stop to keep (an effect that lands after the first stop: a
+//!   count the game raises when its actor has landed). And where a key the input changed is back at its old value
+//!   there, or is a key that moves by itself in that room, the first stop is a window that closes by itself: the
 //!   inputs are tried from it, whether it holds anything new or not (the first MAX_WINDOWS windows of a stop).
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
 //!   interface's own (those the input script writes, and those a fifth of a stop's own inputs change), the clocks (those
@@ -412,6 +413,37 @@ fn trace(text: &str) {
     }
 }
 
+/// The world of the round's stop run to frame `f` with no input (None: its run ended before): from the cache, or
+/// from the twin run on, or from a new fork of `src` when the twin stands past `f`.
+fn twin_world(
+    src: &mut Box<dyn Engine>,
+    twin: &mut Option<Box<dyn Engine>>,
+    cache: &mut HashMap<u64, Option<Facts>>,
+    f: u64,
+) -> EResult<Option<Facts>> {
+    if let Some(w) = cache.get(&f) {
+        return Ok(w.clone());
+    }
+    if twin.as_ref().map_or(true, |t| t.status().frame > f) {
+        if let Some(t) = twin.take() {
+            t.quit();
+        }
+        *twin = Some(src.fork()?);
+    }
+    let t = twin.as_mut().unwrap();
+    let alive = t.status().frame == f || go(t, RunSpec { frame: Some(f), ..Default::default() })?.is_ok();
+    let w = if alive {
+        Some(Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()))
+    } else {
+        if let Some(t) = twin.take() {
+            t.quit();
+        }
+        None
+    };
+    cache.insert(f, w.clone());
+    Ok(w)
+}
+
 /// A point where the pointer is over no verb, object or actor, by the engine's hit test at this stop.
 fn park_point(e: &mut Box<dyn Engine>) -> EResult<Option<(i32, i32)>> {
     let (w, h) = (afford::SCREEN_W, afford::SCREEN_H);
@@ -441,6 +473,10 @@ fn clicks(
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface }];
     // the stops that are windows (the module's text, "After an input"): their engines, names and events
     let mut windows: Vec<(Box<dyn Engine>, String, Vec<Event>)> = Vec::new();
+    // the twin: a copy of the round's stop to fork it from, the fork run on, and its world at the frames asked
+    let mut twin_src: Option<Box<dyn Engine>> = if motion.is_some() { Some(e.fork()?) } else { None };
+    let mut twin: Option<Box<dyn Engine>> = None;
+    let mut twin_at: HashMap<u64, Option<Facts>> = HashMap::new();
     // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
     // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
     // verb), or gave that stop again (it does nothing)
@@ -509,16 +545,54 @@ fn clicks(
                 }
                 out.phase[1] += t.elapsed().as_secs_f64();
                 let t = Instant::now();
-                if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
-                    out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
-                    b.quit();
-                    continue;
-                }
+                let early = match go(&mut b, RunSpec { frame: Some(mf + LEAD), ..Default::default() })? {
+                    Ok(st) => st,
+                    Err(st) => {
+                        out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
+                        b.quit();
+                        continue;
+                    }
+                };
                 if depth == 1 {
                     // the variables the input script wrote for this click: the interface's own
                     if let Ok(l) = b.input_log() {
                         out.iface_vars.extend(l.records.iter().flat_map(|r| r.writes.iter()).filter(|t| t.kind == TouchKind::Var).map(|t| Key::var(t.a as u64)));
                     }
+                }
+                // a sentence half made shows at once (the game is idle again, ego stands where it stood, only the
+                // input script ran): the stop to click on from is this one, LEAD frames after the click
+                let mut settled_half: Option<bool> = None;
+                if (early.idle.is_some() || takes_click(&early)) && early.mv.unwrap_or(0) == 0 {
+                    let ob = b.obs(&NAMES)?;
+                    let half = ob.ego_pos == mego && {
+                        let runs = b.runs()?;
+                        let input = [input0, facts_of(&ob).val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32];
+                        afford::composing(early.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
+                    };
+                    settled_half = Some(half);
+                    if half {
+                        let r = read(name_of(pre, &cl), events, &ob, early);
+                        out.phase[2] += t.elapsed().as_secs_f64();
+                        if matches!(p.hit, Hit::Verb { .. }) {
+                            if depth == 1 {
+                                first_gave.insert(p.hit, r.iface);
+                            } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
+                                learned.insert(p.hit);
+                            }
+                        }
+                        if depth < MAX_CLICKS && seen_mid.insert(r.mid()) {
+                            out.mids += 1;
+                            next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events });
+                        } else {
+                            b.quit();
+                        }
+                        continue;
+                    }
+                }
+                if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
+                    out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
+                    b.quit();
+                    continue;
                 }
                 let played = calm(&mut b, mf, cfg.horizon, ego)?;
                 out.phase[2] += t.elapsed().as_secs_f64();
@@ -529,7 +603,7 @@ fn clicks(
                         let ob = b.obs(&NAMES)?;
                         let r = read(name_of(pre, &cl), events, &ob, st);
                         // only the input script ran since the click and ego stands where it stood: a sentence half made
-                        let half = ob.ego_pos == mego && {
+                        let half = settled_half.is_none() && ob.ego_pos == mego && {
                             let runs = b.runs()?;
                             let input = [input0, r.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32];
                             afford::composing(r.st.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
@@ -550,13 +624,16 @@ fn clicks(
                                 continue;
                             }
                         } else {
-                            // the input changed the world past the round's own motion: PROBE frames on with no input
-                            let touched: Vec<(Key, Val)> = match motion {
-                                Some(m) => r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) && !m.contains(&d.0)).map(|d| (d.0, d.1)).collect(),
-                                None => Vec::new(),
-                            };
+                            // what the input changed: the stop against the twin at its frame (each with its old value)
+                            let mut touched: Vec<(Key, Val)> = Vec::new();
+                            if let (Some(src), true) = (twin_src.as_mut(), r.room == r0.room) {
+                                if let Some(tw) = twin_world(src, &mut twin, &mut twin_at, r.st.frame)? {
+                                    let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
+                                    touched = tw.diff(&mine).into_iter().map(|d| (d.0, r0.facts.val(d.0))).collect();
+                                }
+                            }
                             let mut window = false;
-                            if !touched.is_empty() && r.room == r0.room {
+                            if !touched.is_empty() {
                                 let mut pb = b.fork()?;
                                 out.trials += 1;
                                 let at = pb.status().frame;
@@ -564,7 +641,8 @@ fn clicks(
                                     if let Played::Stop(st2) = calm(&mut pb, at + PROBE, cfg.horizon, ego)? {
                                         let ob2 = pb.obs(&NAMES)?;
                                         let r2 = read(format!("{}~", r.name), r.events.clone(), &ob2, st2);
-                                        window = touched.iter().any(|&(k, old)| r2.facts.val(k) == old);
+                                        // back at its old value, or a key that moves by itself here
+                                        window = touched.iter().any(|&(k, old)| r2.facts.val(k) == old || motion.is_some_and(|m| m.contains(&k)));
                                         out.results.push(r2);
                                     }
                                 }
@@ -598,6 +676,12 @@ fn clicks(
         if let Some(x) = m.engine.take() {
             x.quit();
         }
+    }
+    if let Some(t) = twin.take() {
+        t.quit();
+    }
+    if let Some(t) = twin_src.take() {
+        t.quit();
     }
     // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
     // only (in a window's round, or after a wait, an earlier input's effect lands in every trial), over its first
