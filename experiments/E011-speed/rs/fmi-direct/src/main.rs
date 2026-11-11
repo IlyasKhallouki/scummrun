@@ -42,7 +42,7 @@
 //!   a stop when no kept stop of its line holds it: with an object gained or used up, every room, input and position
 //!   counts again. The highest level is expanded first.
 //! * **Kept.** Within its level a stop goes to the first queue it fits: (0) a world atom other than a variable's
-//!   that is new; (1) an interface or a thing on the screen new in that room; (2) a variable's value that is new, or
+//!   that is new; (1) an interface new in its line, or a thing on the screen new in that room; (2) a variable's value that is new, or
 //!   a walk box or camera bucket new in that room; (3) an atom of the guide's keys new in that room; (4) any other
 //!   world atom new in that room, or a new world (its atoms together, without those that change by themselves). A
 //!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queues 3 and 4 wait until no
@@ -164,7 +164,7 @@ struct Search {
     seen: HashSet<(u64, Key, Val)>,
     seen_at: HashSet<(u64, i32, Key, Val)>,
     sees: HashSet<(u64, i32, i32)>,
-    ifaces: HashSet<(u64, i32, u64)>,
+    ifaces: HashSet<(u64, u64)>,
     boxes: HashSet<(u64, i32, i32)>,
     cams: HashSet<(u64, i32, i32)>,
     cells: HashSet<(u64, u64)>,
@@ -962,7 +962,7 @@ impl Search {
                     class = class.min(1);
                 }
             }
-            if self.ifaces.insert((line, r.room, r.iface)) {
+            if self.ifaces.insert((line, r.iface)) {
                 novel.push("iface".into());
                 class = class.min(1);
             }
@@ -1350,7 +1350,7 @@ fn main() {
     for &t in &r.vis {
         s.sees.insert((line, r.room, t));
     }
-    s.ifaces.insert((line, r.room, r.iface));
+    s.ifaces.insert((line, r.iface));
     s.boxes.insert((line, r.room, r.walkbox));
     s.cams.insert((line, r.room, r.cam));
     s.rooms.push(r.room);
