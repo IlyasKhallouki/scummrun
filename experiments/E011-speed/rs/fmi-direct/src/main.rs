@@ -227,6 +227,8 @@ struct Search {
     mentions: Mentions,
     edges: HashMap<(i32, i32), Vec<Hit>>,
     edges_log: Option<std::fs::File>,
+    /// the ways a walk found false (from, to, the clicks), and how often
+    dead: HashMap<(i32, i32, String), u32>,
     /// the scripts' local variables: per line the values kept stops held, the values seen, the clocks, the capped
     lseen: HashSet<(u64, u64, i32)>,
     lvals: HashMap<u64, Vec<i32>>,
@@ -528,6 +530,8 @@ struct Out {
     skipped: u64,
     /// the windows followed: each one's cell with each of its keys
     followed: Vec<(u64, Key)>,
+    /// the ways (from, to) whose clicks a walk made and that did not lead on
+    bad: Vec<(i32, i32)>,
     /// the keys the stop's waits moved while no input's change of them was pending
     noise: HashSet<Key>,
     /// the scripts' local variables the stop's waits moved: clocks
@@ -559,6 +563,7 @@ impl Out {
         self.windows += o.windows;
         self.skipped += o.skipped;
         self.followed.extend(o.followed);
+        self.bad.extend(o.bad);
         if self.offer.is_null() {
             self.offer = o.offer;
         }
@@ -648,6 +653,17 @@ fn clicks(
         (r.iface, v).hash(&mut h);
         h.finish()
     };
+    // and the values of the variables that a slot's click changed while it changed nothing else (a page of slots that
+    // show no text: what they hold is not in what the interface shows)
+    let mk = |r: &Res, pvars: &[Key]| -> u64 {
+        if pvars.is_empty() {
+            return mkey(r);
+        }
+        let mut h = DefaultHasher::new();
+        (mkey(r), pvars.iter().map(|k| r.facts.val(*k)).collect::<Vec<Val>>()).hash(&mut h);
+        h.finish()
+    };
+    let mut pvars: Vec<Key> = Vec::new();
     let mut seen_mid: HashSet<u64> = HashSet::from([mkey(&r0)]);
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None }];
     // the stops that are windows (the module's text, "After an input"), MAX_WINDOWS of them at most
@@ -673,7 +689,6 @@ fn clicks(
                 None => &mut *e,
             };
             let o = me.obs(&NAMES)?;
-            let mfacts = facts_of(&o);
             let shown: Arc<HashSet<(i32, i32, String)>> = Arc::new(o.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect());
             let of = afford::offer_cfg(me, &o, false, true)?;
             let park = park_point(me)?;
@@ -684,7 +699,7 @@ fn clicks(
             let mf = me.status().frame;
             // what the scripts are at LEAD and LEAD + CALM frames on with no input (made at the first click that may
             // have changed the interface alone)
-            let mut quiet: Option<(u64, u64)> = None;
+            let mut quiet: Option<(u64, u64, Option<Facts>, Option<Facts>)> = None;
             let learn = depth == 2 && skip.is_none() && m.only.is_none();
             let mut learned: HashSet<Hit> = HashSet::new();
             let mego = o.ego_pos;
@@ -694,14 +709,15 @@ fn clicks(
                     v.extend(of.targets.iter().copied());
                     v
                 }
-                // after an interface-only click: the slots that changed; at the round's depth also the slots that
-                // start a sentence and those that change the interface again
+                // after an interface-only click: the slots that changed (a slot that shows no text is taken as
+                // changed: what it holds cannot be read); at the round's depth also the slots that start a sentence
+                // and those that change the interface again
                 Some(before) => of
                     .verbs
                     .iter()
                     .filter(|p| match p.hit {
                         Hit::Verb { slot, id } => {
-                            shown.iter().any(|x| x.0 == slot && x.1 == id && !before.contains(x))
+                            shown.iter().any(|x| x.0 == slot && x.1 == id && (x.2.is_empty() || !before.contains(x)))
                                 || (depth == 1 && (first_gave.contains_key(&p.hit) || shifters.contains(&p.hit)))
                         }
                         _ => false,
@@ -793,9 +809,14 @@ fn clicks(
                         afford::composing(early.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
                     };
                     // or only what the interface shows changed, and CALM frames on it still is so (a sentence that is
-                    // about to run shows too): clicked on from as well
-                    let world_same = |x: &Obs| !mfacts.diff(&facts_of(x)).iter().any(|d| world_kind(d.0));
-                    let mut shows = !half3 && early.idle.is_some() && ob.ego_pos == mego && iface(&ob) != m.iface && world_same(&ob);
+                    // about to run shows too): clicked on from as well. The world is held against what it is with
+                    // no input at the same frame: a room moves by itself (a juggler, a fire), and that is not the
+                    // click's doing
+                    let world_same = |x: &Obs, w: &Option<Facts>| w.as_ref().is_some_and(|w| !w.diff(&facts_of(x)).iter().any(|d| world_kind(d.0)));
+                    let slot = matches!(p.hit, Hit::Verb { .. });
+                    let mut shows = !half3 && early.idle.is_some() && ob.ego_pos == mego && (slot || iface(&ob) != m.iface);
+                    // the variables a slot's click left other than they are with no input
+                    let mut vd: Vec<Key> = Vec::new();
                     let mut half = half3;
                     if half3 || shows {
                         // and no script is anywhere else than with no input at all: a dialog's line clears the
@@ -805,16 +826,25 @@ fn clicks(
                             let mut tw = me.fork()?;
                             out.trials += 1;
                             let mut at = [0u64; 2];
+                            let mut w: [Option<Facts>; 2] = [None, None];
                             for (k, f) in [mf + LEAD, mf + LEAD + CALM].into_iter().enumerate() {
                                 if go(&mut tw, RunSpec { frame: Some(f), ..Default::default() })?.is_ok() {
-                                    at[k] = scripts_of(&tw.obs(&NAMES)?);
+                                    let to = tw.obs(&NAMES)?;
+                                    at[k] = scripts_of(&to);
+                                    w[k] = Some(facts_of(&to));
                                 }
                             }
                             tw.quit();
-                            quiet = Some((at[0], at[1]));
+                            let [w0, w1] = w;
+                            quiet = Some((at[0], at[1], w0, w1));
                         }
-                        let still = quiet.is_some_and(|q| q.0 == scripts_of(&ob));
-                        shows = shows && still;
+                        let still = quiet.as_ref().is_some_and(|q| q.0 == scripts_of(&ob));
+                        if shows && slot {
+                            if let Some(w) = quiet.as_ref().and_then(|q| q.2.as_ref()) {
+                                vd = w.diff(&facts_of(&ob)).into_iter().filter(|d| d.0.kind() == K_VAR).map(|d| d.0).collect();
+                            }
+                        }
+                        shows = shows && still && (iface(&ob) != m.iface || !vd.is_empty()) && quiet.as_ref().is_some_and(|q| world_same(&ob, &q.2));
                         half = half3 && still;
                     }
                     if !half3 || half {
@@ -831,7 +861,7 @@ fn clicks(
                             Ok(st2) => {
                                 ran_on = true;
                                 let ob2 = b.obs(&NAMES)?;
-                                shows = st2.idle.is_some() && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && world_same(&ob2) && quiet.is_some_and(|q| q.1 == scripts_of(&ob2));
+                                shows = st2.idle.is_some() && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && quiet.as_ref().is_some_and(|q| q.1 == scripts_of(&ob2) && world_same(&ob2, &q.3));
                                 if shows {
                                     ob = ob2;
                                     at = st2;
@@ -850,13 +880,23 @@ fn clicks(
                             let mut slots: Vec<i32> = now.symmetric_difference(&shown).map(|x| x.0).collect();
                             slots.sort_unstable();
                             slots.dedup();
-                            let page = slots.len() >= 2;
-                            trace(&format!("    shows {} depth {depth} ({} slots changed)", r.name, slots.len()));
+                            let page = slots.len() >= 2 || vd.len() >= 2;
+                            trace(&format!("    shows {} depth {depth} ({} slots changed, {} variables)", r.name, slots.len(), vd.len()));
+                            if !vd.is_empty() {
+                                let n = pvars.len();
+                                pvars.extend(vd.iter().copied());
+                                pvars.sort_unstable();
+                                pvars.dedup();
+                                if pvars.len() != n {
+                                    // the round's stop under the longer list
+                                    seen_mid.insert(mk(&r0, &pvars));
+                                }
+                            }
                             if shadow {
                                 if page && m.only.is_none() {
                                     shifters.insert(p.hit);
                                 }
-                                seen_mid.insert(mkey(&r));
+                                seen_mid.insert(mk(&r, &pvars));
                                 b.quit();
                                 continue;
                             }
@@ -864,14 +904,14 @@ fn clicks(
                                 if m.only.is_none() {
                                     shifters.insert(p.hit);
                                 }
-                                if seen_mid.insert(mkey(&r)) {
+                                if seen_mid.insert(mk(&r, &pvars)) {
                                     out.mids += 1;
                                     let before = m.only.clone().unwrap_or_else(|| shown.clone());
                                     work.push_back(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: Some(before) });
                                 } else {
                                     b.quit();
                                 }
-                            } else if !page && depth < MAX_CLICKS && seen_mid.insert(mkey(&r)) {
+                            } else if !page && depth < MAX_CLICKS && seen_mid.insert(mk(&r, &pvars)) {
                                 out.mids += 1;
                                 next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: None });
                             } else {
@@ -887,11 +927,11 @@ fn clicks(
                             }
                         }
                         if shadow {
-                            seen_mid.insert(mkey(&r));
+                            seen_mid.insert(mk(&r, &pvars));
                             b.quit();
                             continue;
                         }
-                        if depth < MAX_CLICKS && seen_mid.insert(mkey(&r)) {
+                        if depth < MAX_CLICKS && seen_mid.insert(mk(&r, &pvars)) {
                             out.mids += 1;
                             // a sentence begun after a page of the interface goes on at the slots that changed
                             let only = if depth == 1 { m.only.clone() } else { None };
@@ -930,6 +970,16 @@ fn clicks(
                             let input = [input0, r.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32];
                             afford::composing(r.st.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
                         };
+                        // or a slot's click left the interface another and the world what it is with no input at
+                        // the same frame (an object's own script ran for the slot, and no sentence): half made too
+                        let half = half
+                            || (matches!(p.hit, Hit::Verb { .. }) && r.room == r0.room && ob.ego_pos == mego && r.st.idle.as_deref() == Some("sentence") && r.iface != m.iface && {
+                                let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
+                                match twin_src.as_mut() {
+                                    Some(src) => twin_world(src, &mut twin, &mut twin_at, r.st.frame)?.is_some_and(|tw| tw.diff(&mine).is_empty()),
+                                    None => false,
+                                }
+                            });
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
                             if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
@@ -941,7 +991,7 @@ fn clicks(
                             }
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
                             // line, not a verb's slot): a stop like any other, too
-                            let fresh = seen_mid.insert(mkey(&r));
+                            let fresh = seen_mid.insert(mk(&r, &pvars));
                             if depth < MAX_CLICKS && fresh {
                                 out.mids += 1;
                                 next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events.clone(), only: None });
@@ -1305,13 +1355,16 @@ fn way<'a>(edges: &'a HashMap<(i32, i32), Vec<Hit>>, from: i32, to: i32) -> Opti
 
 /// A walk from the engine's stop along `path`, each room's clicks as they were seen to lead on: the stop at its
 /// end, or None where a click finds nothing to click or a room is not the one expected (the world is another now).
-fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg) -> EResult<Option<Res>> {
+fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg, bad: &mut Vec<(i32, i32)>) -> EResult<Option<Res>> {
     let mut cur = e.fork()?;
     let mut events: Vec<Event> = Vec::new();
     let mut last = cur.status().clone();
-    for (room, hits) in path {
+    'hops: for (room, hits) in path {
         let mut from = cur.status().frame;
+        let here = cur.status().room;
         for (k, hit) in hits.iter().enumerate() {
+            // a click at the screen's edge that left the room: the stop it came to
+            let mut left: Option<Status> = None;
             // the click's point; a thing of the room that is off the screen (a room wider than it) is walked
             // towards first, floor click by floor click at the screen's edge on its side, until it shows
             let mut point = None;
@@ -1363,8 +1416,13 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg)
                         break;
                     }
                     events.push(ev);
-                    if !matches!(calm(&mut cur, f, cfg.horizon, ego)?, Played::Stop(_)) {
-                        break;
+                    match calm(&mut cur, f, cfg.horizon, ego)? {
+                        Played::Stop(st) if st.room != here => {
+                            left = Some(st);
+                            break;
+                        }
+                        Played::Stop(_) => {}
+                        _ => break,
                     }
                     // the room goes on scrolling after ego stands: on until it rests
                     for _ in 0..40 {
@@ -1374,16 +1432,30 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg)
                             break;
                         }
                     }
-                    trace(&format!("    walk: click at {:?} (floor {}) -> xstart {} ego {:?} (of {} points in the picture)", grid[i], is_floor(i), cur.status().xstart, cur.status().ego, cands.len()));
+                    trace(&format!("    walk: room {} click at {:?} (floor {}) -> xstart {} ego {:?} (of {} points in the picture)", cur.status().room, grid[i], is_floor(i), cur.status().xstart, cur.status().ego, cands.len()));
                     if cur.status().xstart != before {
                         moved = true;
                         break;
                     }
                 }
+                if left.is_some() {
+                    break;
+                }
                 if !moved {
                     trace(&format!("    walk: no click at the screen's edge moved the room towards {} (screen {x0}..{x1}, at {at})", hit.name()));
                     break;
                 }
+            }
+            if let Some(st) = left {
+                // the way on was the screen's edge itself: the hop is made if the room is the one expected
+                if st.room == *room {
+                    trace(&format!("    walk: the screen's edge led from room {here} to {room}"));
+                    last = st;
+                    continue 'hops;
+                }
+                trace(&format!("    walk: the screen's edge led from room {here} to {} not {room}", st.room));
+                cur.quit();
+                return Ok(None);
             }
             let Some((x, y)) = point else {
                 trace(&format!("    walk: in room {} nothing to click for {} (on the way to {room})", cur.status().room, hit.name()));
@@ -1413,6 +1485,8 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg)
         match calm(&mut cur, from, cfg.horizon, ego)? {
             Played::Stop(st) if st.room == *room => last = st,
             other => {
+                // the clicks were made and did not lead on: the way is false (or the world another)
+                bad.push((here, *room));
                 trace(&format!("    walk: {} led to room {} not {room} ({})", hits.iter().map(|h| h.name()).collect::<String>(), cur.status().room, match other { Played::Stop(_) => "a stop", Played::Ended(_) => "the end", Played::NotIdle => "no stop" }));
                 cur.quit();
                 return Ok(None);
@@ -1578,7 +1652,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         trace(&format!("  room {} go: rooms named {:?}, ways {:?}", r0.room, rooms, ways.iter().map(|w| w.iter().map(|x| format!("{}:{}", x.0, x.1.iter().map(|h| h.name()).collect::<String>())).collect::<Vec<_>>().join(" ")).collect::<Vec<_>>()));
         for w in ways.iter().rev() {
             out.trials += 1;
-            if let Some(r) = walk(e, w, ego, cfg)? {
+            if let Some(r) = walk(e, w, ego, cfg, &mut out.bad)? {
                 out.results.push(r);
             }
         }
@@ -1655,6 +1729,19 @@ impl Search {
         let results = out.results;
         let (movie, depth, ever0) = (self.nodes[id].events.clone(), self.nodes[id].depth, self.nodes[id].ever.clone());
         let (line0, room00) = (self.nodes[id].line, self.nodes[id].room);
+        // a way whose clicks a walk made and that did not lead on: forgotten (seen again, it is learned again, twice
+        // at most)
+        for k in &out.bad {
+            if let Some(h) = self.edges.remove(k) {
+                let how: String = h.iter().map(|x| x.name()).collect();
+                if let Some(f) = self.edges_log.as_mut() {
+                    let _ = writeln!(f, "{}", json!({"from": k.0, "to": k.1, "how": how, "failed": true}));
+                }
+                *self.dead.entry((k.0, k.1, how)).or_default() += 1;
+            }
+        }
+        // the rooms the stop comes to with no input at all: a click that ends there did not lead there
+        let drift: HashSet<i32> = results.iter().filter(|r| r.name.starts_with("wait") && !r.name.contains('+') && r.room != room00).map(|r| r.room).collect();
         let mut keep: Vec<(usize, usize, usize, usize, bool)> = Vec::new(); // (result, node, level, queue, to the stack)
         for (i, r) in results.iter().enumerate() {
             let world = self.policy.world_of(&r.facts);
@@ -1713,9 +1800,10 @@ impl Search {
                 Vec::new()
             };
             // the clicks that led from the expanded stop's room to another: the way between the two, for a walk
-            if r.room != room00 && !r.name.contains('+') && !r.name.contains('>') && !r.name.starts_with("go") {
+            if r.room != room00 && !drift.contains(&r.room) && !r.name.contains('+') && !r.name.contains('>') && !r.name.starts_with("go") {
                 if let Some(h) = hits_of(&r.name) {
-                    if !self.edges.contains_key(&(room00, r.room)) {
+                    let how = r.name.trim_end_matches('~').to_string();
+                    if !self.edges.contains_key(&(room00, r.room)) && self.dead.get(&(room00, r.room, how)).copied().unwrap_or(0) < 2 {
                         // kept beside the stops (OUT/edges.jsonl), for a run that starts from one of them
                         if let Some(f) = self.edges_log.as_mut() {
                             let _ = writeln!(f, "{}", json!({"from": room00, "to": r.room, "how": r.name.trim_end_matches('~')}));
@@ -2203,7 +2291,13 @@ fn main() {
         if let Some(p) = opt("--edges") {
             for v in std::fs::read_to_string(&p).expect("--edges").lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()) {
                 if let (Some(a), Some(b), Some(h)) = (v["from"].as_i64(), v["to"].as_i64(), v["how"].as_str().and_then(hits_of)) {
-                    s.edges.entry((a as i32, b as i32)).or_insert(h);
+                    if v["failed"].as_bool() == Some(true) {
+                        // a way that run found false
+                        s.edges.remove(&(a as i32, b as i32));
+                        *s.dead.entry((a as i32, b as i32, v["how"].as_str().unwrap_or("").to_string())).or_default() += 1;
+                    } else if s.dead.get(&(a as i32, b as i32, v["how"].as_str().unwrap_or("").to_string())).copied().unwrap_or(0) < 2 {
+                        s.edges.entry((a as i32, b as i32)).or_insert(h);
+                    }
                     loaded.push(v.to_string());
                 }
             }
