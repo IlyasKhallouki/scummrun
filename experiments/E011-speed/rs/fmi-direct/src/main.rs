@@ -131,9 +131,11 @@ const GO_ROOMS: usize = 6;
 const GO_HOPS: usize = 14;
 /// Floor clicks a walk may make in one room to bring a thing onto the screen.
 const GO_SCROLLS: usize = 8;
-/// Half-made stops clicked on from in one round of one fork, at most: where a room makes one of every verb and thing
-/// (it drops the sentence and shows it), the round stays a round. The shallow ones come first.
-const MAX_MIDS: usize = 150;
+/// Half-made stops clicked on from in one round, at most: where a room makes one of every verb and thing (it drops
+/// the sentence and shows it), the round stays a round. The shallow ones come first. Those that come of a page of
+/// the interface are counted apart, so the stops of the first page cannot use up the count before a later page's
+/// are made (a late stop of Part I has about 120 with three pages).
+const MAX_MIDS: usize = 300;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
@@ -298,6 +300,8 @@ struct Cfg {
     batch: usize,
     /// the stops expanded at once (0: workers / slices)
     at_once: usize,
+    /// the half-made stops clicked on from in one round, at most (MAX_MIDS; DIRECT_MAX_MIDS for a measurement)
+    max_mids: usize,
 }
 
 static DIRS: AtomicU64 = AtomicU64::new(0);
@@ -568,23 +572,24 @@ fn name_of(pre: &str, clicks: &[Point]) -> String {
 enum Act {
     /// a verb's slot at the round's stop left this interface
     Gave(Hit, u64),
-    /// a click that changed only what the interface shows: the page variables it changed, whether it is a page, the
-    /// stop it left and the slots shown before it
-    Shows { hit: Hit, page: bool, vd: Vec<Key>, cand: MidCand, before: Arc<HashSet<(i32, i32, String)>> },
+    /// a click that changed only what the interface shows: whether it is a page, the stop it left and the slots shown
+    /// before it
+    Shows { hit: Hit, page: bool, cand: MidCand, before: Arc<HashSet<(i32, i32, String)>> },
     /// a sentence half made (`always`: its key is noted even at the last depth)
     Half { cand: MidCand, only: Option<Arc<HashSet<(i32, i32, String)>>>, always: bool },
     /// a window
     Window(Cand),
 }
 
-/// A stop that may be clicked on from: its engine and clicks, and its identity in the round (`mid_key`'s parts).
+/// A stop that may be clicked on from: its engine and clicks, and its identity in the round (what the interface
+/// shows and the running scripts' locals).
 struct MidCand {
     engine: Box<dyn Engine>,
     clicks: Vec<Point>,
     events: Vec<Event>,
     iface: u64,
     base: u64,
-    vars: Facts,
+    paged: bool,
 }
 
 /// What the scripts are LEAD and LEAD + CALM frames on from a stop with no input, and the facts there.
@@ -651,6 +656,7 @@ struct MidAt {
     events: Vec<Event>,
     iface: u64,
     only: Option<Arc<HashSet<(i32, i32, String)>>>,
+    paged: bool,
 }
 
 /// A stop inside a sentence being composed: its engine (None: the round's own), and the clicks that led to it.
@@ -664,6 +670,8 @@ struct Mid {
     /// before it. From such a stop only the slots that changed are clicked, and the slots that start a sentence;
     /// from the sentence only those that changed
     only: Option<Arc<HashSet<(i32, i32, String)>>>,
+    /// a page of the interface is among its clicks
+    paged: bool,
 }
 
 /// A stop that is a window (the module's text, "After an input"): its engine, its round's name, its events, the keys
@@ -795,26 +803,6 @@ impl Out {
     }
 }
 
-/// A half-made stop's identity in a round: its interface and scripts' locals (`base`), and the values of the
-/// variables a page of the interface was seen to change.
-fn mid_key(base: u64, vars: &Facts, pvars: &[Key]) -> u64 {
-    if pvars.is_empty() {
-        return base;
-    }
-    let mut h = DefaultHasher::new();
-    (base, pvars.iter().map(|k| vars.val(*k)).collect::<Vec<Val>>()).hash(&mut h);
-    h.finish()
-}
-
-/// Whether the round has not seen this half-made stop yet; it is noted with its variables.
-fn see(seen: &mut HashSet<u64>, list: &mut Vec<(u64, Facts)>, base: u64, facts: &Facts, pvars: &[Key]) -> bool {
-    let fresh = seen.insert(mid_key(base, facts, pvars));
-    if fresh {
-        list.push((base, Facts(facts.iter().filter(|p| p.0.kind() == K_VAR).copied().collect())));
-    }
-    fresh
-}
-
 /// A line on stderr when DIRECT_TRACE is set (a measurement aid).
 fn trace(text: &str) {
     if std::env::var_os("DIRECT_TRACE").is_some() {
@@ -858,18 +846,13 @@ fn clicks(
         (r.iface, v).hash(&mut h);
         h.finish()
     };
-    // and the values of the variables that a slot's click changed while it changed nothing else (a page of slots that
-    // show no text: what they hold is not in what the interface shows). The list grows in the round; the stops seen
-    // are kept with their variables, for their keys under the longer list
-    let mut pvars: Vec<Key> = Vec::new();
-    let mut mids_here = 0usize;
+    // (those no page led to, those a page led to)
+    let mut mids_here = [0usize; 2];
     // (a trace: the round's trials by the first click they began with)
     let tracing = std::env::var_os("DIRECT_TRACE").is_some();
     let mut by_first: HashMap<String, u64> = HashMap::new();
-    let mut seen_mid: HashSet<u64> = HashSet::new();
-    let mut seen_list: Vec<(u64, Facts)> = Vec::new();
-    see(&mut seen_mid, &mut seen_list, mkey(&r0), &r0.facts, &pvars);
-    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None }];
+    let mut seen_mid: HashSet<u64> = HashSet::from([mkey(&r0)]);
+    let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None, paged: false }];
     // the stops that are windows (the module's text, "After an input"), MAX_WINDOWS of them at most
     let mut found = 0;
     // the twin: a copy of the round's stop to fork it from, and its world at the frames asked
@@ -890,7 +873,6 @@ fn clicks(
         let mut acts: Vec<Act> = Vec::new();
         let mut by_first: HashMap<String, u64> = HashMap::new();
         let mut twin: Option<Box<dyn Engine>> = None;
-        let vars_of = |f: &Facts| Facts(f.iter().filter(|p| p.0.kind() == K_VAR).copied().collect());
         {
             let o = me.obs(&NAMES)?;
             let shown: Arc<HashSet<(i32, i32, String)>> = Arc::new(o.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect());
@@ -913,15 +895,15 @@ fn clicks(
                     v.extend(of.targets.iter().copied());
                     v
                 }
-                // after an interface-only click: the slots that changed (a slot that shows no text is taken as
-                // changed: what it holds cannot be read); at the round's depth also the slots that start a sentence
-                // and those that change the interface again
+                // after an interface-only click: the slots that changed (a slot whose image another slot showed
+                // before is the same thing in another place, and no change); at the round's depth also the slots
+                // that start a sentence and those that change the interface again
                 Some(before) => of
                     .verbs
                     .iter()
                     .filter(|p| match p.hit {
                         Hit::Verb { slot, id } => {
-                            shown.iter().any(|x| x.0 == slot && x.1 == id && (x.2.is_empty() || !before.contains(x)))
+                            shown.iter().any(|x| x.0 == slot && x.1 == id && if x.2.starts_with('#') { !before.iter().any(|b| b.2 == x.2) } else { !before.contains(x) })
                                 || (depth == 1 && (first_gave.contains_key(&p.hit) || shifters.contains(&p.hit)))
                         }
                         _ => false,
@@ -1014,19 +996,7 @@ fn clicks(
                     // no input at the same frame: a room moves by itself (a juggler, a fire), and that is not the
                     // click's doing
                     let world_same = |x: &Obs, w: &Option<Facts>| w.as_ref().is_some_and(|w| !w.diff(&facts_of(x)).iter().any(|d| world_kind(d.0)));
-                    // a page of slots that show no text: at the round's depth a slot's click that left no text of
-                    // the interface another (no verb, no sentence) and two or more variables other than they are
-                    // with no input
-                    let slot = depth == 1 && matches!(p.hit, Hit::Verb { .. }) && {
-                        let texts = |v: &[Verb]| -> Vec<(i32, i32, String)> {
-                            let mut t: Vec<(i32, i32, String)> = v.iter().filter_map(|x| x.name.clone().filter(|n| !n.is_empty()).map(|n| (x.slot, x.id, n))).collect();
-                            t.sort_unstable();
-                            t
-                        };
-                        texts(&ob.verbs) == texts(&o.verbs)
-                    };
-                    let mut shows = !half3 && early.idle.is_some() && ob.ego_pos == mego && (slot || iface(&ob) != m.iface);
-                    let mut vd: Vec<Key> = Vec::new();
+                    let mut shows = !half3 && early.idle.is_some() && ob.ego_pos == mego && iface(&ob) != m.iface;
                     let mut half = half3;
                     if half3 || shows {
                         // and no script is anywhere else than with no input at all: a dialog's line clears the
@@ -1054,15 +1024,7 @@ fn clicks(
                             g.clone().unwrap()
                         });
                         let still = qv.as_ref().is_some_and(|q| q.0 == scripts_of(&ob));
-                        if shows && slot {
-                            if let Some(w) = qv.as_ref().and_then(|q| q.2.as_ref()) {
-                                vd = w.diff(&facts_of(&ob)).into_iter().filter(|d| d.0.kind() == K_VAR).map(|d| d.0).collect();
-                            }
-                        }
-                        if vd.len() < 2 {
-                            vd.clear();
-                        }
-                        shows = shows && still && (iface(&ob) != m.iface || !vd.is_empty()) && qv.as_ref().is_some_and(|q| world_same(&ob, &q.2));
+                        shows = shows && still && qv.as_ref().is_some_and(|q| world_same(&ob, &q.2));
                         half = half3 && still;
                     }
                     if !half3 || half {
@@ -1098,11 +1060,15 @@ fn clicks(
                             let mut slots: Vec<i32> = now.symmetric_difference(&shown).map(|x| x.0).collect();
                             slots.sort_unstable();
                             slots.dedup();
-                            let page = slots.len() >= 2 || !vd.is_empty();
-                            trace(&format!("    shows {} depth {depth} ({} slots changed, {} variables)", r.name, slots.len(), vd.len()));
-                            let before = m.only.clone().unwrap_or_else(|| shown.clone());
-                            let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events };
-                            acts.push(Act::Shows { hit: p.hit, page, vd, cand, before });
+                            let page = slots.len() >= 2;
+                            trace(&format!("    shows {} depth {depth} ({} slots changed)", r.name, slots.len()));
+                            // (the slots shown before it: on this stop and, where pages led to it, on those before)
+                            let before = match &m.only {
+                                Some(b) => Arc::new(b.union(&shown).cloned().collect()),
+                                None => shown.clone(),
+                            };
+                            let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events, paged: m.paged };
+                            acts.push(Act::Shows { hit: p.hit, page, cand, before });
                             return Ok(PointOut { out, acts, learned, first });
                         }
                         if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
@@ -1114,7 +1080,7 @@ fn clicks(
                         }
                         // a sentence begun after a page of the interface goes on at the slots that changed
                         let only = if depth == 1 { m.only.clone() } else { None };
-                        let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events };
+                        let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events, paged: m.paged };
                         acts.push(Act::Half { cand, only, always: false });
                         return Ok(PointOut { out, acts, learned, first });
                     }
@@ -1161,7 +1127,7 @@ fn clicks(
                             }
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
                             // line, not a verb's slot): a stop like any other, too
-                            let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events.clone() };
+                            let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events.clone(), paged: m.paged };
                             acts.push(Act::Half { cand, only: None, always: true });
                             out.results.push(slim(r, base));
                             return Ok(PointOut { out, acts, learned, first });
@@ -1282,6 +1248,8 @@ fn clicks(
         }
     };
     let threads = cfg.slices.max(1);
+    let max_mids = cfg.max_mids;
+    let named = |c: &[Point]| c.iter().map(|x| x.hit.name()).collect::<String>();
     for depth in 1..=MAX_CLICKS {
         let mut next: Vec<Mid> = Vec::new();
         let mut work: VecDeque<Mid> = frontier.into_iter().collect();
@@ -1290,7 +1258,7 @@ fn clicks(
             // of the stop before it; at the second the first stop teaches which slots to skip
             let n = if threads == 1 || depth == 1 || (depth == 2 && skip.is_none()) { 1 } else { work.len() };
             let (group, mut engines): (Vec<MidAt>, Vec<Option<Box<dyn Engine>>>) =
-                work.drain(..n).map(|m| (MidAt { clicks: m.clicks, events: m.events, iface: m.iface, only: m.only }, m.engine)).unzip();
+                work.drain(..n).map(|m| (MidAt { clicks: m.clicks, events: m.events, iface: m.iface, only: m.only, paged: m.paged }, m.engine)).unzip();
             let tg = Instant::now();
             let outs: Vec<EResult<MidOut>> = if n == 1 {
                 let r = match engines[0].as_mut() {
@@ -1350,41 +1318,35 @@ fn clicks(
                         Act::Gave(hit, i) => {
                             first_gave.insert(hit, i);
                         }
-                        Act::Shows { hit, page, vd, cand, before } => {
-                            if !vd.is_empty() {
-                                let n = pvars.len();
-                                pvars.extend(vd.iter().copied());
-                                pvars.sort_unstable();
-                                pvars.dedup();
-                                if pvars.len() != n {
-                                    seen_mid = seen_list.iter().map(|(b, f)| mid_key(*b, f, &pvars)).collect();
-                                }
-                            }
+                        Act::Shows { hit, page, cand, before } => {
                             // a page of the interface from the round's stop: clicked on from at the same depth, at
                             // the slots that changed. Else the start or the middle of a sentence
                             if page && depth == 1 {
                                 shifters.insert(hit);
-                                if see(&mut seen_mid, &mut seen_list, cand.base, &cand.vars, &pvars) && mids_here < MAX_MIDS {
-                                    mids_here += 1;
+                                if seen_mid.insert(cand.base) && mids_here[1] < max_mids {
+                                    mids_here[1] += 1;
                                     out.mids += 1;
-                                    work.push_back(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only: Some(before) });
+                                    trace(&format!("    mid {} depth {depth} page", named(&cand.clicks)));
+                                    work.push_back(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only: Some(before), paged: true });
                                 } else {
                                     cand.engine.quit();
                                 }
-                            } else if !page && depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, cand.base, &cand.vars, &pvars) && mids_here < MAX_MIDS {
-                                mids_here += 1;
+                            } else if !page && depth < MAX_CLICKS && seen_mid.insert(cand.base) && mids_here[cand.paged as usize] < max_mids {
+                                mids_here[cand.paged as usize] += 1;
                                 out.mids += 1;
-                                next.push(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only: None });
+                                trace(&format!("    mid {} depth {depth} shows", named(&cand.clicks)));
+                                next.push(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only: None, paged: cand.paged });
                             } else {
                                 cand.engine.quit();
                             }
                         }
                         Act::Half { cand, only, always } => {
-                            let fresh = (always || depth < MAX_CLICKS) && see(&mut seen_mid, &mut seen_list, cand.base, &cand.vars, &pvars);
-                            if depth < MAX_CLICKS && fresh && mids_here < MAX_MIDS {
-                                mids_here += 1;
+                            let fresh = (always || depth < MAX_CLICKS) && seen_mid.insert(cand.base);
+                            if depth < MAX_CLICKS && fresh && mids_here[cand.paged as usize] < max_mids {
+                                mids_here[cand.paged as usize] += 1;
                                 out.mids += 1;
-                                next.push(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only });
+                                trace(&format!("    mid {} depth {depth} {}", named(&cand.clicks), if always { "settled" } else { "half" }));
+                                next.push(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only, paged: cand.paged });
                             } else {
                                 cand.engine.quit();
                             }
@@ -2489,6 +2451,9 @@ fn verify(nodes: &str, id: u64, out: &Path, keys: &str) {
 }
 
 fn main() {
+    // an image verb's name is its image's hash (engine svm-e027; an engine without it shows no name for one, and a
+    // page of images is then not seen)
+    std::env::set_var("SPEEDRUN_VERB_IMAGES", "1");
     let a: Vec<String> = std::env::args().skip(1).collect();
     let opt = |k: &str| a.iter().position(|x| x == k).and_then(|i| a.get(i + 1)).cloned();
     if a.first().map(String::as_str) == Some("forkbench") {
@@ -2650,6 +2615,7 @@ fn main() {
         slices: opt("--slices").map(|v| v.parse().unwrap()).unwrap_or(1),
         batch: opt("--batch").map(|v| v.parse().unwrap()).unwrap_or(BATCH),
         at_once: opt("--at-once").map(|v| v.parse().unwrap()).unwrap_or(0),
+        max_mids: std::env::var("DIRECT_MAX_MIDS").ok().and_then(|v| v.parse().ok()).unwrap_or(MAX_MIDS),
     };
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let root_events = if a.iter().any(|x| x == "--no-skips") {

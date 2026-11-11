@@ -110,7 +110,8 @@ impl HostCfg {
         // passed to every engine when set in this process's environment (an engine with the E014 patch).
         // E024 (plan.md Part 2, item 8): the segment's start frame (SPEEDRUN_START_FRAME, patch 0001) and var 19's
         // required value (SPEEDRUN_TIMER_NEXT), so skips run from boot; extra_env goes on after TIMER_NEXT=any (spawn)
-        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE", "SPEEDRUN_START_FRAME", "SPEEDRUN_TIMER_NEXT"] {
+        // E027: an image verb's name is its image's hash (SPEEDRUN_VERB_IMAGES=1, engine svm-e027)
+        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE", "SPEEDRUN_START_FRAME", "SPEEDRUN_TIMER_NEXT", "SPEEDRUN_VERB_IMAGES"] {
             if let Some(v) = std::env::var(k).ok().filter(|v| !v.is_empty()) {
                 extra_env.push((k.to_string(), v));
             }

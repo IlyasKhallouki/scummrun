@@ -5,12 +5,14 @@
 # machine: the digest of the kept stops says whether a change altered what the search does, the seconds what it
 # costs. Monkey Island only; the rungs file is read to report, as in every run.
 #   bench.sh BIN OUT [WORKERS=4] [STOPS=7] [REFS="p7top cake crew meathook boot"]
-#   SLICES=S in the environment: the round dealt to S forks (1: one fork, the round as it is defined)
+#   SLICES=S in the environment: S threads for one stop's round (1: one thread)
+#   ENGINE=PATH: another engine binary than env.sh's; EXTRA="K=V ...": more settings for the engine or the search
 set -e
 BIN=$1; OUT=$2; W=${3:-4}; N=${4:-7}; REFS=${5:-"p7top cake crew meathook boot"}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); ROOT=$(cd "$HERE/../../.." && pwd); RES=$ROOT/experiments/E027-direct/results
-source "$ROOT/experiments/E026-part1/run/env.sh"
+source "$HERE/env.sh"
 ulimit -n 65536 2>/dev/null || true
+[ -n "${ENGINE:-}" ] && export FMI_ENGINE_BIN=$ENGINE
 cd "$ROOT"
 for ref in $REFS; do
   case $ref in
@@ -22,8 +24,8 @@ for ref in $REFS; do
     *) echo "unknown reference $ref"; exit 2;;
   esac
   O=$OUT/$ref; rm -rf "$O"; mkdir -p "$O"
-  env $ON $MI "$BIN" "$O" --minutes 60 --stops $N --workers $W --slices ${SLICES:-1} --batch 1 --at-once 1 \
-    --guide $HOME/.cache/fast-mi-e026/size-cost/guide-part1.json --rungs experiments/E011-speed/rs/fmi-checks/rungs/rungs-part1.json \
+  env $ON $MI ${EXTRA:-} "$BIN" "$O" --minutes 60 --stops $N --workers $W --slices ${SLICES:-1} --batch 1 --at-once 1 \
+    --guide $GUIDE27 --rungs $RUNGS27 ${WATCH:+--watch $WATCH} \
     --lines gains --flag-lines --go $FROM > "$O/out.txt" 2> "$O/err.txt" || { echo "$ref: the run failed"; tail -3 "$O/err.txt"; continue; }
   rm -rf "$O/eng"
   python3 - "$ref" "$O" <<'PY'
@@ -37,7 +39,9 @@ for l in open(f"{O}/nodes.jsonl"):
     if d["id"] == 0: continue  # the run's first stop (in the file since the stops hold their own events only)
     h.update(repr((d["id"], d["parent"], d["how"], d["room"], d["level"], d["class"], d["frame"])).encode()); n += 1
 t = s["trial_seconds"]; b = s.get("batch_seconds", {})
-print(f'{ref:9s} stops {s["expanded"]:3d} trials {s["trials"]:7d} kept {n:5d} digest {h.hexdigest()[:10]} | wall {s["seconds"]:6.1f} s'
+mids = [json.loads(l)["mids"] for l in open(f"{O}/offers.jsonl")]
+held = "".join(f' {w["key"]}={w["value"]}@{w["seconds"]:.0f}s' for w in s.get("watch", []) if w["node"] is not None)
+print(f'{ref:9s} stops {s["expanded"]:3d} trials {s["trials"]:7d} kept {n:5d} digest {h.hexdigest()[:10]} mids max {max(mids) if mids else 0:3d}{held} | wall {s["seconds"]:6.1f} s'
       f' explore {b.get("explore", 0):6.1f} commit {b.get("commit", 0):5.1f} engines {b.get("engines", 0):4.1f}'
       f' | trial s: fork {t["fork"]:6.1f} run {t["run"]:6.1f} read {t["read"]:5.1f} inputs {t["inputs"]:5.1f} quit {t["quit"]:4.1f}')
 PY
