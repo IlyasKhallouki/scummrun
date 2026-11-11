@@ -499,6 +499,84 @@ fn name_of(pre: &str, clicks: &[Point]) -> String {
     format!("{pre}{}", clicks.iter().map(|p| p.hit.name()).collect::<String>())
 }
 
+/// What one half-made stop's clicks leave for the round to decide, in the clicks' order (`clicks`): the round keeps
+/// one list of the half-made stops it has seen, and that list is read and written in the round's order only.
+enum Act {
+    /// a verb's slot at the round's stop left this interface
+    Gave(Hit, u64),
+    /// a click that changed only what the interface shows: the page variables it changed, whether it is a page, the
+    /// stop it left and the slots shown before it
+    Shows { hit: Hit, page: bool, vd: Vec<Key>, cand: MidCand, before: Arc<HashSet<(i32, i32, String)>> },
+    /// a sentence half made (`always`: its key is noted even at the last depth)
+    Half { cand: MidCand, only: Option<Arc<HashSet<(i32, i32, String)>>>, always: bool },
+    /// a window
+    Window(Cand),
+}
+
+/// A stop that may be clicked on from: its engine and clicks, and its identity in the round (`mid_key`'s parts).
+struct MidCand {
+    engine: Box<dyn Engine>,
+    clicks: Vec<Point>,
+    events: Vec<Event>,
+    iface: u64,
+    base: u64,
+    vars: Facts,
+}
+
+/// One half-made stop's clicks: the trials' results, what is left to the round, the slots it learned to skip (the
+/// first stop of the second depth), a trace's counts.
+struct MidOut {
+    out: Out,
+    acts: Vec<Act>,
+    learned: Option<HashSet<Hit>>,
+    by_first: HashMap<String, u64>,
+}
+
+/// The twin of a round: a copy of the round's stop that takes no input, to fork from, and its world at the frames
+/// asked so far. The stops of a round worked on side by side each run a fork of their own.
+struct Twins {
+    src: Mutex<Option<Box<dyn Engine>>>,
+    at: Mutex<HashMap<u64, Option<Facts>>>,
+}
+
+impl Twins {
+    /// The world of the round's stop run to frame `f` with no input (None: no twin, or its run ended before).
+    fn world(&self, twin: &mut Option<Box<dyn Engine>>, f: u64) -> EResult<Option<Facts>> {
+        if let Some(w) = self.at.lock().unwrap().get(&f) {
+            return Ok(w.clone());
+        }
+        if twin.as_ref().map_or(true, |t| t.status().frame > f) {
+            if let Some(t) = twin.take() {
+                t.quit();
+            }
+            match self.src.lock().unwrap().as_mut() {
+                Some(src) => *twin = Some(src.fork()?),
+                None => return Ok(None),
+            }
+        }
+        let t = twin.as_mut().unwrap();
+        let alive = t.status().frame == f || go(t, RunSpec { frame: Some(f), ..Default::default() })?.is_ok();
+        let w = if alive {
+            Some(Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()))
+        } else {
+            if let Some(t) = twin.take() {
+                t.quit();
+            }
+            None
+        };
+        self.at.lock().unwrap().insert(f, w.clone());
+        Ok(w)
+    }
+}
+
+/// A half-made stop without its engine: what a thread other than the engine's may read of it.
+struct MidAt {
+    clicks: Vec<Point>,
+    events: Vec<Event>,
+    iface: u64,
+    only: Option<Arc<HashSet<(i32, i32, String)>>>,
+}
+
 /// A stop inside a sentence being composed: its engine (None: the round's own), and the clicks that led to it.
 struct Mid {
     engine: Option<Box<dyn Engine>>,
@@ -616,37 +694,6 @@ fn trace(text: &str) {
     }
 }
 
-/// The world of the round's stop run to frame `f` with no input (None: its run ended before): from the cache, or
-/// from the twin run on, or from a new fork of `src` when the twin stands past `f`.
-fn twin_world(
-    src: &mut Box<dyn Engine>,
-    twin: &mut Option<Box<dyn Engine>>,
-    cache: &mut HashMap<u64, Option<Facts>>,
-    f: u64,
-) -> EResult<Option<Facts>> {
-    if let Some(w) = cache.get(&f) {
-        return Ok(w.clone());
-    }
-    if twin.as_ref().map_or(true, |t| t.status().frame > f) {
-        if let Some(t) = twin.take() {
-            t.quit();
-        }
-        *twin = Some(src.fork()?);
-    }
-    let t = twin.as_mut().unwrap();
-    let alive = t.status().frame == f || go(t, RunSpec { frame: Some(f), ..Default::default() })?.is_ok();
-    let w = if alive {
-        Some(Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()))
-    } else {
-        if let Some(t) = twin.take() {
-            t.quit();
-        }
-        None
-    };
-    cache.insert(f, w.clone());
-    Ok(w)
-}
-
 /// A point where the pointer is over no verb, object or actor, by the engine's hit test at this stop.
 fn park_point(e: &mut Box<dyn Engine>) -> EResult<Option<(i32, i32)>> {
     let (w, h) = (afford::SCREEN_W, afford::SCREEN_H);
@@ -663,7 +710,6 @@ fn clicks(
     motion: Option<&HashSet<Key>>,
     carry: &[(Key, Val)],
     lown: &HashSet<u64>,
-    part: (usize, usize),
     snap: &Snap<'_>,
     cfg: &Cfg,
     out: &mut Out,
@@ -688,16 +734,17 @@ fn clicks(
     // are kept with their variables, for their keys under the longer list
     let mut pvars: Vec<Key> = Vec::new();
     let mut mids_here = 0usize;
+    // (a trace: the round's trials by the first click they began with)
+    let tracing = std::env::var_os("DIRECT_TRACE").is_some();
+    let mut by_first: HashMap<String, u64> = HashMap::new();
     let mut seen_mid: HashSet<u64> = HashSet::new();
     let mut seen_list: Vec<(u64, Facts)> = Vec::new();
     see(&mut seen_mid, &mut seen_list, mkey(&r0), &r0.facts, &pvars);
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None }];
     // the stops that are windows (the module's text, "After an input"), MAX_WINDOWS of them at most
     let mut found = 0;
-    // the twin: a copy of the round's stop to fork it from, the fork run on, and its world at the frames asked
-    let mut twin_src: Option<Box<dyn Engine>> = if motion.is_some() { Some(e.fork()?) } else { None };
-    let mut twin: Option<Box<dyn Engine>> = None;
-    let mut twin_at: HashMap<u64, Option<Facts>> = HashMap::new();
+    // the twin: a copy of the round's stop to fork it from, and its world at the frames asked
+    let twins = Twins { src: Mutex::new(if motion.is_some() { Some(e.fork()?) } else { None }), at: Mutex::new(HashMap::new()) };
     // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
     // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
     // verb), or gave that stop again (it does nothing)
@@ -705,15 +752,17 @@ fn clicks(
     let mut skip: Option<HashSet<Hit>> = None;
     // the slots whose click from the round's stop changed only what the interface shows
     let mut shifters: HashSet<Hit> = HashSet::new();
-    for depth in 1..=MAX_CLICKS {
-        let mut next: Vec<Mid> = Vec::new();
-        let mut work: VecDeque<Mid> = frontier.into_iter().collect();
-        while let Some(mut m) = work.pop_front() {
-            let own = m.engine.is_none();
-            let me: &mut Box<dyn Engine> = match m.engine.as_mut() {
-                Some(x) => x,
-                None => &mut *e,
-            };
+    // One half-made stop's clicks (the round's stop is the first of them): every trial from it. It reads the round's
+    // lists and writes none: what the round decides (which stops are clicked on from, which windows are followed,
+    // what the slots teach) is left in `acts`, in the clicks' order. So stops that no stop before them in the round's
+    // order can change are worked on side by side, and the round is what it is with one thread.
+    let task = |me: &mut Box<dyn Engine>, m: &MidAt, depth: usize, skip: &Option<HashSet<Hit>>, shifters: &HashSet<Hit>, first_gave: &HashMap<Hit, u64>| -> EResult<MidOut> {
+        let mut out = Out::default();
+        let mut acts: Vec<Act> = Vec::new();
+        let mut by_first: HashMap<String, u64> = HashMap::new();
+        let mut twin: Option<Box<dyn Engine>> = None;
+        let vars_of = |f: &Facts| Facts(f.iter().filter(|p| p.0.kind() == K_VAR).copied().collect());
+        {
             let o = me.obs(&NAMES)?;
             let shown: Arc<HashSet<(i32, i32, String)>> = Arc::new(o.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect());
             let of = afford::offer_cfg(me, &o, false, true)?;
@@ -766,21 +815,7 @@ fn clicks(
                     }
                 }
             }
-            // this fork's share of the round's first clicks; the other forks' slots are clicked too, only for what
-            // the click teaches (the interface it leaves): no stop and no sentence comes of them here
-            let mut shadows: Vec<bool> = vec![false; points.len()];
-            if own && part.1 > 1 {
-                let all = std::mem::take(&mut points);
-                shadows.clear();
-                for (j, p) in all.into_iter().enumerate() {
-                    let share = j % part.1 == part.0;
-                    if share || matches!(p.hit, Hit::Verb { .. }) {
-                        points.push(p);
-                        shadows.push(!share);
-                    }
-                }
-            }
-            for (p, &shadow) in points.iter().zip(shadows.iter()) {
+            for p in points.iter() {
                 if depth >= 2 && (skip.as_ref().is_some_and(|s| s.contains(&p.hit)) || shifters.contains(&p.hit)) {
                     out.skipped += 1;
                     continue;
@@ -797,6 +832,9 @@ fn clicks(
                     events.push(Event { frame: mf + 2, what: Input::Move(x, y) });
                 }
                 out.trials += 1;
+                if tracing {
+                    *by_first.entry(cl[0].hit.name()).or_default() += 1;
+                }
                 match b.inputs(&events[m.events.len()..]) {
                     Ok(()) => {}
                     Err(EngineError::Bridge(_)) => {
@@ -920,69 +958,24 @@ fn clicks(
                             slots.dedup();
                             let page = slots.len() >= 2 || !vd.is_empty();
                             trace(&format!("    shows {} depth {depth} ({} slots changed, {} variables)", r.name, slots.len(), vd.len()));
-                            if !vd.is_empty() {
-                                let n = pvars.len();
-                                pvars.extend(vd.iter().copied());
-                                pvars.sort_unstable();
-                                pvars.dedup();
-                                if pvars.len() != n {
-                                    seen_mid = seen_list.iter().map(|(b, f)| mid_key(*b, f, &pvars)).collect();
-                                }
-                            }
-                            if shadow {
-                                if page && m.only.is_none() {
-                                    shifters.insert(p.hit);
-                                }
-                                see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
-                                b.quit();
-                                continue;
-                            }
-                            if page && depth == 1 {
-                                shifters.insert(p.hit);
-                                if see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) && mids_here < MAX_MIDS {
-                                    mids_here += 1;
-                                    out.mids += 1;
-                                    let before = m.only.clone().unwrap_or_else(|| shown.clone());
-                                    work.push_back(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: Some(before) });
-                                } else {
-                                    b.quit();
-                                }
-                            } else if !page && depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) && mids_here < MAX_MIDS {
-                                mids_here += 1;
-                                out.mids += 1;
-                                next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only: None });
-                            } else {
-                                b.quit();
-                            }
+                            let before = m.only.clone().unwrap_or_else(|| shown.clone());
+                            let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events };
+                            acts.push(Act::Shows { hit: p.hit, page, vd, cand, before });
                             continue;
                         }
                         if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                             if depth == 1 {
-                                first_gave.insert(p.hit, r.iface);
+                                acts.push(Act::Gave(p.hit, r.iface));
                             } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
                                 learned.insert(p.hit);
                             }
                         }
-                        if shadow {
-                            see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
-                            b.quit();
-                            continue;
-                        }
-                        if depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars) && mids_here < MAX_MIDS {
-                            mids_here += 1;
-                            out.mids += 1;
-                            // a sentence begun after a page of the interface goes on at the slots that changed
-                            let only = if depth == 1 { m.only.clone() } else { None };
-                            next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events, only });
-                        } else {
-                            b.quit();
-                        }
+                        // a sentence begun after a page of the interface goes on at the slots that changed
+                        let only = if depth == 1 { m.only.clone() } else { None };
+                        let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events };
+                        acts.push(Act::Half { cand, only, always: false });
                         continue;
                     }
-                }
-                if shadow {
-                    b.quit();
-                    continue;
                 }
                 if !ran_on {
                     if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
@@ -1013,36 +1006,28 @@ fn clicks(
                         let half = half
                             || (matches!(p.hit, Hit::Verb { .. }) && r.room == r0.room && ob.ego_pos == mego && r.st.idle.as_deref() == Some("sentence") && r.iface != m.iface && {
                                 let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
-                                match twin_src.as_mut() {
-                                    Some(src) => twin_world(src, &mut twin, &mut twin_at, r.st.frame)?.is_some_and(|tw| tw.diff(&mine).is_empty()),
-                                    None => false,
-                                }
+                                twins.world(&mut twin, r.st.frame)?.is_some_and(|tw| tw.diff(&mine).is_empty())
                             });
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
                             if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                                 if depth == 1 {
-                                    first_gave.insert(p.hit, r.iface);
+                                    acts.push(Act::Gave(p.hit, r.iface));
                                 } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
                                     learned.insert(p.hit);
                                 }
                             }
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
                             // line, not a verb's slot): a stop like any other, too
-                            let fresh = see(&mut seen_mid, &mut seen_list, mkey(&r), &r.facts, &pvars);
-                            if depth < MAX_CLICKS && fresh && mids_here < MAX_MIDS {
-                                mids_here += 1;
-                                out.mids += 1;
-                                next.push(Mid { engine: Some(b), clicks: cl, iface: r.iface, events: r.events.clone(), only: None });
-                                out.results.push(r);
-                                continue;
-                            }
+                            let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events.clone() };
+                            acts.push(Act::Half { cand, only: None, always: true });
                             out.results.push(r);
+                            continue;
                         } else {
                             // what the input changed: the stop against the twin at its frame (each with its old value)
                             let mut touched: Vec<(Key, Val)> = Vec::new();
-                            if let (Some(src), true) = (twin_src.as_mut(), r.room == r0.room) {
-                                if let Some(tw) = twin_world(src, &mut twin, &mut twin_at, r.st.frame)? {
+                            if r.room == r0.room {
+                                if let Some(tw) = twins.world(&mut twin, r.st.frame)? {
                                     let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
                                     touched = tw
                                         .diff(&mine)
@@ -1077,13 +1062,13 @@ fn clicks(
                                 }
                                 pb.quit();
                             }
-                            if !back.is_empty() && found < MAX_WINDOWS {
+                            if !back.is_empty() {
                                 // a window, while one of its keys was followed from this cell fewer than
-                                // WINDOW_TRIES times: for the stop's expansion to follow
+                                // WINDOW_TRIES times: for the stop's expansion to follow (the round's first
+                                // MAX_WINDOWS of them)
                                 let c = cell(r.room, r.iface, &snap.policy.world_of(&r.facts), snap.ambient);
                                 if back.iter().any(|&k| snap.wins.get(&(c, k)).copied().unwrap_or(0) < WINDOW_TRIES) {
-                                    found += 1;
-                                    out.cands.push(Cand { engine: b, name: format!("{}>", r.name), events: r.events.clone(), keys: touched.clone(), cell: c, back });
+                                    acts.push(Act::Window(Cand { engine: b, name: format!("{}>", r.name), events: r.events.clone(), keys: touched.clone(), cell: c, back }));
                                     out.results.push(r);
                                     continue;
                                 }
@@ -1098,11 +1083,135 @@ fn clicks(
                 b.quit();
                 out.phase[4] += t.elapsed().as_secs_f64();
             }
-            if learn {
-                skip = Some(learned);
+            if let Some(t) = twin.take() {
+                t.quit();
             }
-            if let Some(x) = m.engine.take() {
+            Ok(MidOut { out, acts, learned: learn.then_some(learned), by_first })
+        }
+    };
+    let threads = cfg.slices.max(1);
+    for depth in 1..=MAX_CLICKS {
+        let mut next: Vec<Mid> = Vec::new();
+        let mut work: VecDeque<Mid> = frontier.into_iter().collect();
+        while !work.is_empty() {
+            // side by side: the stops whose clicks no stop before them can change. At the first depth each page comes
+            // of the stop before it; at the second the first stop teaches which slots to skip
+            let n = if threads == 1 || depth == 1 || (depth == 2 && skip.is_none()) { 1 } else { work.len() };
+            let (group, mut engines): (Vec<MidAt>, Vec<Option<Box<dyn Engine>>>) =
+                work.drain(..n).map(|m| (MidAt { clicks: m.clicks, events: m.events, iface: m.iface, only: m.only }, m.engine)).unzip();
+            let outs: Vec<EResult<MidOut>> = if n == 1 {
+                let r = match engines[0].as_mut() {
+                    Some(x) => task(x, &group[0], depth, &skip, &shifters, &first_gave),
+                    None => task(&mut *e, &group[0], depth, &skip, &shifters, &first_gave),
+                };
+                vec![r]
+            } else {
+                let slots: Vec<Mutex<Option<Box<dyn Engine>>>> = engines.drain(..).map(Mutex::new).collect();
+                let res: Vec<Mutex<Option<EResult<MidOut>>>> = (0..n).map(|_| Mutex::new(None)).collect();
+                let at = AtomicUsize::new(0);
+                std::thread::scope(|sc| {
+                    for _ in 0..threads.min(n) {
+                        sc.spawn(|| loop {
+                            let i = at.fetch_add(1, Ordering::Relaxed);
+                            if i >= n {
+                                break;
+                            }
+                            let mut eng = slots[i].lock().unwrap().take().expect("a half-made stop's engine");
+                            let r = task(&mut eng, &group[i], depth, &skip, &shifters, &first_gave);
+                            eng.quit();
+                            *res[i].lock().unwrap() = Some(r);
+                        });
+                    }
+                });
+                res.into_iter().map(|x| x.into_inner().unwrap().expect("every stop of the group")).collect()
+            };
+            for x in engines.drain(..).flatten() {
                 x.quit();
+            }
+            // in the round's order: what each stop left for the round
+            let mut bad: Option<EngineError> = None;
+            for mo in outs {
+                let mo = match mo {
+                    Ok(mo) if bad.is_none() => mo,
+                    Ok(mo) => {
+                        for a in mo.acts {
+                            match a {
+                                Act::Shows { cand, .. } | Act::Half { cand, .. } => cand.engine.quit(),
+                                Act::Window(c) => c.engine.quit(),
+                                Act::Gave(..) => {}
+                            }
+                        }
+                        continue;
+                    }
+                    Err(x) => {
+                        bad = bad.or(Some(x));
+                        continue;
+                    }
+                };
+                for (k, v) in mo.by_first {
+                    *by_first.entry(k).or_default() += v;
+                }
+                for a in mo.acts {
+                    match a {
+                        Act::Gave(hit, i) => {
+                            first_gave.insert(hit, i);
+                        }
+                        Act::Shows { hit, page, vd, cand, before } => {
+                            if !vd.is_empty() {
+                                let n = pvars.len();
+                                pvars.extend(vd.iter().copied());
+                                pvars.sort_unstable();
+                                pvars.dedup();
+                                if pvars.len() != n {
+                                    seen_mid = seen_list.iter().map(|(b, f)| mid_key(*b, f, &pvars)).collect();
+                                }
+                            }
+                            // a page of the interface from the round's stop: clicked on from at the same depth, at
+                            // the slots that changed. Else the start or the middle of a sentence
+                            if page && depth == 1 {
+                                shifters.insert(hit);
+                                if see(&mut seen_mid, &mut seen_list, cand.base, &cand.vars, &pvars) && mids_here < MAX_MIDS {
+                                    mids_here += 1;
+                                    out.mids += 1;
+                                    work.push_back(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only: Some(before) });
+                                } else {
+                                    cand.engine.quit();
+                                }
+                            } else if !page && depth < MAX_CLICKS && see(&mut seen_mid, &mut seen_list, cand.base, &cand.vars, &pvars) && mids_here < MAX_MIDS {
+                                mids_here += 1;
+                                out.mids += 1;
+                                next.push(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only: None });
+                            } else {
+                                cand.engine.quit();
+                            }
+                        }
+                        Act::Half { cand, only, always } => {
+                            let fresh = (always || depth < MAX_CLICKS) && see(&mut seen_mid, &mut seen_list, cand.base, &cand.vars, &pvars);
+                            if depth < MAX_CLICKS && fresh && mids_here < MAX_MIDS {
+                                mids_here += 1;
+                                out.mids += 1;
+                                next.push(Mid { engine: Some(cand.engine), clicks: cand.clicks, iface: cand.iface, events: cand.events, only });
+                            } else {
+                                cand.engine.quit();
+                            }
+                        }
+                        Act::Window(c) => {
+                            if found < MAX_WINDOWS {
+                                found += 1;
+                                out.cands.push(c);
+                            } else {
+                                c.engine.quit();
+                            }
+                        }
+                    }
+                }
+                if let Some(l) = mo.learned {
+                    skip = Some(l);
+                }
+                out.absorb(mo.out);
+            }
+            if let Some(x) = bad {
+                return Err(x);
             }
         }
         frontier = next;
@@ -1112,70 +1221,25 @@ fn clicks(
             x.quit();
         }
     }
-    if let Some(t) = twin.take() {
+    if let Some(t) = twins.src.lock().unwrap().take() {
         t.quit();
     }
-    if let Some(t) = twin_src.take() {
-        t.quit();
+    if tracing && !by_first.is_empty() {
+        let mut v: Vec<(String, u64)> = by_first.into_iter().collect();
+        v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let all: u64 = v.iter().map(|x| x.1).sum();
+        trace(&format!("    {pre}: {all} trials by first click: {}", v.iter().take(12).map(|x| format!("{} {}", x.0, x.1)).collect::<Vec<_>>().join(", ")));
     }
     Ok(())
 }
 
-/// One round of inputs from the engine's stop (`clicks`), its first clicks dealt to `cfg.slices` forks of the stop
-/// side by side; their results one after the other, so a round is the same every time.
+/// One round of inputs from the engine's stop (`clicks`). Its half-made stops are worked on by `cfg.slices` threads
+/// side by side and read in the round's order, so a round is the same every time and with any number of threads.
 fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&HashSet<Key>>, carry: &[(Key, Val)], lown: &HashSet<u64>, snap: &Snap<'_>, cfg: &Cfg) -> EResult<Out> {
-    let n = cfg.slices.max(1);
-    if n == 1 {
-        let mut out = Out::default();
-        clicks(e, pre, lead, motion, carry, lown, (0, 1), snap, cfg, &mut out)?;
-        return Ok(out);
-    }
-    let mut forks: Vec<Box<dyn Engine>> = Vec::new();
-    for _ in 0..n {
-        match e.fork() {
-            Ok(f) => forks.push(f),
-            Err(x) => {
-                for f in forks {
-                    f.quit();
-                }
-                return Err(x);
-            }
-        }
-    }
-    let parts: Vec<EResult<Out>> = std::thread::scope(|sc| {
-        let hs: Vec<_> = forks
-            .into_iter()
-            .enumerate()
-            .map(|(i, mut f)| {
-                sc.spawn(move || {
-                    let mut out = Out::default();
-                    let r = clicks(&mut f, pre, lead, motion, carry, lown, (i, n), snap, cfg, &mut out);
-                    f.quit();
-                    match r {
-                        Ok(()) => Ok(out),
-                        Err(x) => {
-                            for c in out.cands {
-                                c.engine.quit();
-                            }
-                            Err(x)
-                        }
-                    }
-                })
-            })
-            .collect();
-        hs.into_iter().map(|h| h.join().expect("a round's part")).collect()
-    });
     let mut out = Out::default();
-    let mut bad = None;
-    for p in parts {
-        match p {
-            Ok(o) => out.absorb(o),
-            Err(x) => bad = Some(x),
-        }
-    }
-    match bad {
-        None => Ok(out),
-        Some(x) => {
+    match clicks(e, pre, lead, motion, carry, lown, snap, cfg, &mut out) {
+        Ok(()) => Ok(out),
+        Err(x) => {
             for c in out.cands {
                 c.engine.quit();
             }

@@ -5,6 +5,7 @@
 # machine: the digest of the kept stops says whether a change altered what the search does, the seconds what it
 # costs. Monkey Island only; the rungs file is read to report, as in every run.
 #   bench.sh BIN OUT [WORKERS=4] [STOPS=7] [REFS="p7top cake crew meathook boot"]
+#   SLICES=S in the environment: the round dealt to S forks (1: one fork, the round as it is defined)
 set -e
 BIN=$1; OUT=$2; W=${3:-4}; N=${4:-7}; REFS=${5:-"p7top cake crew meathook boot"}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); ROOT=$(cd "$HERE/../../.." && pwd); RES=$ROOT/experiments/E027-direct/results
@@ -21,7 +22,7 @@ for ref in $REFS; do
     *) echo "unknown reference $ref"; exit 2;;
   esac
   O=$OUT/$ref; rm -rf "$O"; mkdir -p "$O"
-  env $ON $MI "$BIN" "$O" --minutes 60 --stops $N --workers $W --slices $W --batch 1 --at-once 1 \
+  env $ON $MI "$BIN" "$O" --minutes 60 --stops $N --workers $W --slices ${SLICES:-1} --batch 1 --at-once 1 \
     --guide $HOME/.cache/fast-mi-e026/size-cost/guide-part1.json --rungs experiments/E011-speed/rs/fmi-checks/rungs/rungs-part1.json \
     --lines gains --flag-lines --go $FROM > "$O/out.txt" 2> "$O/err.txt" || { echo "$ref: the run failed"; tail -3 "$O/err.txt"; continue; }
   rm -rf "$O/eng"
