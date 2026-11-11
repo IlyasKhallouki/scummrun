@@ -112,3 +112,45 @@ gets a line in the notebook entry: what changed, why, the run's rungs and times.
 
 E026's route (the reading's wait fix, the landmarks, the kitchen gates, Run 1) is not continued while E027 runs.
 Its branches stay as they are: `e026` at 9a63b43, `e026-cost` at df6ea04, `e026-click` at e39925e.
+
+## Addendum 1 (2026-11-11, 18:05 UTC): before the next runs on the VM
+
+Written after vm28 and after the work on the laptop that followed it (the entry's sections from 16:10 UTC on), and
+before any run with that tree on the VM. The rules and the stop rule above stand.
+
+What changed since the runs that held P1-P12, in one line each (the entry has the measurements):
+
+- a round is one piece worked on by several threads, the same with any number of them; no shares of first clicks;
+- a page of the inventory is read from the slots' images (engine svm-e027, patch 0011), not guessed;
+- a stop's engine comes from the nearest kept engine on its way; no boot from the whole movie;
+- nodes.jsonl holds each stop's own events; a run writes its rung stops and its newest top stop as it goes;
+- `--go` takes the exits the scripts name as ways, and a walk that cannot go on leaves the stop where it stands;
+- `--shares`: the lines take turns (the newest every second turn, the next every fourth, and so on).
+
+Runs planned, each at most 2 hours on the VM, launched and read with `experiments/E027-direct/run/vm.sh`:
+
+1. **One run from boot**, `--lines gains --flag-lines --go --shares`. It is the run owed since vm11: the rungs so
+   far were held by a chain of eleven runs.
+2. **One run from vm28's stop 21276** (P12 held), same flags, for P10, P13 and P14.
+
+Before either: the two checks on the laptop (object 420 from vm24's stop, the third trial from vm26's stop) pass
+with the tree that is run, and two runs of the bench give the same digests.
+
+Predictions (made now; the checks on the laptop are known for object 420 only: 13 stops with `--shares`, 77
+without):
+
+| | Prediction |
+|---|---|
+| The run from boot holds P6 (first trial) within 60 min | 70% |
+| The run from boot holds P7 (second trial) within 120 min | 40% |
+| The run from boot holds P9 within 120 min | 20% |
+| Trials a stop, late in the run from vm28's stop (vm28: 3,994) | 1,200 to 2,000 |
+| Stops expanded a minute at that depth with 28 workers (vm28: 21) | 60 to 150 |
+| The run from vm28's stop holds P10 or P13 within 120 min | 35% |
+| It holds P14 (Part I's end) within 120 min | 10% |
+| Where the run from boot first stands still | the sword training's dialog (P5) or the fights: both took a mechanism each when first met, and neither has been met from boot with this order |
+| Two runs of the bench give the same digests | 95% (five references gave the same digests with 1 and 4 threads, several times) |
+
+What would count against the tree: the run from boot not holding P3 and P4 within 40 min (vm11 held them at 22
+and 24 min with the old order): then `--shares` or the page reading costs the early game more than they give the
+late game, and the two are measured apart.
