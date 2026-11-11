@@ -26,7 +26,7 @@
 //!   key the input changed is back at its old value there, the first stop is a window that closes by itself: the
 //!   inputs are tried from it, whether it holds anything new or not (the first MAX_WINDOWS windows of a stop).
 //! * **The world** of a stop is its room, owners, states, classes and bits, and the guide's variables but the
-//!   interface's own (those the input script writes, and those a fifth of a stop's inputs change), the clocks (those
+//!   interface's own (those the input script writes, and those a fifth of a stop's own inputs change), the clocks (those
 //!   that take two values or more over one stop's waits), and those seen with more than VAR_CAP values.
 //! * **Lines and levels.** A stop's line is what ego has gained and lost on the way to it: the objects it has owned
 //!   (and did not own at the boot) and those of them it owns no more. Its level is their count. Something is new to
@@ -421,7 +421,15 @@ fn park_point(e: &mut Box<dyn Engine>) -> EResult<Option<(i32, i32)>> {
 }
 
 /// The click sequences from the engine's stop (the module's text, "Inputs"), each a trial; `pre` names the round.
-fn clicks(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&HashSet<Key>>, cfg: &Cfg, out: &mut Out) -> EResult<()> {
+fn clicks(
+    e: &mut Box<dyn Engine>,
+    pre: &str,
+    lead: &[Event],
+    motion: Option<&HashSet<Key>>,
+    echo: Option<&HashSet<Key>>,
+    cfg: &Cfg,
+    out: &mut Out,
+) -> EResult<()> {
     let o0 = e.obs(&NAMES)?;
     let st0 = e.status().clone();
     let r0 = read(String::new(), Vec::new(), &o0, st0);
@@ -591,27 +599,31 @@ fn clicks(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&Ha
             x.quit();
         }
     }
+    // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
+    // only (in a window's round, or after a wait, an earlier input's effect lands in every trial), over its first
+    // stops (not those read PROBE frames on), and never a variable the stop's waits moved
+    if let Some(moving) = echo {
+        let made: Vec<&Res> = out.results[first..].iter().filter(|r| !r.name.ends_with('~')).collect();
+        if made.len() >= 10 {
+            let mut changed: HashMap<Key, usize> = HashMap::new();
+            for r in &made {
+                for (k, _, _) in r0.facts.diff(&r.facts) {
+                    if k.kind() == K_VAR && !moving.contains(&k) {
+                        *changed.entry(k).or_default() += 1;
+                    }
+                }
+            }
+            let n = made.len();
+            out.iface_vars.extend(changed.into_iter().filter(|&(_, c)| c * 5 >= n).map(|(k, _)| k));
+        }
+    }
     // the windows: the inputs from each, with no window found inside one
     for (mut b, name, events) in windows {
         out.windows += 1;
         trace(&format!("    window {name} ({} trials so far)", out.trials));
-        let r = clicks(&mut b, &name, &events, None, cfg, out);
+        let r = clicks(&mut b, &name, &events, None, None, cfg, out);
         b.quit();
         r?;
-    }
-    // a variable a fifth of the round's stops changed echoes the input
-    let made = &out.results[first..];
-    if made.len() >= 10 {
-        let mut changed: HashMap<Key, usize> = HashMap::new();
-        for r in made {
-            for (k, _, _) in r0.facts.diff(&r.facts) {
-                if k.kind() == K_VAR {
-                    *changed.entry(k).or_default() += 1;
-                }
-            }
-        }
-        let n = made.len();
-        out.iface_vars.extend(changed.into_iter().filter(|&(_, c)| c * 5 >= n).map(|(k, _)| k));
     }
     Ok(())
 }
@@ -668,15 +680,16 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, snap: &Snap, cfg: &Cfg) -> EResu
         }
         b.quit();
     }
+    let moving: HashSet<Key> = values.keys().copied().collect();
     out.clocks.extend(values.into_iter().filter(|x| x.1.len() >= 2).map(|x| x.0));
     let mut motion = out.ambient.clone();
     motion.extend(snap.room_motion.iter().filter(|x| x.0 == r0.room).map(|x| x.1));
     trace(&format!("  room {} waits done, {} moved", r0.room, waited.len()));
-    clicks(e, "", &[], Some(&motion), cfg, &mut out)?;
+    clicks(e, "", &[], Some(&motion), Some(&moving), cfg, &mut out)?;
     trace(&format!("  room {} round done: {} trials, {} windows", r0.room, out.trials, out.windows));
     // where the world moved by itself (and few stops of this room and level saw that): the inputs again from there
     for (n, mut b) in waited {
-        let r = clicks(&mut b, &format!("wait{n}+"), &[], None, cfg, &mut out);
+        let r = clicks(&mut b, &format!("wait{n}+"), &[], None, None, cfg, &mut out);
         b.quit();
         r?;
     }
