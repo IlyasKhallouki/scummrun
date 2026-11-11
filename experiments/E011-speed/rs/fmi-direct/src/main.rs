@@ -1176,6 +1176,8 @@ fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&Has
 struct Mentions {
     objs: HashMap<u32, Vec<i32>>,
     bits: HashMap<u32, Vec<i32>>,
+    /// (from room, to room, object): the object's own code leads ego from its room to the other
+    exits: Vec<(i32, i32, i32)>,
 }
 
 /// The integers that follow each `pat` in `line`.
@@ -1260,6 +1262,17 @@ fn mentions_of(dir: &Path) -> Mentions {
                 Some(r) => {
                     let me = num(&name, "obj-");
                     if let Some(o) = me {
+                        // the rooms the object's own code leads ego to: a way the scripts advise
+                        for l in text.lines().filter(|l| !l.starts_with('#')) {
+                            if let Some(at) = l.find("loadRoomWithEgo(") {
+                                let args: Vec<&str> = l[at + "loadRoomWithEgo(".len()..].split(',').collect();
+                                if let Some(to) = args.get(1).and_then(|x| x.trim().parse::<i32>().ok()) {
+                                    if to != r && !m.exits.contains(&(r, to, o as i32)) {
+                                        m.exits.push((r, to, o as i32));
+                                    }
+                                }
+                            }
+                        }
                         home.insert(o, r);
                         own.entry(o).or_default().extend(objs.iter().copied().filter(|x| *x != o));
                     }
@@ -2326,7 +2339,15 @@ fn main() {
                 }
             }
         }
-        eprintln!("mentions: {} objects, {} flags named in rooms' scripts; {} ways from room to room", s.mentions.objs.len(), s.mentions.bits.len(), s.edges.len());
+        // the ways the scripts advise (an object whose code leads ego to another room), where none was seen: a click
+        // on the object. Advice only: a walk that fails on one forgets it
+        let seen = s.edges.len();
+        for &(a, b, o) in &s.mentions.exits {
+            if !s.dead.contains_key(&(a, b, format!("t{o}"))) {
+                s.edges.entry((a, b)).or_insert_with(|| vec![Hit::Object(o)]);
+            }
+        }
+        eprintln!("mentions: {} objects, {} flags named in rooms' scripts; {} ways from room to room seen, {} more the scripts advise", s.mentions.objs.len(), s.mentions.bits.len(), seen, s.edges.len() - seen);
     }
     s.edges_log = std::fs::File::create(out.join("edges.jsonl")).ok();
     if let Some(f) = s.edges_log.as_mut() {
@@ -2462,6 +2483,7 @@ fn main() {
         let snap = Snap { motion: &s.motion, wins: &s.wins, noise: &s.noise, lclocks: &s.lclocks, policy: &s.policy, ambient: &s.ambient, mentions: &s.mentions, edges: &s.edges };
         // side by side: each stop explored, from the search's state at the batch's start
         let n = batch.len();
+        let t_batch = Instant::now();
         let done: Vec<Mutex<Option<Done>>> = (0..n).map(|_| Mutex::new(None)).collect();
         let next = AtomicUsize::new(0);
         std::thread::scope(|sc| {
@@ -2491,6 +2513,7 @@ fn main() {
                 });
             }
         });
+        let t_explored = t_batch.elapsed().as_secs_f64();
         // in the batch's order: committed
         let mut parents: Vec<Mutex<Option<Parent>>> = Vec::new();
         for d in done {
@@ -2505,6 +2528,7 @@ fn main() {
                 Err(x) => eprintln!("node {id}: {x}"),
             }
         }
+        let t_committed = t_batch.elapsed().as_secs_f64();
         // side by side: the kept stops' engines, each a fork of its parent's
         let made: Mutex<Vec<(usize, Box<dyn Engine>)>> = Mutex::new(Vec::new());
         let next = AtomicUsize::new(0);
@@ -2526,6 +2550,7 @@ fn main() {
             }
         });
         s.making = 0;
+        trace(&format!("batch of {n}: explored in {t_explored:.1} s, committed in {:.1} s, engines in {:.1} s", t_committed - t_explored, t_batch.elapsed().as_secs_f64() - t_committed));
         for (nid, b) in made.into_inner().unwrap() {
             s.live.insert(nid, b);
         }
