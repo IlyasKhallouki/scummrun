@@ -1629,11 +1629,25 @@ fn way<'a>(edges: &'a HashMap<(i32, i32), Vec<Hit>>, from: i32, to: i32) -> Opti
 }
 
 /// A walk from the engine's stop along `path`, each room's clicks as they were seen to lead on: the stop at its
-/// end, or None where a click finds nothing to click or a room is not the one expected (the world is another now).
+/// end. Where a click finds nothing to click or a room is not the one expected (the world is another now, or the
+/// way asks for something first), the stop where the walk stands, if it left the room it began in: what the way
+/// asks for is asked there. None where it did not leave, or stands at no stop.
 fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg, bad: &mut Vec<(i32, i32)>) -> EResult<Option<Res>> {
     let mut cur = e.fork()?;
     let mut events: Vec<Event> = Vec::new();
     let mut last = cur.status().clone();
+    let room0 = last.room;
+    // the walk's stop short of its end
+    let short = |mut cur: Box<dyn Engine>, events: Vec<Event>, st: Status| -> EResult<Option<Res>> {
+        if st.room == room0 || st.idle.is_none() {
+            cur.quit();
+            return Ok(None);
+        }
+        let ob = cur.obs(&NAMES)?;
+        let r = read(format!("go{}", st.room), events, &ob, st);
+        cur.quit();
+        Ok(Some(r))
+    };
     'hops: for (room, hits) in path {
         let mut from = cur.status().frame;
         let here = cur.status().room;
@@ -1729,13 +1743,12 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg,
                     continue 'hops;
                 }
                 trace(&format!("    walk: the screen's edge led from room {here} to {} not {room}", st.room));
-                cur.quit();
-                return Ok(None);
+                return short(cur, events, st);
             }
             let Some((x, y)) = point else {
                 trace(&format!("    walk: in room {} nothing to click for {} (on the way to {room})", cur.status().room, hit.name()));
-                cur.quit();
-                return Ok(None);
+                let st = cur.status().clone();
+                return short(cur, events, st);
             };
             let park = park_point(&mut cur)?;
             from = cur.status().frame;
@@ -1763,8 +1776,13 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg,
                 // the clicks were made and did not lead on: the way is false (or the world another)
                 bad.push((here, *room));
                 trace(&format!("    walk: {} led to room {} not {room} ({})", hits.iter().map(|h| h.name()).collect::<String>(), cur.status().room, match other { Played::Stop(_) => "a stop", Played::Ended(_) => "the end", Played::NotIdle => "no stop" }));
-                cur.quit();
-                return Ok(None);
+                return match other {
+                    Played::Stop(st) => short(cur, events, st),
+                    _ => {
+                        cur.quit();
+                        Ok(None)
+                    }
+                };
             }
         }
     }
