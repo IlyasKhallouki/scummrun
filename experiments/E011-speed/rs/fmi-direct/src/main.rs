@@ -47,13 +47,17 @@
 //! * **Lines and levels.** A stop's line is what ego has gained and lost on the way to it: the objects it has owned
 //!   (and did not own at the boot) and those of them it owns no more. Its level is their count. Something is new to
 //!   a stop when no kept stop of its line holds it: with an object gained or used up, every room, input and position
-//!   counts again. The highest level is expanded first.
+//!   counts again. The highest level is expanded first. With `--lines gains` a line is the gains alone and the
+//!   level their count: a loss starts no line (what it changed is new in its line, the rooms are not).
 //! * **Kept.** Within its level a stop goes to the first queue it fits: (0) a world atom other than a variable's
-//!   that is new; (1) an interface new in its line, or a thing on the screen new in that room; (2) a variable's value that is new, or
-//!   a walk box or camera bucket new in that room; (3) an atom of the guide's keys new in that room; (4) any other
+//!   that is new, or a count of the guide's flags set that no stop of its line has held (the flags are won one by
+//!   one on different paths: the first stop with more of them is new, though each flag is not); (1) an interface new in its line, or a thing on the screen new in that room; (2) a variable's value that is new, or
+//!   a walk box or camera bucket new in that room, or a new value of a local variable of a script running at the
+//!   stop (a script that waits for the player keeps there what the facts do not show: how often a line was said;
+//!   those a wait moves, and those seen with more than LOCAL_CAP values, do not count); (3) an atom of the guide's keys new in that room; (4) any other
 //!   world atom new in that room, or a new world (its atoms together, without those that change by themselves). A
-//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queues 3 and 4 wait until no
-//!   level holds a stop in queues 0 to 2.
+//!   stop that fits none is dropped. Queue 0 is expanded first, then 1, and so on; queue 4 waits until no
+//!   level holds a stop in queues 0 to 3 (queue 3 carries a flag from room to room, which nothing else does).
 //! * **Order.** Stops are taken from the queues a batch at a time and expanded side by side, each from the search's
 //!   state at the batch's start; their results are committed in the batch's order. A run is the same every time.
 //!
@@ -105,11 +109,13 @@ const LIVE_MAX: usize = 32;
 const QUEUES: usize = 5;
 const LIVE_QUEUES: usize = 3;
 /// The queues expanded at every level, the highest first, before any level's later ones.
-const FIRST_QUEUES: usize = 3;
+const FIRST_QUEUES: usize = 4;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
 const VAR_CAP: usize = 8;
+/// A local variable of a running script seen with more values than this counts no more.
+const LOCAL_CAP: usize = 5;
 
 struct Node {
     events: Vec<Event>,
@@ -175,6 +181,15 @@ struct Search {
     boxes: HashSet<(u64, i32, i32)>,
     cams: HashSet<(u64, i32, i32)>,
     cells: HashSet<(u64, u64)>,
+    /// per line: the counts of the guide's flags set that a kept stop has held
+    counts: HashSet<(u64, u32)>,
+    /// lines by gains alone (--lines gains)
+    gains_only: bool,
+    /// the scripts' local variables: per line the values kept stops held, the values seen, the clocks, the capped
+    lseen: HashSet<(u64, u64, i32)>,
+    lvals: HashMap<u64, Vec<i32>>,
+    lclocks: HashSet<u64>,
+    lcapped: HashSet<u64>,
     /// the objects ego owns at the boot
     root_owned: HashSet<u32>,
     var_vals: HashMap<Key, Vec<Val>>,
@@ -218,6 +233,8 @@ struct Cfg {
     /// expanded at once (workers / slices of them)
     slices: usize,
     batch: usize,
+    /// the stops expanded at once (0: workers / slices)
+    at_once: usize,
 }
 
 static DIRS: AtomicU64 = AtomicU64::new(0);
@@ -244,6 +261,22 @@ fn iface(o: &Obs) -> u64 {
     h.finish()
 }
 
+/// The local variables of the scripts running at a stop: a script that waits for the player (a dialog's) keeps its
+/// count of what was said in them, and nothing else of the game's state shows it.
+fn locals_of(o: &Obs) -> Vec<(u64, i32)> {
+    let mut v = Vec::new();
+    for sl in &o.slots {
+        if let Some(ls) = &sl.locals {
+            for (i, &x) in ls.iter().enumerate() {
+                let mut h = DefaultHasher::new();
+                (sl.where_, sl.number, i).hash(&mut h);
+                v.push((h.finish(), x));
+            }
+        }
+    }
+    v
+}
+
 /// One stop as read from its engine: the facts, and what is not in them.
 struct Res {
     name: String,
@@ -263,6 +296,9 @@ struct Res {
     /// window or after a wait
     own: Vec<(Key, Val)>,
     inside: bool,
+    /// the local variables of the scripts that run at the stop: (script and index hashed, value); after `explore`
+    /// only those that differ from the expanded stop's
+    locals: Vec<(u64, i32)>,
 }
 
 fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
@@ -289,6 +325,7 @@ fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
         changed: Vec::new(),
         own: Vec::new(),
         inside: false,
+        locals: locals_of(o),
         facts,
         st,
     }
@@ -448,6 +485,8 @@ struct Out {
     followed: Vec<(u64, Key)>,
     /// the keys the stop's waits moved while no input's change of them was pending
     noise: HashSet<Key>,
+    /// the scripts' local variables the stop's waits moved: clocks
+    lclocks: HashSet<u64>,
     offer: Value,
     /// the variables the input script wrote in a trial, or that a fifth of the stop's inputs changed
     iface_vars: HashSet<Key>,
@@ -482,6 +521,7 @@ impl Out {
         self.clocks.extend(o.clocks);
         self.ambient.extend(o.ambient);
         self.noise.extend(o.noise);
+        self.lclocks.extend(o.lclocks);
         for (a, b) in self.phase.iter_mut().zip(o.phase.iter()) {
             *a += b;
         }
@@ -1090,8 +1130,14 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     if let Some(x) = bad {
         return Err(x);
     }
+    let locals0: HashMap<u64, i32> = r0.locals.iter().copied().collect();
     for r in out.results.iter_mut() {
         r.changed = r0.facts.diff(&r.facts).into_iter().filter(|d| world_kind(d.0) || d.0.kind() == K_VAR).map(|d| (d.0, d.2)).collect();
+        r.locals.retain(|l| locals0.get(&l.0) != Some(&l.1));
+        if r.name.starts_with("wait") && !r.name.contains('+') {
+            // what a run with no input moved
+            out.lclocks.extend(r.locals.iter().map(|l| l.0));
+        }
     }
     Ok(out)
 }
@@ -1140,6 +1186,7 @@ impl Search {
         }
         self.policy.iface_vars.extend(out.iface_vars.iter().copied());
         self.policy.clocks.extend(out.clocks.iter().copied());
+        self.lclocks.extend(out.lclocks.iter().copied());
         self.ambient.extend(out.ambient.iter().copied());
         self.trials += out.trials;
         self.skipped += out.skipped;
@@ -1168,8 +1215,9 @@ impl Search {
                     ever.insert(at, o);
                 }
             }
-            let level = (2 * ever.len() - owned.len()) as u32;
-            let line = line_of(&ever, &owned);
+            // --lines gains: a line is what was gained, a loss stays in its line (what it changed is new there,
+            // the rest is not)
+            let (level, line) = if self.gains_only { (ever.len() as u32, line_of(&ever, &[])) } else { ((2 * ever.len() - owned.len()) as u32, line_of(&ever, &owned)) };
             // in the expanded stop's line and room only what changed can be new; elsewhere every atom may be
             let atoms: Vec<(Key, Val)> = if line == line0 && r.room == room00 {
                 r.changed.iter().filter(|p| self.policy.world(p.0)).copied().collect()
@@ -1202,6 +1250,35 @@ impl Search {
                 if self.seen_at.insert((line, r.room, k, val)) {
                     class = class.min(if guide { 3 } else { 4 });
                 }
+            }
+            // a local variable of a running script with a value new in the line (a count a dialog keeps of what
+            // was said): like a variable's
+            let mut fresh = false;
+            for &(k, v) in &r.locals {
+                if self.lclocks.contains(&k) || self.lcapped.contains(&k) {
+                    continue;
+                }
+                if self.lseen.insert((line, k, v)) {
+                    fresh = true;
+                    let vals = self.lvals.entry(k).or_default();
+                    if !vals.contains(&v) {
+                        vals.push(v);
+                    }
+                    if vals.len() > LOCAL_CAP {
+                        self.lcapped.insert(k);
+                    }
+                }
+            }
+            if fresh {
+                novel.push("local".into());
+                class = class.min(2);
+            }
+            // the guide's flags the stop holds set: a count no stop of the line has held is new (a stop that holds
+            // two flags which two other stops hold one each is the first with both)
+            let flags = world.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && self.policy.guide.contains(&p.0)).count() as u32;
+            if self.counts.insert((line, flags)) {
+                novel.push(format!("flags={flags}"));
+                class = 0;
             }
             for &t in &r.vis {
                 if self.sees.insert((line, r.room, t)) {
@@ -1338,7 +1415,7 @@ fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
     std::fs::create_dir_all(out).expect("OUT");
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let mut e = host
-        .boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(out) })
+        .boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(out) })
         .expect("the boot");
     let o = e.obs(&ObsReq::default()).expect("obs");
     let base = facts_of(&o);
@@ -1415,7 +1492,7 @@ fn verify(nodes: &str, id: u64, out: &Path, keys: &str) {
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let t0 = Instant::now();
     let mut e = host
-        .boot(&BootCfg { seed: 1, events: events.clone(), frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(out) })
+        .boot(&BootCfg { seed: 1, events: events.clone(), frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(out) })
         .expect("the boot");
     let f = e.facts().expect("facts");
     let room = f.val(Key::pack(K_ROOM, 0, 0, 0));
@@ -1443,7 +1520,7 @@ fn main() {
         let n: usize = a[2].parse().expect("N");
         let host = Host::new(HostCfg::from_env()).expect("the host");
         let mut e = host
-            .boot(&BootCfg { seed: 1, events: Vec::new(), frame: None, dump_locals: false, lean: true, out_dir: eng_dir(&out) })
+            .boot(&BootCfg { seed: 1, events: Vec::new(), frame: None, dump_locals: true, lean: true, out_dir: eng_dir(&out) })
             .expect("the boot");
         let f0 = e.status().frame;
         let mut t = [0f64; 6];
@@ -1486,7 +1563,7 @@ fn main() {
         let out = PathBuf::from(&a[3]);
         std::fs::create_dir_all(&out).expect("OUT");
         let host = Host::new(HostCfg::from_env()).expect("the host");
-        let mut e = host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(&out) }).expect("the boot");
+        let mut e = host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(&out) }).expect("the boot");
         let keys: Vec<Key> = a[4].split(',').map(Key::parse).collect();
         let ego = e.facts().expect("facts").val(Key::pack(K_EGO, 0, 0, 0)) as i32;
         let say = |e: &mut Box<dyn Engine>, what: &str| {
@@ -1544,6 +1621,7 @@ fn main() {
         workers: opt("--workers").map(|v| v.parse().unwrap()).unwrap_or(6),
         slices: opt("--slices").map(|v| v.parse().unwrap()).unwrap_or(1),
         batch: opt("--batch").map(|v| v.parse().unwrap()).unwrap_or(BATCH),
+        at_once: opt("--at-once").map(|v| v.parse().unwrap()).unwrap_or(0),
     };
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let root_events = if a.iter().any(|x| x == "--no-skips") {
@@ -1564,7 +1642,7 @@ fn main() {
     };
     let t0 = Instant::now();
     let mut e = host
-        .boot(&BootCfg { seed: 1, events: root_events.clone(), frame: root_frame, dump_locals: false, lean: true, out_dir: eng_dir(&out) })
+        .boot(&BootCfg { seed: 1, events: root_events.clone(), frame: root_frame, dump_locals: true, lean: true, out_dir: eng_dir(&out) })
         .expect("the boot");
     let st = e.status().clone();
     eprintln!("boot: frame {} room {} idle {:?} in {:.1} s", st.frame, st.room, st.idle, t0.elapsed().as_secs_f64());
@@ -1575,6 +1653,7 @@ fn main() {
         live_max: LIVE_MAX.max(4 * cfg.workers),
         ..Default::default()
     };
+    s.gains_only = opt("--lines").as_deref() == Some("gains");
     if let Some(p) = opt("--guide") {
         // the guide's keys (fmi guide map): the variables among them are the ones the game's code tests
         let g: Value = serde_json::from_str(&std::fs::read_to_string(&p).expect("--guide")).expect("the guide's JSON");
@@ -1601,6 +1680,8 @@ fn main() {
         s.sees.insert((line, r.room, t));
     }
     s.ifaces.insert((line, r.iface));
+    let flags0 = r.facts.iter().filter(|p| p.0.kind() == K_BIT && p.1 != 0 && s.policy.guide.contains(&p.0)).count() as u32;
+    s.counts.insert((line, flags0));
     s.boxes.insert((line, r.room, r.walkbox));
     s.cams.insert((line, r.room, r.cam));
     s.rooms.push(r.room);
@@ -1619,7 +1700,7 @@ fn main() {
     while t0.elapsed() < limit {
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
-        let at_once = (cfg.workers / cfg.slices.max(1)).max(1);
+        let at_once = if cfg.at_once > 0 { cfg.at_once } else { (cfg.workers / cfg.slices.max(1)).max(1) };
         while batch.len() < at_once * cfg.batch {
             // the highest level first and in it the first queue, over the first queues of every level; then the same
             // over the later ones
@@ -1647,7 +1728,7 @@ fn main() {
                     let booted = engine.is_none();
                     let e = match engine {
                         Some(e) => Ok(e),
-                        None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: false, lean: true, out_dir: eng_dir(&cfg.out) }),
+                        None => host.boot(&BootCfg { seed: 1, events, frame: Some(frame), dump_locals: true, lean: true, out_dir: eng_dir(&cfg.out) }),
                     };
                     let r = match e {
                         Ok(mut e) => match { trace(&format!("node {id}: explore")); let r = explore(&mut e, level, &pending, inside, &snap, &cfg); trace(&format!("node {id}: explored")); r } {
