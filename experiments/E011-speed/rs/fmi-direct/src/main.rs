@@ -2093,14 +2093,87 @@ impl Search {
         // the rooms the stop comes to with no input at all: a click that ends there did not lead there
         let drift: HashSet<i32> = results.iter().filter(|r| r.name.starts_with("wait") && !r.name.contains('+') && r.room != room00).map(|r| r.room).collect();
         let mut keep: Vec<(usize, usize, usize, usize, bool)> = Vec::new(); // (result, node, level, queue, to the stack)
+        // The expanded stop's own, made once. A result holds what differs from that stop (`delta`), and what is
+        // asked of it here is put together from the stop's and the difference: a pass over a result's 25,000 facts
+        // for each question was the commit's time once the writing was gone
+        let base = &out.base;
+        let ego0 = base.val(Key::pack(K_EGO, 0, 0, 0));
+        let flaglike = |k: Key| k.kind() == K_BIT || k.kind() == K_CLASS;
+        let bit_of = |k: Key| if k.kind() == K_BIT { k.a() as usize } else { 4096 + (k.a() as usize) * 32 + (k.b() as usize & 31) };
+        let h1 = |k: Key, v: Val| -> u64 {
+            let mut h = DefaultHasher::new();
+            (k, v).hash(&mut h);
+            h.finish()
+        };
+        // its guide's variables; what it owns; its flags set (but those seen unset again); the sum of its world's
+        // atoms' hashes but the ambient keys' (the variables' part is added for each result: a variable may leave
+        // the world while the stop is committed)
+        let gv0: Vec<(Key, Val)> = base.iter().filter(|p| p.0.kind() == K_VAR && self.policy.guide.contains(&p.0)).copied().collect();
+        let own0: Vec<u32> = base.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego0).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect();
+        let mut set0: Vec<u64> = Vec::new();
+        let mut sum0 = 0u64;
+        for p in base.iter().filter(|p| world_kind(p.0)) {
+            if flaglike(p.0) && p.1 != 0 && !self.toggles.contains(&p.0) {
+                let n = bit_of(p.0);
+                if set0.len() <= n / 64 {
+                    set0.resize(n / 64 + 1, 0);
+                }
+                set0[n / 64] |= 1 << (n % 64);
+            }
+            if !self.ambient.contains(&p.0) {
+                sum0 = sum0.wrapping_add(h1(p.0, p.1));
+            }
+        }
         for (i, r) in results.iter().enumerate() {
             let tc = Instant::now();
-            let facts = patched(&out.base, &r.delta);
-            let world = self.policy.world_of(&facts);
+            let d = &r.delta;
+            // a key's value at the result
+            let val = |k: Key| -> Val {
+                match d.binary_search_by_key(&k, |x| x.0) {
+                    Ok(i) => d[i].2.unwrap_or(0),
+                    Err(_) => base.val(k),
+                }
+            };
             let mut novel: Vec<String> = Vec::new();
             let mut class = QUEUES;
-            let ego = facts.val(Key::pack(K_EGO, 0, 0, 0));
-            let owned: Vec<u32> = facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect();
+            let ego = val(Key::pack(K_EGO, 0, 0, 0));
+            // the cell's part of the guide's variables that are world (not the interface's, a clock's or a capped
+            // one's), as the world is before this result's own atoms are read (one of them may cap a variable)
+            let mut sum_vars = 0u64;
+            for &(k, v0) in &gv0 {
+                let v = match d.binary_search_by_key(&k, |x| x.0) {
+                    Ok(i) => d[i].2,
+                    Err(_) => Some(v0),
+                };
+                if let Some(v) = v.filter(|_| self.policy.world(k) && !self.ambient.contains(&k)) {
+                    sum_vars = sum_vars.wrapping_add(h1(k, v));
+                }
+            }
+            for x in d.iter().filter(|x| x.0.kind() == K_VAR && base.get(x.0).is_none()) {
+                if let Some(v) = x.2.filter(|_| self.policy.world(x.0) && !self.ambient.contains(&x.0)) {
+                    sum_vars = sum_vars.wrapping_add(h1(x.0, v));
+                }
+            }
+            // what it owns: the expanded stop's with the owners that differ (read whole where ego is another)
+            let owned: Vec<u32> = if ego != ego0 {
+                patched(base, d).iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect()
+            } else {
+                let mut v = own0.clone();
+                for x in d.iter().filter(|x| x.0.kind() == K_OWNER) {
+                    let o = x.0.a() as u32;
+                    if self.root_owned.contains(&o) {
+                        continue;
+                    }
+                    match (v.binary_search(&o), x.2 == Some(ego)) {
+                        (Err(at), true) => v.insert(at, o),
+                        (Ok(at), false) => {
+                            v.remove(at);
+                        }
+                        _ => {}
+                    }
+                }
+                v
+            };
             let mut ever = ever0.clone();
             for &o in &owned {
                 if let Err(at) = ever.binary_search(&o) {
@@ -2116,20 +2189,28 @@ impl Search {
             // gets a class): both are set once and stay, or are seen unset again and count no more
             self.ct[0] += tc.elapsed().as_secs_f64();
             let tc = Instant::now();
-            let flaglike = |k: Key| k.kind() == K_BIT || k.kind() == K_CLASS;
             for c in r.changed.iter().filter(|c| flaglike(c.0) && c.1 == 0) {
-                self.toggles.insert(c.0);
+                if self.toggles.insert(c.0) {
+                    // seen unset: it counts no more, for this stop's later results too
+                    let n = bit_of(c.0);
+                    if let Some(w) = set0.get_mut(n / 64) {
+                        *w &= !(1u64 << (n % 64));
+                    }
+                }
             }
-            let mut set: Vec<u64> = Vec::new();
-            let mut flags = 0u32;
-            for p in world.iter().filter(|p| flaglike(p.0) && p.1 != 0 && !self.toggles.contains(&p.0)) {
-                let n = if p.0.kind() == K_BIT { p.0.a() as usize } else { 4096 + (p.0.a() as usize) * 32 + (p.0.b() as usize & 31) };
+            let mut set = set0.clone();
+            for x in d.iter().filter(|x| flaglike(x.0)) {
+                let n = bit_of(x.0);
                 if set.len() <= n / 64 {
                     set.resize(n / 64 + 1, 0);
                 }
-                set[n / 64] |= 1 << (n % 64);
-                flags += 1;
+                if x.2.is_some_and(|v| v != 0) && !self.toggles.contains(&x.0) {
+                    set[n / 64] |= 1u64 << (n % 64);
+                } else {
+                    set[n / 64] &= !(1u64 << (n % 64));
+                }
             }
+            let flags: u32 = set.iter().map(|w| w.count_ones()).sum();
             // a set of flags that no kept stop of the line holds all of: new, and followed before anything else of
             // its level (the last such stop first: what is won one flag at a time is won on one path)
             let within = |a: &[u64], b: &[u64]| a.iter().enumerate().all(|(i, w)| w & !b.get(i).copied().unwrap_or(0) == 0);
@@ -2186,7 +2267,8 @@ impl Search {
             let atoms: Vec<(Key, Val)> = if line == line0 && r.room == room00 {
                 r.changed.iter().filter(|p| self.policy.world(p.0)).copied().collect()
             } else {
-                world.clone()
+                // another room or another line: every atom of its world (its facts put together again)
+                self.policy.world_of(&patched(base, d))
             };
             for &(k, val) in &atoms {
                 let guide = self.policy.guide.contains(&k);
@@ -2259,7 +2341,24 @@ impl Search {
             }
             self.ct[3] += tc.elapsed().as_secs_f64();
             let tc = Instant::now();
-            if self.cells.insert((line, cell(r.room, r.iface, &world, &self.ambient))) {
+            // the cell: the room, the interface, and the world's atoms but the ambient keys', as the sum of the
+            // atoms' hashes: the expanded stop's sum with what differs, and the guide's variables that are world
+            let mut sum = sum0;
+            for x in d.iter().filter(|x| world_kind(x.0) && !self.ambient.contains(&x.0)) {
+                if let Some(v0) = base.get(x.0) {
+                    sum = sum.wrapping_sub(h1(x.0, v0));
+                }
+                if let Some(v) = x.2 {
+                    sum = sum.wrapping_add(h1(x.0, v));
+                }
+            }
+            sum = sum.wrapping_add(sum_vars);
+            let c = {
+                let mut h = DefaultHasher::new();
+                (r.room, r.iface, sum).hash(&mut h);
+                h.finish()
+            };
+            if self.cells.insert((line, c)) {
                 class = class.min(4);
             }
             self.ct[4] += tc.elapsed().as_secs_f64();
@@ -2276,7 +2375,7 @@ impl Search {
             let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
             let mut first_held = false;
             for w in self.watch.iter_mut() {
-                if w.2.is_none() && facts.val(w.0) == w.1 {
+                if w.2.is_none() && val(w.0) == w.1 {
                     first_held = true;
                     w.2 = Some((nid, secs));
                     eprintln!("[{secs:7.1}s] WATCH {}={} first held by node {nid}", w.0, w.1);
@@ -2284,7 +2383,7 @@ impl Search {
             }
             for g in self.rungs.iter_mut().filter(|g| g.at.is_none()) {
                 let held = g.conds.iter().filter(|&&(k, ge, v)| {
-                    let (have, want) = (facts.val(k), v.unwrap_or(ego));
+                    let (have, want) = (val(k), v.unwrap_or(ego));
                     if ge { have >= want } else { have == want }
                 });
                 if held.count() >= g.least {
@@ -2336,7 +2435,7 @@ impl Search {
             }
             let mut pending = r.own.clone();
             for &(k, old) in &self.nodes[id].pending {
-                if facts.val(k) != old && !pending.iter().any(|p| p.0 == k) {
+                if val(k) != old && !pending.iter().any(|p| p.0 == k) {
                     pending.push((k, old));
                 }
             }
