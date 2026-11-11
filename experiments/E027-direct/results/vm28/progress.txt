@@ -1,0 +1,20 @@
+[    8.4s] RUNG P2 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P3 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P4 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P5 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P6 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P7 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P8 first held by node 1 (level 0, 2533 trials so far)
+[    8.4s] RUNG P9 first held by node 1 (level 0, 2533 trials so far)
+[   48.5s] WATCH room=59 first held by node 487
+[  516.6s] RUNG P11 first held by node 5809 (level 2, 506339 trials so far)
+[  516.6s] WATCH bit:89=1 first held by node 5809
+boot: frame 53682 room 83 idle Some("sentence") in 1.2 s
+guide: 805 keys, 115 of them variables
+mentions: 342 objects, 211 flags named in rooms' scripts; 80 ways from room to room seen, 67 more the scripts advise
+[   38.8s] kept 448 [13, 72, 36, 22, 304], expanded 7, level 0 (441 queued there), queued [0, 70, 36, 22, 304], trials 21038 (560/s), rooms 8, rungs ["P0", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"], boots 3
+[  182.0s] kept 2463 [450, 441, 283, 64, 1224], expanded 67, level 2 (1350 queued there), queued [0, 435, 283, 64, 1224], trials 172212 (408/s), rooms 16, rungs ["P0", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"], boots 28
+[  286.4s] kept 3498 [499, 592, 390, 71, 1945], expanded 115, level 2 (2337 queued there), queued [0, 582, 390, 71, 1945], trials 264154 (1230/s), rooms 18, rungs ["P0", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"], boots 46
+[  374.8s] kept 4541 [534, 664, 461, 72, 2809], expanded 163, level 2 (3332 queued there), queued [0, 637, 461, 72, 2809], trials 354210 (859/s), rooms 32, rungs ["P0", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"], boots 65
+[  458.4s] kept 5524 [569, 671, 549, 74, 3660], expanded 211, level 2 (4267 queued there), queued [0, 630, 549, 74, 3660], trials 438777 (1015/s), rooms 35, rungs ["P0", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"], boots 88
+[  527.4s] kept 5863 [581, 706, 583, 78, 3914], expanded 253, level 2 (4564 queued there), queued [0, 636, 579, 78, 3914], trials 524052 (1302/s), rooms 36, rungs ["P0", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P11"], boots 112
