@@ -34,6 +34,7 @@ h = hashlib.sha1(); n = 0
 for l in open(f"{O}/nodes.jsonl"):
     i = l.find(',"events"')
     d = json.loads(l[:i] + "}") if i > 0 else json.loads(l)
+    if d["id"] == 0: continue  # the run's first stop (in the file since the stops hold their own events only)
     h.update(repr((d["id"], d["parent"], d["how"], d["room"], d["level"], d["class"], d["frame"])).encode()); n += 1
 t = s["trial_seconds"]; b = s.get("batch_seconds", {})
 print(f'{ref:9s} stops {s["expanded"]:3d} trials {s["trials"]:7d} kept {n:5d} digest {h.hexdigest()[:10]} | wall {s["seconds"]:6.1f} s'

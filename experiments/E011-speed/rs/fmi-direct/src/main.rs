@@ -144,7 +144,10 @@ const VAR_CAP: usize = 8;
 const LOCAL_CAP: usize = 5;
 
 struct Node {
+    /// the events of the trial that made it (the first stop's: the whole movie it starts with), and the stop it came
+    /// from (the first stop: none). Its movie from boot is theirs one after the other (`Search::movie`)
     events: Vec<Event>,
+    parent: usize,
     frame: u64,
     depth: u32,
     /// the objects ego has owned on the way here and did not own at the boot, ascending
@@ -256,6 +259,9 @@ struct Search {
     making: usize,
     /// the batches' wall seconds: the stops explored (side by side), committed (one by one), the kept engines made
     wall: [f64; 3],
+    /// the commit's seconds by part: the world and what is owned, the flags, the atoms, the rest of what is new, the
+    /// cell, a kept stop's line and node
+    ct: [f64; 6],
     live_max: usize,
     phase: [f64; 5],
     frames: u64,
@@ -636,6 +642,50 @@ struct Out {
     /// the frames they ran
     phase: [f64; 5],
     frames: u64,
+}
+
+impl Search {
+    /// A kept stop's movie from boot: the events of each trial on the way to it, from the first stop's down.
+    fn movie(&self, id: usize) -> Vec<Event> {
+        let mut chain = vec![id];
+        while self.nodes[*chain.last().unwrap()].parent != usize::MAX {
+            chain.push(self.nodes[*chain.last().unwrap()].parent);
+        }
+        chain.iter().rev().flat_map(|&i| self.nodes[i].events.iter().cloned()).collect()
+    }
+}
+
+/// A kept stop of a run's file: its line and its movie from boot. A line of nodes.jsonl holds the events of its own
+/// trial ("movie": "own") and names the stop it came from, down to the run's first stop, whose line holds the movie
+/// the run began with. A line of rung-stops.jsonl or top.jsonl, and of a run before this form, holds the whole
+/// movie. `id` None: the file's first line.
+fn stop_of(path: &str, id: Option<u64>) -> (Value, Vec<Event>) {
+    let text = std::fs::read_to_string(path).expect("the stops' file");
+    let find = |id: Option<u64>| -> Value {
+        let line = match id {
+            None => text.lines().next(),
+            Some(id) => {
+                let head = format!("{{\"id\":{id},");
+                text.lines().find(|l| l.starts_with(&head)).or_else(|| text.lines().find(|l| serde_json::from_str::<Value>(l).is_ok_and(|v| v["id"].as_u64() == Some(id))))
+            }
+        };
+        serde_json::from_str(line.expect("the stop's line")).expect("the stop's line read")
+    };
+    let events = |v: &Value| -> Vec<Event> {
+        let a = v["events"].as_array().expect("a stop's events");
+        let e: Vec<Event> = a.iter().filter_map(fmi_explore::events::event_of).collect();
+        assert_eq!(e.len(), a.len(), "every event read");
+        e
+    };
+    let line = find(id);
+    let mut parts = vec![events(&line)];
+    let mut at = line.clone();
+    while at["movie"].as_str() == Some("own") {
+        at = find(Some(at["parent"].as_u64().expect("the stop it came from")));
+        parts.push(events(&at));
+    }
+    parts.reverse();
+    (line, parts.into_iter().flatten().collect())
 }
 
 impl Out {
@@ -1860,7 +1910,7 @@ impl Search {
             self.ends.push((id, x));
         }
         let results = out.results;
-        let (movie, depth, ever0) = (self.nodes[id].events.clone(), self.nodes[id].depth, self.nodes[id].ever.clone());
+        let (depth, ever0) = (self.nodes[id].depth, self.nodes[id].ever.clone());
         let (line0, room00) = (self.nodes[id].line, self.nodes[id].room);
         // a way whose clicks a walk made and that did not lead on: forgotten (seen again, it is learned again, twice
         // at most)
@@ -1877,6 +1927,7 @@ impl Search {
         let drift: HashSet<i32> = results.iter().filter(|r| r.name.starts_with("wait") && !r.name.contains('+') && r.room != room00).map(|r| r.room).collect();
         let mut keep: Vec<(usize, usize, usize, usize, bool)> = Vec::new(); // (result, node, level, queue, to the stack)
         for (i, r) in results.iter().enumerate() {
+            let tc = Instant::now();
             let world = self.policy.world_of(&r.facts);
             let mut novel: Vec<String> = Vec::new();
             let mut class = QUEUES;
@@ -1895,6 +1946,8 @@ impl Search {
             // (a stop that holds two flags which two other stops hold one each is the first with both)
             // a flag here is a bit or a class of an object (an object made into something else keeps its number and
             // gets a class): both are set once and stay, or are seen unset again and count no more
+            self.ct[0] += tc.elapsed().as_secs_f64();
+            let tc = Instant::now();
             let flaglike = |k: Key| k.kind() == K_BIT || k.kind() == K_CLASS;
             for c in r.changed.iter().filter(|c| flaglike(c.0) && c.1 == 0) {
                 self.toggles.insert(c.0);
@@ -1922,6 +1975,7 @@ impl Search {
                 tops.push(set);
                 dive = true;
             }
+            self.ct[1] += tc.elapsed().as_secs_f64();
             // what the stop won, where it begins a line: the objects it gained, the flags it set
             let news: Vec<Key> = if dive {
                 r.changed
@@ -1960,6 +2014,7 @@ impl Search {
                 class = 0;
             }
             // in the expanded stop's line and room only what changed can be new; elsewhere every atom may be
+            let tc = Instant::now();
             let atoms: Vec<(Key, Val)> = if line == line0 && r.room == room00 {
                 r.changed.iter().filter(|p| self.policy.world(p.0)).copied().collect()
             } else {
@@ -1992,6 +2047,8 @@ impl Search {
                     class = class.min(if guide { 3 } else { 4 });
                 }
             }
+            self.ct[2] += tc.elapsed().as_secs_f64();
+            let tc = Instant::now();
             // a local variable of a running script with a value new in the line (a count a dialog keeps of what
             // was said): like a variable's
             let mut fresh = false;
@@ -2032,9 +2089,12 @@ impl Search {
                 novel.push(format!("cam={}", r.cam));
                 class = class.min(2);
             }
+            self.ct[3] += tc.elapsed().as_secs_f64();
+            let tc = Instant::now();
             if self.cells.insert((line, cell(r.room, r.iface, &world, &self.ambient))) {
                 class = class.min(4);
             }
+            self.ct[4] += tc.elapsed().as_secs_f64();
             // nothing new, alone or together: dropped
             if class == QUEUES {
                 continue;
@@ -2042,9 +2102,9 @@ impl Search {
             if !self.rooms.contains(&r.room) {
                 self.rooms.push(r.room);
             }
+            let tc = Instant::now();
             let nid = self.nodes.len();
-            let mut events = movie.clone();
-            events.extend(r.events.iter().cloned());
+            let events = r.events.clone();
             let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
             let mut first_held = false;
             for w in self.watch.iter_mut() {
@@ -2071,25 +2131,38 @@ impl Search {
                 novel.truncate(12);
                 novel.push(format!("+{}", n - 12));
             }
-            let text = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
+            // nodes.jsonl: the stop's own events and the stop it came from (the movie is theirs one after the other:
+            // a line with every stop's whole movie was 1.8 GB in two hours). The line is made once and written in
+            // one piece (a value written as it is formatted goes to the file in thousands of small writes: that was
+            // nearly all of the commit's time)
+            let mut text = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
                 "owned": owned.len(), "class": class, "how": r.name, "novel": novel, "t": (secs * 10.0).round() / 10.0,
-                "news": news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(),
+                "news": news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(), "movie": "own",
                 "events": events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
             if let Some(f) = self.log.as_mut() {
-                let _ = writeln!(f, "{text}");
+                let _ = f.write_all(format!("{text}\n").as_bytes());
             }
-            if first_held {
-                if let Some(f) = self.rung_log.as_mut() {
-                    let _ = writeln!(f, "{text}");
-                    let _ = f.flush();
+            let top = dive && level >= self.top;
+            if first_held || top {
+                // rung-stops.jsonl and top.jsonl: the whole movie, so that the line alone replays from boot
+                let mut whole = self.movie(id);
+                whole.extend(events.iter().cloned());
+                text["events"] = Value::Array(whole.iter().map(fmi_explore::events::event_json).collect());
+                text.as_object_mut().unwrap().remove("movie");
+                let text = format!("{text}\n");
+                if first_held {
+                    if let Some(f) = self.rung_log.as_mut() {
+                        let _ = f.write_all(text.as_bytes());
+                        let _ = f.flush();
+                    }
                 }
-            }
-            if dive && level >= self.top {
-                if let Some(p) = &self.top_path {
-                    // written whole beside and moved in: a reader never sees half a line
-                    let tmp = p.with_extension("jsonl.new");
-                    if std::fs::write(&tmp, format!("{text}\n")).is_ok() {
-                        let _ = std::fs::rename(&tmp, p);
+                if top {
+                    if let Some(p) = &self.top_path {
+                        // written whole beside and moved in: a reader never sees half a line
+                        let tmp = p.with_extension("jsonl.new");
+                        if std::fs::write(&tmp, &text).is_ok() {
+                            let _ = std::fs::rename(&tmp, p);
+                        }
                     }
                 }
             }
@@ -2101,11 +2174,12 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
             keep.push((i, nid, level as usize, class, dive || (self.flag_lines && class == 0)));
+            self.ct[5] += tc.elapsed().as_secs_f64();
         }
         if let Some(f) = self.offers.as_mut() {
             let _ = writeln!(f, "{}", json!({"node": id, "room": room0, "offer": out.offer, "trials": out.trials, "skipped": out.skipped, "mids": out.mids, "windows": out.windows,
@@ -2176,9 +2250,7 @@ fn rungs_of(path: &str) -> Vec<Rung> {
 /// single click of its offer (targets and floor points) in a fork, run FRAMES frames at most: what the stop was, or
 /// where the run stood every 400 frames when it reached none (room, idle, cutscene depth, user input, ego moving).
 fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
-    let text = std::fs::read_to_string(nodes).expect("NODES.jsonl");
-    let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
-    let events: Vec<Event> = line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect();
+    let (line, events) = stop_of(nodes, Some(id));
     let frame = line["frame"].as_u64().unwrap();
     std::fs::create_dir_all(out).expect("OUT");
     let host = Host::new(HostCfg::from_env()).expect("the host");
@@ -2247,14 +2319,7 @@ fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
 /// `direct verify NODES.jsonl ID OUT [KEY=V,..]`: the kept stop's movie played from boot in a fresh engine, to its
 /// frame; prints the room and each key's value there, and whether each equals V.
 fn verify(nodes: &str, id: u64, out: &Path, keys: &str) {
-    let text = std::fs::read_to_string(nodes).expect("NODES.jsonl");
-    let line = text
-        .lines()
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .find(|v| v["id"].as_u64() == Some(id))
-        .expect("the node");
-    let events: Vec<Event> = line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect();
-    assert_eq!(events.len(), line["events"].as_array().unwrap().len(), "every event read");
+    let (line, events) = stop_of(nodes, Some(id));
     let frame = line["frame"].as_u64().unwrap();
     std::fs::create_dir_all(out).expect("OUT");
     let host = Host::new(HostCfg::from_env()).expect("the host");
@@ -2291,9 +2356,8 @@ fn main() {
         let (events, frame) = match opt("--from") {
             Some(nodes) => {
                 let id: u64 = a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID");
-                let text = std::fs::read_to_string(&nodes).expect("--from NODES");
-                let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
-                (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect::<Vec<Event>>(), line["frame"].as_u64())
+                let (line, events) = stop_of(&nodes, Some(id));
+                (events, line["frame"].as_u64())
             }
             None => (Vec::new(), None),
         };
@@ -2368,10 +2432,8 @@ fn main() {
         // `direct seq NODES ID OUT KEYS STEP...`: a measurement tool. The kept stop's movie from boot, then each STEP
         // "X,Y,N": a click at (X, Y) on the next frame and N frames run (N = "s": to where ego stands and the bridge
         // is idle); after each step, and every 5 frames for 120 more after the last, the KEYS' values.
-        let text = std::fs::read_to_string(&a[1]).expect("NODES");
         let id: u64 = a[2].parse().expect("ID");
-        let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| v["id"].as_u64() == Some(id)).expect("the node");
-        let events: Vec<Event> = line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect();
+        let (line, events) = stop_of(&a[1], Some(id));
         let frame = line["frame"].as_u64().unwrap();
         let out = PathBuf::from(&a[3]);
         std::fs::create_dir_all(&out).expect("OUT");
@@ -2460,10 +2522,9 @@ fn main() {
         (None, None) => None,
     };
     let from: Option<(Vec<Event>, u64, Vec<Key>)> = from_at.map(|(nodes, id)| {
-        let text = std::fs::read_to_string(&nodes).expect("--from NODES");
-        let line = text.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|v| id.is_none() || v["id"].as_u64() == id).expect("the node");
+        let (line, events) = stop_of(&nodes, id);
         let news = line["news"].as_array().map(|v| v.iter().filter_map(|x| x.as_str()).map(Key::parse).collect()).unwrap_or_default();
-        (line["events"].as_array().unwrap().iter().filter_map(fmi_explore::events::event_of).collect(), line["frame"].as_u64().unwrap(), news)
+        (events, line["frame"].as_u64().unwrap(), news)
     });
     let (root_events, root_frame, from_news) = match from {
         Some((ev, f, n)) => (ev, Some(f), n),
@@ -2571,7 +2632,13 @@ fn main() {
         Some(t) => t.split(',').filter(|x| !x.is_empty()).map(Key::parse).collect(),
         None => from_news.clone(),
     };
-    s.nodes.push(Node { events: root_events, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news });
+    if let Some(f) = s.log.as_mut() {
+        let first = json!({"id": 0, "parent": Value::Null, "depth": 0, "frame": st.frame, "room": r.room, "level": 0, "owned": 0, "class": 0, "how": "", "novel": [], "t": 0.0,
+            "news": root_news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(),
+            "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
+        let _ = f.write_all(format!("{first}\n").as_bytes());
+    }
+    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
@@ -2646,8 +2713,10 @@ fn main() {
                 })
             };
             let Some(id) = first.or_else(last) else { break };
+            let live = s.live.remove(&id);
+            let movie = if live.is_some() { Vec::new() } else { s.movie(id) };
             let n = &s.nodes[id];
-            batch.push(Mutex::new(Some((id, s.live.remove(&id), n.events.clone(), n.frame, n.level, n.pending.clone(), n.inside, if s.go { n.news.clone() } else { Vec::new() }))));
+            batch.push(Mutex::new(Some((id, live, movie, n.frame, n.level, n.pending.clone(), n.inside, if s.go { n.news.clone() } else { Vec::new() }))));
         }
         if batch.is_empty() {
             break;
@@ -2752,6 +2821,7 @@ fn main() {
         "max_depth": depth, "boots": s.boots, "top_level": s.top,
         "trial_seconds": {"fork": s.phase[0], "inputs": s.phase[1], "run": s.phase[2], "read": s.phase[3], "quit": s.phase[4]}, "trial_frames": s.frames,
         "batch_seconds": {"explore": s.wall[0], "commit": s.wall[1], "engines": s.wall[2]},
+        "commit_seconds": {"world": s.ct[0], "flags": s.ct[1], "atoms": s.ct[2], "new": s.ct[3], "cell": s.ct[4], "kept": s.ct[5]},
         "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
         "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(),
         "ends": s.ends.iter().map(|(n, x)| json!([n, x])).collect::<Vec<Value>>(),
