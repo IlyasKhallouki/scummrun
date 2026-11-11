@@ -1,0 +1,32 @@
+[    0.6s] RUNG P2 first held by node 1 (level 0, 421 trials so far)
+[    0.6s] RUNG P3 first held by node 1 (level 0, 421 trials so far)
+[    0.6s] RUNG P4 first held by node 1 (level 0, 421 trials so far)
+[    0.6s] RUNG P5 first held by node 1 (level 0, 421 trials so far)
+[    0.6s] RUNG P6 first held by node 1 (level 0, 421 trials so far)
+[    6.5s] WATCH var:263=1 first held by node 442
+[   13.5s] kept 1165 [419, 110, 203, 44, 388], expanded 37, level 0 (1128 queued there), queued [0, 106, 203, 44, 388], trials 12956 (983/s), rooms 10, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 24
+[   25.3s] kept 1928 [589, 179, 372, 77, 710], expanded 67, level 0 (1861 queued there), queued [0, 175, 372, 77, 710], trials 27281 (1213/s), rooms 13, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 54
+[   38.3s] kept 2704 [793, 253, 526, 124, 1007], expanded 103, level 0 (2601 queued there), queued [0, 249, 526, 124, 1007], trials 40267 (999/s), rooms 13, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 90
+[   50.1s] kept 3268 [841, 296, 658, 241, 1231], expanded 139, level 0 (3129 queued there), queued [0, 292, 658, 241, 1231], trials 59365 (1613/s), rooms 23, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 126
+[   60.7s] kept 3842 [883, 329, 755, 342, 1532], expanded 175, level 0 (3667 queued there), queued [0, 325, 755, 342, 1532], trials 74509 (1429/s), rooms 30, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 162
+[   72.0s] kept 4471 [958, 389, 873, 445, 1805], expanded 217, level 0 (4254 queued there), queued [0, 385, 873, 445, 1805], trials 86623 (1075/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 204
+[   83.0s] kept 4917 [1054, 434, 968, 493, 1967], expanded 259, level 0 (4658 queued there), queued [0, 430, 968, 493, 1967], trials 100070 (1221/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 246
+[   93.6s] kept 5420 [1101, 493, 1075, 583, 2167], expanded 295, level 0 (5125 queued there), queued [0, 489, 1075, 583, 2167], trials 115367 (1441/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 282
+[  104.6s] kept 5952 [1151, 536, 1157, 674, 2433], expanded 331, level 0 (5621 queued there), queued [0, 532, 1157, 674, 2433], trials 130181 (1351/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 318
+[  109.0s] WATCH var:263=2 first held by node 6089
+[  115.3s] kept 6403 [1283, 592, 1293, 689, 2545], expanded 373, level 0 (6030 queued there), queued [0, 588, 1293, 689, 2545], trials 140794 (986/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 360
+[  126.5s] kept 6664 [1297, 627, 1337, 689, 2713], expanded 397, level 0 (6267 queued there), queued [0, 623, 1337, 689, 2713], trials 163285 (2021/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 384
+[  137.9s] kept 7097 [1390, 720, 1435, 691, 2860], expanded 445, level 0 (6652 queued there), queued [0, 716, 1435, 691, 2860], trials 174660 (996/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 432
+[  148.2s] kept 7469 [1445, 794, 1502, 695, 3032], expanded 481, level 0 (6988 queued there), queued [0, 790, 1502, 695, 3032], trials 190130 (1495/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 468
+[  151.6s] WATCH var:263=3 first held by node 7563
+[  159.6s] kept 7919 [1554, 861, 1608, 695, 3200], expanded 529, level 0 (7390 queued there), queued [0, 857, 1608, 695, 3200], trials 200047 (876/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 516
+[  169.6s] kept 8324 [1600, 920, 1683, 697, 3423], expanded 565, level 0 (7759 queued there), queued [0, 916, 1683, 697, 3423], trials 213997 (1389/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 552
+[  181.1s] kept 8703 [1662, 1000, 1752, 699, 3589], expanded 613, level 0 (8090 queued there), queued [0, 996, 1752, 699, 3589], trials 227355 (1167/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 600
+[  192.6s] kept 9082 [1740, 1072, 1827, 706, 3736], expanded 661, level 0 (8421 queued there), queued [0, 1068, 1827, 706, 3736], trials 238308 (952/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 648
+[  202.6s] kept 9406 [1785, 1129, 1855, 708, 3928], expanded 703, level 0 (8703 queued there), queued [0, 1125, 1855, 708, 3928], trials 249585 (1124/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 690
+[  213.6s] kept 9767 [1850, 1199, 1942, 710, 4065], expanded 745, level 0 (9022 queued there), queued [0, 1195, 1942, 710, 4065], trials 262901 (1210/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 732
+[  223.7s] kept 10104 [1891, 1237, 1998, 712, 4265], expanded 781, level 0 (9323 queued there), queued [0, 1233, 1998, 712, 4265], trials 276455 (1337/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 768
+[  234.7s] kept 10417 [1967, 1272, 2034, 721, 4422], expanded 835, level 0 (9582 queued there), queued [0, 1268, 2034, 721, 4422], trials 283874 (678/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 822
+[  245.8s] kept 10818 [2036, 1343, 2135, 722, 4581], expanded 877, level 0 (9941 queued there), queued [0, 1339, 2135, 722, 4581], trials 296662 (1152/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 864
+[  256.3s] kept 11229 [2100, 1417, 2208, 722, 4781], expanded 919, level 0 (10310 queued there), queued [0, 1413, 2208, 722, 4781], trials 304060 (701/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 906
+[  267.1s] kept 11535 [2143, 1501, 2236, 723, 4931], expanded 961, level 0 (10574 queued there), queued [0, 1497, 2236, 723, 4931], trials 316669 (1173/s), rooms 31, rungs ["P0", "P2", "P3", "P4", "P5", "P6"], boots 948

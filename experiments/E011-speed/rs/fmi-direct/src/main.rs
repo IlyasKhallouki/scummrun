@@ -117,6 +117,8 @@ const QUEUES: usize = 5;
 const LIVE_QUEUES: usize = 3;
 /// The queues expanded at every level, the highest first, before any level's later ones.
 const FIRST_QUEUES: usize = 4;
+/// The kept stops of one expanded stop that get a kept engine.
+const LIVE_EACH: usize = 8;
 /// Stops of one batch for each worker.
 const BATCH: usize = 3;
 /// A variable seen with more values than this in kept stops counts no more.
@@ -1469,9 +1471,16 @@ impl Search {
             } else {
                 self.queues[level][class].push_back(nid);
             }
-            if class < LIVE_QUEUES && self.live.len() + self.making < self.live_max {
-                self.making += 1;
+            if class < LIVE_QUEUES {
                 make.push((nid, results[i].events.clone(), results[i].st.frame));
+            }
+        }
+        // a kept engine for LIVE_EACH of them: the last ones where the newest stop is taken first, else the first
+        if make.len() > LIVE_EACH {
+            if self.flag_lines {
+                make.drain(..make.len() - LIVE_EACH);
+            } else {
+                make.truncate(LIVE_EACH);
             }
         }
         make
@@ -1916,6 +1925,13 @@ fn main() {
         s.making = 0;
         for (nid, b) in made.into_inner().unwrap() {
             s.live.insert(nid, b);
+        }
+        // the oldest kept engines go when there are too many: their stops wait longest
+        while s.live.len() > s.live_max {
+            let Some(&old) = s.live.keys().min() else { break };
+            if let Some(e) = s.live.remove(&old) {
+                e.quit();
+            }
         }
         if printed.elapsed() >= Duration::from_secs(10) {
             s.progress(&mut last, printed.elapsed().as_secs_f64());
