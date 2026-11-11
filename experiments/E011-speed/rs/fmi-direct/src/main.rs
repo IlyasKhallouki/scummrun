@@ -587,6 +587,18 @@ struct MidCand {
     vars: Facts,
 }
 
+/// What the scripts are LEAD and LEAD + CALM frames on from a stop with no input, and the facts there.
+type Quiet = (u64, u64, Option<Facts>, Option<Facts>);
+
+/// One click's trial from a half-made stop: its results, what it leaves to the round, the slot it learned to skip,
+/// the first click of its sequence (a trace).
+struct PointOut {
+    out: Out,
+    acts: Vec<Act>,
+    learned: Vec<Hit>,
+    first: Option<String>,
+}
+
 /// One half-made stop's clicks: the trials' results, what is left to the round, the slots it learned to skip (the
 /// first stop of the second depth), a trace's counts.
 struct MidOut {
@@ -873,7 +885,7 @@ fn clicks(
     // lists and writes none: what the round decides (which stops are clicked on from, which windows are followed,
     // what the slots teach) is left in `acts`, in the clicks' order. So stops that no stop before them in the round's
     // order can change are worked on side by side, and the round is what it is with one thread.
-    let task = |me: &mut Box<dyn Engine>, m: &MidAt, depth: usize, skip: &Option<HashSet<Hit>>, shifters: &HashSet<Hit>, first_gave: &HashMap<Hit, u64>| -> EResult<MidOut> {
+    let task = |me: &mut Box<dyn Engine>, m: &MidAt, depth: usize, inner: usize, skip: &Option<HashSet<Hit>>, shifters: &HashSet<Hit>, first_gave: &HashMap<Hit, u64>| -> EResult<MidOut> {
         let mut out = Out::default();
         let mut acts: Vec<Act> = Vec::new();
         let mut by_first: HashMap<String, u64> = HashMap::new();
@@ -891,7 +903,7 @@ fn clicks(
             let mf = me.status().frame;
             // what the scripts are at LEAD and LEAD + CALM frames on with no input (made at the first click that may
             // have changed the interface alone)
-            let mut quiet: Option<(u64, u64, Option<Facts>, Option<Facts>)> = None;
+            let quiet: Mutex<Option<Arc<Quiet>>> = Mutex::new(None);
             let learn = depth == 2 && skip.is_none() && m.only.is_none();
             let mut learned: HashSet<Hit> = HashSet::new();
             let mego = o.ego_pos;
@@ -932,13 +944,21 @@ fn clicks(
                     }
                 }
             }
-            for p in points.iter() {
+            // One click from the stop: its trial, and what it leaves for the stop's list. It reads the stop and
+            // writes nothing of it, so a stop's clicks run side by side where the stop stands alone in its group,
+            // each thread forking its trials from a copy of the stop's engine of its own
+            let point = |src: &mut Box<dyn Engine>, p: &Point, twin: &mut Option<Box<dyn Engine>>| -> EResult<PointOut> {
+                let mut out = Out::default();
+                let mut acts: Vec<Act> = Vec::new();
+                let mut learned: Vec<Hit> = Vec::new();
+                let mut first: Option<String> = None;
+                let mut qv: Option<Arc<Quiet>> = None;
                 if depth >= 2 && (skip.as_ref().is_some_and(|s| s.contains(&p.hit)) || shifters.contains(&p.hit)) {
                     out.skipped += 1;
-                    continue;
+                    return Ok(PointOut { out, acts, learned, first });
                 }
                 let t = Instant::now();
-                let mut b = me.fork()?;
+                let mut b = src.fork()?;
                 out.phase[0] += t.elapsed().as_secs_f64();
                 let t = Instant::now();
                 let mut cl = m.clicks.clone();
@@ -950,14 +970,14 @@ fn clicks(
                 }
                 out.trials += 1;
                 if tracing {
-                    *by_first.entry(cl[0].hit.name()).or_default() += 1;
+                    first = Some(cl[0].hit.name());
                 }
                 match b.inputs(&events[m.events.len()..]) {
                     Ok(()) => {}
                     Err(EngineError::Bridge(_)) => {
                         out.refused += 1;
                         b.quit();
-                        continue;
+                        return Ok(PointOut { out, acts, learned, first });
                     }
                     Err(x) => return Err(x),
                 }
@@ -968,7 +988,7 @@ fn clicks(
                     Err(st) => {
                         out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                         b.quit();
-                        continue;
+                        return Ok(PointOut { out, acts, learned, first });
                     }
                 };
                 if depth == 1 {
@@ -1012,32 +1032,37 @@ fn clicks(
                         // and no script is anywhere else than with no input at all: a dialog's line clears the
                         // choices at once and its script goes on a few frames later; such a click is read where
                         // the game has settled, as any other
-                        if quiet.is_none() {
-                            let mut tw = me.fork()?;
-                            out.trials += 1;
-                            let mut at = [0u64; 2];
-                            let mut w: [Option<Facts>; 2] = [None, None];
-                            for (k, f) in [mf + LEAD, mf + LEAD + CALM].into_iter().enumerate() {
-                                if go(&mut tw, RunSpec { frame: Some(f), ..Default::default() })?.is_ok() {
-                                    let to = tw.obs(&NAMES)?;
-                                    at[k] = scripts_of(&to);
-                                    w[k] = Some(facts_of(&to));
+                        // (made once for the stop, by the first click that asks for it)
+                        qv = Some({
+                            let mut g = quiet.lock().unwrap();
+                            if g.is_none() {
+                                let mut tw = src.fork()?;
+                                out.trials += 1;
+                                let mut at = [0u64; 2];
+                                let mut w: [Option<Facts>; 2] = [None, None];
+                                for (k, f) in [mf + LEAD, mf + LEAD + CALM].into_iter().enumerate() {
+                                    if go(&mut tw, RunSpec { frame: Some(f), ..Default::default() })?.is_ok() {
+                                        let to = tw.obs(&NAMES)?;
+                                        at[k] = scripts_of(&to);
+                                        w[k] = Some(facts_of(&to));
+                                    }
                                 }
+                                tw.quit();
+                                let [w0, w1] = w;
+                                *g = Some(Arc::new((at[0], at[1], w0, w1)));
                             }
-                            tw.quit();
-                            let [w0, w1] = w;
-                            quiet = Some((at[0], at[1], w0, w1));
-                        }
-                        let still = quiet.as_ref().is_some_and(|q| q.0 == scripts_of(&ob));
+                            g.clone().unwrap()
+                        });
+                        let still = qv.as_ref().is_some_and(|q| q.0 == scripts_of(&ob));
                         if shows && slot {
-                            if let Some(w) = quiet.as_ref().and_then(|q| q.2.as_ref()) {
+                            if let Some(w) = qv.as_ref().and_then(|q| q.2.as_ref()) {
                                 vd = w.diff(&facts_of(&ob)).into_iter().filter(|d| d.0.kind() == K_VAR).map(|d| d.0).collect();
                             }
                         }
                         if vd.len() < 2 {
                             vd.clear();
                         }
-                        shows = shows && still && (iface(&ob) != m.iface || !vd.is_empty()) && quiet.as_ref().is_some_and(|q| world_same(&ob, &q.2));
+                        shows = shows && still && (iface(&ob) != m.iface || !vd.is_empty()) && qv.as_ref().is_some_and(|q| world_same(&ob, &q.2));
                         half = half3 && still;
                     }
                     if !half3 || half {
@@ -1049,12 +1074,12 @@ fn clicks(
                             Err(st) => {
                                 out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                                 b.quit();
-                                continue;
+                                return Ok(PointOut { out, acts, learned, first });
                             }
                             Ok(st2) => {
                                 ran_on = true;
                                 let ob2 = b.obs(&NAMES)?;
-                                shows = st2.idle.is_some() && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && quiet.as_ref().is_some_and(|q| q.1 == scripts_of(&ob2) && world_same(&ob2, &q.3));
+                                shows = st2.idle.is_some() && st2.mv.unwrap_or(0) == 0 && ob2.ego_pos == mego && iface(&ob2) == shown3 && qv.as_ref().is_some_and(|q| q.1 == scripts_of(&ob2) && world_same(&ob2, &q.3));
                                 if shows {
                                     ob = ob2;
                                     at = st2;
@@ -1078,27 +1103,27 @@ fn clicks(
                             let before = m.only.clone().unwrap_or_else(|| shown.clone());
                             let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events };
                             acts.push(Act::Shows { hit: p.hit, page, vd, cand, before });
-                            continue;
+                            return Ok(PointOut { out, acts, learned, first });
                         }
                         if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                             if depth == 1 {
                                 acts.push(Act::Gave(p.hit, r.iface));
                             } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
-                                learned.insert(p.hit);
+                                learned.push(p.hit);
                             }
                         }
                         // a sentence begun after a page of the interface goes on at the slots that changed
                         let only = if depth == 1 { m.only.clone() } else { None };
                         let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events };
                         acts.push(Act::Half { cand, only, always: false });
-                        continue;
+                        return Ok(PointOut { out, acts, learned, first });
                     }
                 }
                 if !ran_on {
                     if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
                         out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                         b.quit();
-                        continue;
+                        return Ok(PointOut { out, acts, learned, first });
                     }
                 }
                 let played = calm(&mut b, mf, cfg.horizon, ego)?;
@@ -1123,7 +1148,7 @@ fn clicks(
                         let half = half
                             || (matches!(p.hit, Hit::Verb { .. }) && r.room == r0.room && ob.ego_pos == mego && r.st.idle.as_deref() == Some("sentence") && r.iface != m.iface && {
                                 let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
-                                twins.world(&mut twin, r.st.frame)?.is_some_and(|tw| tw.diff(&mine).is_empty())
+                                twins.world(twin, r.st.frame)?.is_some_and(|tw| tw.diff(&mine).is_empty())
                             });
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
@@ -1131,7 +1156,7 @@ fn clicks(
                                 if depth == 1 {
                                     acts.push(Act::Gave(p.hit, r.iface));
                                 } else if learn && (first_gave.get(&p.hit) == Some(&r.iface) || r.iface == m.iface) {
-                                    learned.insert(p.hit);
+                                    learned.push(p.hit);
                                 }
                             }
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
@@ -1139,12 +1164,12 @@ fn clicks(
                             let cand = MidCand { base: mkey(&r), vars: vars_of(&r.facts), engine: b, clicks: cl, iface: r.iface, events: r.events.clone() };
                             acts.push(Act::Half { cand, only: None, always: true });
                             out.results.push(slim(r, base));
-                            continue;
+                            return Ok(PointOut { out, acts, learned, first });
                         } else {
                             // what the input changed: the stop against the twin at its frame (each with its old value)
                             let mut touched: Vec<(Key, Val)> = Vec::new();
                             if r.room == r0.room {
-                                if let Some(tw) = twins.world(&mut twin, r.st.frame)? {
+                                if let Some(tw) = twins.world(twin, r.st.frame)? {
                                     let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
                                     touched = tw
                                         .diff(&mine)
@@ -1187,7 +1212,7 @@ fn clicks(
                                 if back.iter().any(|&k| snap.wins.get(&(c, k)).copied().unwrap_or(0) < WINDOW_TRIES) {
                                     acts.push(Act::Window(Cand { engine: b, name: format!("{}>", r.name), events: r.events.clone(), keys: touched.clone(), cell: c, back }));
                                     out.results.push(slim(r, base));
-                                    continue;
+                                    return Ok(PointOut { out, acts, learned, first });
                                 }
                             }
                             out.results.push(slim(r, base));
@@ -1199,6 +1224,56 @@ fn clicks(
                 let t = Instant::now();
                 b.quit();
                 out.phase[4] += t.elapsed().as_secs_f64();
+                Ok(PointOut { out, acts, learned, first })
+            };
+            let outs: Vec<EResult<PointOut>> = if inner <= 1 || points.len() < 2 * inner {
+                let mut v = Vec::with_capacity(points.len());
+                for p in points.iter() {
+                    let r = point(me, p, &mut twin);
+                    let bad = r.is_err();
+                    v.push(r);
+                    if bad {
+                        break;
+                    }
+                }
+                v
+            } else {
+                let mut copies: Vec<Mutex<Option<Box<dyn Engine>>>> = Vec::new();
+                for _ in 0..inner {
+                    copies.push(Mutex::new(Some(me.fork()?)));
+                }
+                let slots: Vec<Mutex<Option<EResult<PointOut>>>> = points.iter().map(|_| Mutex::new(None)).collect();
+                let at = AtomicUsize::new(0);
+                std::thread::scope(|sc| {
+                    for c in &copies {
+                        sc.spawn(|| {
+                            let mut eng = c.lock().unwrap().take().expect("the thread's copy of the stop's engine");
+                            let mut twin: Option<Box<dyn Engine>> = None;
+                            loop {
+                                let i = at.fetch_add(1, Ordering::Relaxed);
+                                if i >= points.len() {
+                                    break;
+                                }
+                                *slots[i].lock().unwrap() = Some(point(&mut eng, &points[i], &mut twin));
+                            }
+                            if let Some(t) = twin.take() {
+                                t.quit();
+                            }
+                            eng.quit();
+                        });
+                    }
+                });
+                slots.into_iter().map(|x| x.into_inner().unwrap().expect("every click of the stop")).collect()
+            };
+            // in the clicks' order
+            for po in outs {
+                let po = po?;
+                out.absorb(po.out);
+                acts.extend(po.acts);
+                learned.extend(po.learned);
+                if let Some(f) = po.first {
+                    *by_first.entry(f).or_default() += 1;
+                }
             }
             if let Some(t) = twin.take() {
                 t.quit();
@@ -1219,8 +1294,8 @@ fn clicks(
             let tg = Instant::now();
             let outs: Vec<EResult<MidOut>> = if n == 1 {
                 let r = match engines[0].as_mut() {
-                    Some(x) => task(x, &group[0], depth, &skip, &shifters, &first_gave),
-                    None => task(&mut *e, &group[0], depth, &skip, &shifters, &first_gave),
+                    Some(x) => task(x, &group[0], depth, threads, &skip, &shifters, &first_gave),
+                    None => task(&mut *e, &group[0], depth, threads, &skip, &shifters, &first_gave),
                 };
                 vec![r]
             } else {
@@ -1235,7 +1310,7 @@ fn clicks(
                                 break;
                             }
                             let mut eng = slots[i].lock().unwrap().take().expect("a half-made stop's engine");
-                            let r = task(&mut eng, &group[i], depth, &skip, &shifters, &first_gave);
+                            let r = task(&mut eng, &group[i], depth, 1, &skip, &shifters, &first_gave);
                             eng.quit();
                             *res[i].lock().unwrap() = Some(r);
                         });
