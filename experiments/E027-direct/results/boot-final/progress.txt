@@ -1,0 +1,8 @@
+[   57.0s] RUNG P2 first held by node 336 (level 0, 13277 trials so far)
+[ 2792.3s] RUNG P1 first held by node 4653 (level 8, 486967 trials so far)
+[ 2809.8s] WATCH owner:568=1 first held by node 4758
+[ 2929.0s] RUNG P6 first held by node 5137 (level 18, 519624 trials so far)
+[ 5277.1s] RUNG P4 first held by node 7212 (level 18, 860477 trials so far)
+[ 5977.4s] RUNG P3 first held by node 7590 (level 19, 933448 trials so far)
+[ 9176.4s] RUNG P5 first held by node 9156 (level 19, 1415739 trials so far)
+[11371.1s] RUNG P7 first held by node 14285 (level 20, 1568142 trials so far)
