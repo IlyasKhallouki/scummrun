@@ -29,16 +29,29 @@ pts = sorted((t["tick"], t["qf"] / 4 - t["tick"]) for t in trace if t["type"] in
 marks = sorted(t["tick"] for t in trace if t["type"] in ("room", "skip"))
 pcm = np.fromfile(f"{cap}/cap.pcm", dtype="<i2").reshape(-1, 2)
 per_tick = len(pcm) / end["tick"]
-pieces, pos, prev = [], 0, pts[0]
+EDGE = rate * 15 // 1000
+pieces, pos, prev, rise = [], 0, pts[0], False
 for tk, d in pts[1:]:
     gap = d - prev[1]
     if gap > 0:
         at = next((m for m in marks if prev[0] <= m <= tk), tk)
         a = int(round(at * per_tick))
-        pieces.append(pcm[pos:a]); pieces.append(np.zeros((int(round(gap * rate / FPS)), 2), dtype="<i2"))
-        pos = a
+        # (the sound goes down before the silence and comes up after it, 15 ms each: no click at the cut)
+        seg = pcm[pos:a].astype(np.float32)
+        n = min(len(seg), EDGE)
+        if n:
+            seg[len(seg) - n:] *= np.linspace(1.0, 0.0, n, dtype=np.float32)[:, None]
+        if rise and len(seg):
+            m = min(len(seg), EDGE)
+            seg[:m] *= np.linspace(0.0, 1.0, m, dtype=np.float32)[:, None]
+        pieces.append(seg.astype("<i2")); pieces.append(np.zeros((int(round(gap * rate / FPS)), 2), dtype="<i2"))
+        pos, rise = a, True
     prev = (tk, d)
-pieces.append(pcm[pos:])
+seg = pcm[pos:].astype(np.float32)
+if rise and len(seg):
+    m = min(len(seg), EDGE)
+    seg[:m] *= np.linspace(0.0, 1.0, m, dtype=np.float32)[:, None]
+pieces.append(seg.astype("<i2"))
 audio = np.concatenate(pieces).astype(np.float32)
 # the sound stops with the capture: its last third of a second fades, so it does not end on a cut
 n = min(len(audio), rate // 3)
