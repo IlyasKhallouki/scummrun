@@ -95,7 +95,8 @@
 //!   then goes through what it saw there, and only then turns to the line before. With `--shares` the lines take
 //!   turns instead: the highest level's newest line every second turn, the next every fourth, and so on (a line
 //!   entered on the way, with much in it, had every turn otherwise); and a stop at the end of a walk the search
-//!   made has its turn before any line's.
+//!   made has its turn before any line's, and so has a stop made inside a window that is new by a guide
+//!   variable's value (a count the game keeps of what was done while the window was open is followed at once).
 //! * **Where to go (`--go`).** A stop that begins a line has won something: an object, a flag. The scripts name
 //!   it somewhere (an owner asked for, the other object of a sentence, a flag tested): from that stop one walk is
 //!   made to each of the nearest GO_ROOMS rooms whose scripts do, over the clicks that were seen to lead from room
@@ -205,6 +206,9 @@ struct Node {
     news: Vec<Key>,
     /// the stop at the end of a walk the search made (`--go`)
     walk: bool,
+    /// a stop made inside a window that is new by a guide variable's value (a count the game keeps of what was
+    /// done while the window was open)
+    win: bool,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -2389,10 +2393,12 @@ impl Search {
                 // another room or another line: every atom of its world (its facts put together again)
                 self.policy.world_of(&patched(base, d))
             };
+            let mut count_new = false;
             for &(k, val) in &atoms {
                 let guide = self.policy.guide.contains(&k);
                 if k.kind() == K_VAR {
                     if self.seen.insert((line, k, val)) {
+                        count_new = true;
                         novel.push(format!("{k}={val}"));
                         class = class.min(2);
                         let vals = self.var_vals.entry(k).or_default();
@@ -2567,7 +2573,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go"), win: count_new && r.name.contains('>') });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -3035,7 +3041,7 @@ fn main() {
             "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
         let _ = f.write_all(format!("{first}\n").as_bytes());
     }
-    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false });
+    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
@@ -3083,18 +3089,24 @@ fn main() {
             // and before any line's turn, a stop at the end of a walk the search made (the newest first): the scripts
             // name that room for what the line's first stop won, so it is looked at once before the line goes on.
             // (Such a stop is of the line of the stop that won, which is an old line as soon as another begins.)
+            // The same for a stop made inside a window that is new by a guide variable's value: a count the game
+            // keeps of what was done while the window was open. Such a stop is of the line of the stop the window
+            // was found at, which may have no turn for long, and in its third queue (an input, the same inside its
+            // window, the same again inside that one's, and then another: each stop new by the count alone).
+            // (A stop new there by a key of the world has the stack of its line; put first as well, such stops
+            // took half the turns and the check from vm24's stop held nothing in 30 stops.)
             let walked = if s.shares && newest {
                 // (the stop, its level, its queue or usize::MAX for the stack, its place there)
                 let mut best: Option<(usize, usize, usize, usize)> = None;
                 for l in 0..s.queues.len() {
                     for (i, &id) in s.stacks.get(l).into_iter().flatten().enumerate() {
-                        if s.nodes[id].walk && best.map_or(true, |b| id > b.0) {
+                        if (s.nodes[id].walk || s.nodes[id].win) && best.map_or(true, |b| id > b.0) {
                             best = Some((id, l, usize::MAX, i));
                         }
                     }
                     for c in 0..FIRST_QUEUES {
                         for (i, &id) in s.queues[l][c].iter().enumerate() {
-                            if s.nodes[id].walk && best.map_or(true, |b| id > b.0) {
+                            if (s.nodes[id].walk || s.nodes[id].win) && best.map_or(true, |b| id > b.0) {
                                 best = Some((id, l, c, i));
                             }
                         }
