@@ -195,6 +195,8 @@ const COUNT_FEW: usize = 4;
 const COUNT_INPUTS: usize = 4;
 const COUNT_GROUPS: usize = 3;
 const COUNT_STATES: usize = 256;
+/// `--go`: the walks made from the states of one group of counts to the rooms whose scripts read them
+const COUNT_WALKS: usize = 8;
 const GO_HOPS: usize = 14;
 /// Floor clicks a walk may make in one room to bring a thing onto the screen.
 const GO_SCROLLS: usize = 8;
@@ -294,6 +296,8 @@ struct Search {
     shares: bool,
     /// the stops expanded for a dead end (one click given there): none is given from them
     given: HashSet<usize>,
+    /// where a count was walked to (`explore`'s counting): (the line of gains, the room, the count, its value)
+    went: HashSet<(u64, i32, Key, Val)>,
     /// --motion-once: a key the game moves by itself is new once in a line of gains
     motion_once: bool,
     tick: u64,
@@ -1652,6 +1656,9 @@ fn round(e: &mut Box<dyn Engine>, pre: &str, lead: &[Event], motion: Option<&Has
 struct Mentions {
     objs: HashMap<u32, Vec<i32>>,
     bits: HashMap<u32, Vec<i32>>,
+    /// per variable the scripts of a few rooms count on (add to or take from; GLOBAL_ROOMS rooms at most: one
+    /// counted on in every room is a script's scratch), the rooms whose own scripts read it
+    vars: HashMap<u32, Vec<i32>>,
     /// (from room, to room, object): the object's own code leads ego from its room to the other
     exits: Vec<(i32, i32, i32)>,
 }
@@ -1672,9 +1679,10 @@ fn nums_after(line: &str, pat: &str) -> Vec<u32> {
 }
 
 /// The objects a script's text names (an owner asked for, a second object compared, an object's code started, a
-/// class asked for or set, a sentence's objects) and the flags it tests (a flag written is no test).
-fn names_of(text: &str) -> (Vec<u32>, Vec<u32>) {
-    let (mut objs, mut bits) = (Vec::new(), Vec::new());
+/// class asked for or set, a sentence's objects), the flags it tests (a flag written is no test), the variables
+/// it reads and those it counts on (adds to or takes from; one set to a value is neither).
+fn names_of(text: &str) -> (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) {
+    let (mut objs, mut bits, mut vars, mut counted) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for line in text.lines().filter(|l| !l.starts_with('#')) {
         for pat in ["getObjectOwner(", "startObject(", "classOfIs(", "setClass(", "pickupObject("] {
             objs.extend(nums_after(line, pat));
@@ -1706,8 +1714,22 @@ fn names_of(text: &str) -> (Vec<u32>, Vec<u32>) {
             }
             at = from;
         }
+        let mut at = 0;
+        while let Some(i) = line[at..].find("Var[") {
+            let from = at + i + 4;
+            let digits: String = line[from..].chars().take_while(|c| c.is_ascii_digit()).collect();
+            let after = &line[from + digits.len()..];
+            if let (Ok(n), true) = (digits.parse::<u32>(), after.starts_with(']')) {
+                if ["] += ", "] -= ", "]++", "]--"].iter().any(|w| after.starts_with(w)) {
+                    counted.push(n);
+                } else if !after.starts_with("] = ") {
+                    vars.push(n);
+                }
+            }
+            at = from;
+        }
     }
-    (objs, bits)
+    (objs, bits, vars, counted)
 }
 
 /// The mentions of a scripts' dump: a room's scripts' own, those of the global scripts few rooms start (GLOBAL_ROOMS
@@ -1720,6 +1742,7 @@ fn mentions_of(dir: &Path) -> Mentions {
     let mut home: HashMap<u32, i32> = HashMap::new();
     let mut own: HashMap<u32, Vec<u32>> = HashMap::new();
     let mut globals: HashMap<u32, (Vec<u32>, Vec<u32>)> = HashMap::new();
+    let (mut read, mut counts): (HashMap<u32, Vec<i32>>, HashMap<u32, Vec<i32>>) = (HashMap::new(), HashMap::new());
     let mut starts: HashMap<u32, Vec<i32>> = HashMap::new();
     let Ok(rd) = std::fs::read_dir(dir) else { return m };
     let mut folders: Vec<PathBuf> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect();
@@ -1733,7 +1756,7 @@ fn mentions_of(dir: &Path) -> Mentions {
         for f in files {
             let name = f.file_name().and_then(|x| x.to_str()).unwrap_or("").to_string();
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
-            let (objs, bits) = names_of(&text);
+            let (objs, bits, vars, counted) = names_of(&text);
             match room {
                 Some(r) => {
                     let me = num(&name, "obj-");
@@ -1762,6 +1785,14 @@ fn mentions_of(dir: &Path) -> Mentions {
                         let v = m.bits.entry(b).or_default();
                         if !v.contains(&r) {
                             v.push(r);
+                        }
+                    }
+                    for (list, into) in [(vars, &mut read), (counted, &mut counts)] {
+                        for x in list {
+                            let v = into.entry(x).or_default();
+                            if !v.contains(&r) {
+                                v.push(r);
+                            }
                         }
                     }
                     for g in text.lines().filter(|l| !l.starts_with('#')).flat_map(|l| nums_after(l, "startScript(")) {
@@ -1796,6 +1827,13 @@ fn mentions_of(dir: &Path) -> Mentions {
             }
         }
     }
+    for (x, rooms) in counts {
+        if rooms.len() <= GLOBAL_ROOMS {
+            if let Some(r) = read.remove(&x) {
+                m.vars.insert(x, r);
+            }
+        }
+    }
     for (o, others) in &own {
         for r in others.iter().filter_map(|x| home.get(x)) {
             let v = m.objs.entry(*o).or_default();
@@ -1804,7 +1842,7 @@ fn mentions_of(dir: &Path) -> Mentions {
             }
         }
     }
-    for v in m.objs.values_mut().chain(m.bits.values_mut()) {
+    for v in m.objs.values_mut().chain(m.bits.values_mut()).chain(m.vars.values_mut()) {
         v.sort_unstable();
     }
     m
@@ -2431,6 +2469,28 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                 }
                 h.finish()
             };
+            // --go: a count counts where the scripts read it, and that may be another room (what is set here is
+            // asked for there). For the counts the scripts of a few rooms add to or take from (`Mentions::vars`):
+            // from each state of the counts a walk to the other rooms whose scripts read one, the nearest first,
+            // one trial a walk, COUNT_WALKS at most. A walk's stop is a walk's stop like any other: new there by
+            // the count's value if it is, and expanded before the lines' turns. (A state of the counts alone is no
+            // stop here, and as a stop of its own it is new by a variable's value alone and waits: 633 such stops
+            // stood before it in one run)
+            let mut ways: Vec<Vec<(i32, &Vec<Hit>)>> = Vec::new();
+            if snap.go {
+                let mut rooms: Vec<i32> = Vec::new();
+                for k in &vars {
+                    for &r in snap.mentions.vars.get(&(k.a() as u32)).into_iter().flatten() {
+                        if r != r0.room && !rooms.contains(&r) {
+                            rooms.push(r);
+                        }
+                    }
+                }
+                ways = rooms.iter().filter_map(|&t| way(snap.edges, r0.room, t)).collect();
+                ways.sort_by_key(|w| (w.len(), w.last().map(|x| x.0)));
+                ways.truncate(GO_ROOMS);
+            }
+            let mut walks = 0usize;
             let mut led: HashSet<u64> = HashSet::from([beside(&r0.facts)]);
             let mut seen: HashSet<u64> = HashSet::from([state(&r0.facts)]);
             let mut queue: VecDeque<(Box<dyn Engine>, String, Vec<Event>, usize)> = VecDeque::from([(e.fork()?, String::new(), Vec::new(), 0)]);
@@ -2457,6 +2517,24 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                             made += 1;
                             out.results.push(slim(r, &r0.facts));
                         }
+                        if fresh && here {
+                            for w in &ways {
+                                if walks >= COUNT_WALKS {
+                                    break;
+                                }
+                                walks += 1;
+                                out.trials += 1;
+                                if let Some(mut r) = walk(&mut b, w, ego, cfg, &mut out.bad)? {
+                                    let mut whole = all.clone();
+                                    whole.append(&mut r.events);
+                                    r.events = whole;
+                                    // ("gone": a walk made with a count; first in its room with that value in
+                                    // its line of gains, it goes before the lines' turns as a walk does)
+                                    r.name = format!("gone{}", r.room);
+                                    out.results.push(slim(r, &r0.facts));
+                                }
+                            }
+                        }
                         if fresh && here && seen.len() < COUNT_STATES {
                             queue.push_back((b, rname, all, depth + 1));
                         } else {
@@ -2465,6 +2543,9 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                     }
                 }
                 at.quit();
+            }
+            if walks > 0 {
+                trace(&format!("  room {} counting: {walks} walks to {:?}", r0.room, ways.iter().map(|w| w.last().map(|x| x.0)).collect::<Vec<_>>()));
             }
             trace(&format!("  room {} counting: inputs {:?}, counts {:?}, keys {:?}, {} states, {} stops", r0.room, inputs.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vars.iter().map(|k| format!("{k}")).collect::<Vec<_>>(), keys.iter().map(|k| format!("{k}")).collect::<Vec<_>>(), seen.len(), made));
         }
@@ -2768,9 +2849,15 @@ impl Search {
                 self.policy.world_of(&patched(base, d))
             };
             let mut count_new = false;
+            // a walk made with a count goes first once for the room and the count's value in a line of gains (in
+            // every line a set of flags begins it would be first again: 16 of 40 stops in one check)
+            let mut count_went = false;
             for &(k, val) in &atoms {
                 let guide = self.policy.guide.contains(&k);
                 if k.kind() == K_VAR {
+                    if r.name.starts_with("gone") && self.mentions.vars.contains_key(&(k.a() as u32)) && self.went.insert((gline, r.room, k, val)) {
+                        count_went = true;
+                    }
                     if self.seen.insert((line, k, val)) {
                         count_new = true;
                         novel.push(format!("{k}={val}"));
@@ -2999,7 +3086,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go"), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+') });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") && (count_went || !r.name.starts_with("gone")), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+') });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -3406,6 +3493,7 @@ fn main() {
             }
         }
         eprintln!("mentions: {} objects, {} flags named in rooms' scripts; {} ways from room to room seen, {} more the scripts advise", s.mentions.objs.len(), s.mentions.bits.len(), seen, s.edges.len() - seen);
+        trace(&format!("mentions: {} variables a few rooms' scripts count on", s.mentions.vars.len()));
     }
     s.edges_log = std::fs::File::create(out.join("edges.jsonl")).ok();
     if let Some(f) = s.edges_log.as_mut() {

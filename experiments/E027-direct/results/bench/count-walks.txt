@@ -1,0 +1,24 @@
+E027 bench, 2026-11-12: a count is walked to the rooms whose scripts read it. In the counting step, for the
+counts that the scripts of a few rooms add to or take from (3 rooms at most; the scripts' dump, as advice): from
+each state of the counts a walk to the other rooms whose own scripts read one of them, the nearest first, one
+trial a walk, 8 walks at most. The walk's stop goes before the lines' turns, as a walk's does, where it is the
+first in its room with that value of the count in its line of gains. Old: tree 15e5cfc (binary click1).
+
+From part3a's stop 6988 (room 16, level 13), 40 stops:
+old tree    part3a itself: the stop with var:242 = 4 (stop 7032) was new by that value alone and stood in the
+            third queue with 633 stops before it, 665 of that queue's 794 new by ego's walk box alone; bit:530
+            never set in 2 h (1,309 stops, 714,060 trials), no gain in the run's last 60 minutes
+this tree   8 walks from room 16 to room 11; bit:530 set by the 4th stop, 33.2 s; room 20 entered at 170.9 s;
+            6 of the 40 stops are such walks' stops (16 of 40 before the walk went first only once for a room and
+            a value in a line of gains); 31,722 trials
+
+Monkey Island's scripts: 71 variables are added to or taken from; 24 of them in 3 rooms' scripts at most.
+
+Five stops from each reference (default flags):  trials  kept  digest       (old: the same)
+p7top       4791   104  5a020cf174
+cake        8213   124  a91ca2c9eb
+crew        3210   271  cb39ef7d95
+meathook    7631    51  a4cee03988
+boot        1549    40  6213300783
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).
