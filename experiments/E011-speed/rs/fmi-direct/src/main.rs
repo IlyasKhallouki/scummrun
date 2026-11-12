@@ -6,6 +6,7 @@
 //!
 //!   direct OUT [--minutes M] [--stops N] [--workers W] [--slices S] [--at-once A] [--horizon H] [--no-skips]
 //!              [--guide FILE] [--rungs FILE] [--watch KEY=V,..] [--lines gains] [--flag-lines] [--shares] [--go]
+//!              [--motion-once]
 //!              [--cross-pages]
 //!              [--from NODES ID | --from-run DIR] [--edges FILE] [--news KEY,..] [--ever OBJ,..]
 //!   direct verify NODES.jsonl ID OUT [KEY=V,..]      (a kept stop replayed from boot in a fresh engine)
@@ -289,6 +290,8 @@ struct Search {
     live: HashMap<usize, Box<dyn Engine>>,
     /// --shares: the lines take turns (the batch's loop), and the turns counted so far
     shares: bool,
+    /// --motion-once: a key the game moves by itself is new once in a line of gains
+    motion_once: bool,
     tick: u64,
     /// the engines of expanded stops, each with the count at its last use: a stop that comes of one of them, or of
     /// a stop that does, is made from it
@@ -2760,11 +2763,17 @@ impl Search {
                     }
                     continue;
                 }
-                if self.seen.insert((line, k, val)) {
+                // --motion-once (off by default; not yet run from the boot): a key the game moves by itself (a wait
+                // moved it at some stop: a room's own motion, a door on a timer) is new once in a line of gains,
+                // not once more in every line a set of flags begins there. No input brought the value about, and
+                // with each new set of flags a room's motion was news again (64% of a run's trials after its
+                // sixth rung, most of them in room 28)
+                let own = if self.motion_once && self.ambient.contains(&k) { gline } else { line };
+                if self.seen.insert((own, k, val)) {
                     novel.push(format!("{k}={val}"));
                     class = 0;
                 }
-                if self.seen_at.insert((line, r.room, k, val)) {
+                if self.seen_at.insert((own, r.room, k, val)) {
                     class = class.min(if guide { 3 } else { 4 });
                 }
             }
@@ -3340,6 +3349,7 @@ fn main() {
     s.gains_only = opt("--lines").as_deref() == Some("gains");
     s.flag_lines = a.iter().any(|x| x == "--flag-lines");
     s.shares = a.iter().any(|x| x == "--shares");
+    s.motion_once = a.iter().any(|x| x == "--motion-once");
     s.go = a.iter().any(|x| x == "--go");
     let mut loaded: Vec<String> = Vec::new();
     if s.go {

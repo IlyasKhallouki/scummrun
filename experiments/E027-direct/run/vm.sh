@@ -15,7 +15,8 @@
 #   vm.sh watch NAME            pull every 3 minutes until the run's summary is there (run it in the background)
 #   vm.sh kill                  end the run's processes on the VM
 #
-# Settings (environment): WORKERS (28), SLICES (7: threads for one stop's round), AT_ONCE (4: stops at once).
+# Settings (environment): WORKERS (28), SLICES (7: threads for one stop's round), AT_ONCE (4: stops at once),
+# EXTRA (more flags for the search, e.g. --motion-once).
 set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); ROOT=$(cd "$HERE/../../.." && pwd)
 IPF=$HOME/.cache/fast-mi-e026/vm/ip
@@ -51,7 +52,7 @@ source experiments/E027-direct/run/env.sh
 game_ok || true
 env \$ON \$MI /var/tmp/fast-mi/target-direct7/fast/direct $VMOUT/$name --minutes $minutes --workers ${WORKERS:-28} \\
   --slices ${SLICES:-7} --batch 1 --at-once ${AT_ONCE:-4} --guide \$GUIDE27 --rungs \$RUNGS27 ${watch:+--watch $watch} \\
-  --lines gains --flag-lines --shares --go $FROM > $VMOUT/$name/out.txt 2> $VMOUT/$name/err.txt
+  --lines gains --flag-lines --shares --go ${EXTRA:-} $FROM > $VMOUT/$name/out.txt 2> $VMOUT/$name/err.txt
 rm -rf $VMOUT/$name/eng
 RUN
     T=30 on "chmod +x $VMOUT/$name-run.sh; nohup setsid $VMOUT/$name-run.sh > $VMOUT/$name/launch.txt 2>&1 < /dev/null & exit 0"
