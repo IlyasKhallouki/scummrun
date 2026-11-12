@@ -1,0 +1,38 @@
+E027 bench, 2026-11-12: a stop's identity for what is new leaves out the slots that are the interface's own
+state: those a click changed that changed nothing else (learned in the run). Old: tree 250d653. Laptop, 6
+threads; trials and stops do not depend on the machine.
+
+cont6 (tree 250d653) since P8: 385 stops, 560,624 trials; 71 of the stops (93,370 trials, 16.7%) were kept for
+the interface alone: the picture of a half-made stop again (a click that did nothing on another page), a room
+entered with the inventory on another page, a sentence that ran with ego walking.
+
+One stop of cont6 expanded once (--shares --go):
+                 old trials  kept  for the interface alone    new trials  kept  for the interface alone
+stop 13635           2914     73    16                             2914     45    0
+stop 11554           1390     98    17                             1390     51    1
+The slots learned there: 21 to 30 (the inventory's, with its two arrows) and 35 (the sentence's line).
+
+The checks:                              old                          new
+p7top: owner:420=1                       stop 26, 46049 trials        stop 26, 46049 trials
+       30 stops                          kept 824                     kept 643
+cake:  var:196=3                         stop 15, 16472               stop 15, 16472
+       30 stops                          kept 492                     kept 356
+from cont2's stop 1021: P5               stop 37, 35496               stop 37, 35496
+       60 stops                          kept 1296                    kept 1171
+from cont4's stop 3627: var:282=2        stop 5, 537                  stop 5, 537
+       150 stops                         kept 2268                    kept 2228
+In the last two the slots learned are also 37 to 42, 44, 46, 47: a dialog's lines, where a click turned their page.
+
+Five stops from each reference (default flags):  trials  kept  digest
+p7top       4331    94  a773d871e1   (kept 116 before)
+cake        7718   113  8384468573   (143)
+crew        2245   239  a1027f643d   (249)
+meathook    7559    47  072cabd359   (105)
+boot        1492    40  b52a352cf0   (45; 1461 trials)
+
+On the ways to the rungs held so far (boot-long2 to P3: 194 stops; cont1 to P7; cont4 to P5 and the second fight
+won; cont6 to P8 and P9; 645 stops in all) one stop was kept for the interface alone: boot-long2's stop 8876,
+room 51, new by the scripts that take the clicks. Those stay in the identity.
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept, 3 rooms, no error (2921 and 284 before);
+the slot learned there: 35.

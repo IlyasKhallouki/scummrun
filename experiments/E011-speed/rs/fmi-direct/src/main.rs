@@ -46,6 +46,9 @@
 //!   not, the sentence waits for more and is clicked on from. Neither is a stop for its interface or its cell
 //!   alone (`pic`): as a stop of its own it would be the round's clicks made again. A dialog's line is neither:
 //!   its script is at another place.
+//!   And the slots such clicks change (a sentence's line, a page's slots) are the interface's own state: a
+//!   stop's identity for what is new is its other slots and the scripts that take the clicks, so a room entered
+//!   with the inventory on another page, or a half-made stop's picture seen again, is nothing new.
 //! * **A round** is all that from one stop. It is one list of half-made stops, each clicked on from once (at most
 //!   MAX_MIDS of them, counted apart for those a page led to: a guard for a room that leaves one for every click).
 //!   A half-made stop's clicks read the round's lists and write none; what the round decides (which stops are
@@ -268,6 +271,9 @@ struct Search {
     seen_at: HashSet<(u64, i32, Key, Val)>,
     sees: HashSet<(u64, i32, i32)>,
     ifaces: HashSet<(u64, u64)>,
+    /// the slots that are the interface's own state: those a click changed that changed nothing else. A stop's
+    /// identity for what is new leaves them out (the sentence being made and the inventory's page are no news)
+    own_slots: HashSet<i32>,
     boxes: HashSet<(u64, i32, i32)>,
     cams: HashSet<(u64, i32, i32)>,
     cells: HashSet<(u64, u64)>,
@@ -381,6 +387,21 @@ fn iface(o: &Obs) -> u64 {
     h.finish()
 }
 
+/// What each visible slot shows, by slot: its id and text hashed (no game text leaves the process).
+fn slots_of(o: &Obs) -> Vec<(i32, u64)> {
+    let mut v: Vec<(i32, u64)> = o
+        .verbs
+        .iter()
+        .map(|x| {
+            let mut h = DefaultHasher::new();
+            (x.id, x.name.as_deref().unwrap_or("")).hash(&mut h);
+            (x.slot, h.finish())
+        })
+        .collect();
+    v.sort_unstable();
+    v
+}
+
 /// The local variables of the scripts running at a stop: a script that waits for the player (a dialog's) keeps its
 /// count of what was said in them, and nothing else of the game's state shows it.
 fn locals_of(o: &Obs) -> Vec<(u64, i32)> {
@@ -440,6 +461,11 @@ struct Res {
     /// running script at the twin's place (a sentence half made; a local may hold what was picked), or several are
     /// with every script as the twin's, locals and all (a page of the interface). No stop for its interface alone
     pic: bool,
+    /// what each visible slot shows (its id and text, hashed), by slot; and the two scripts that take the clicks
+    /// and run the sentences, hashed: the interface's parts, for an identity without the slots that are the
+    /// interface's own state (`Search::own_slots`)
+    slots: Vec<(i32, u64)>,
+    hands: u64,
     /// the local variables of the scripts that run at the stop: (script and index hashed, value); after `explore`
     /// only those that differ from the expanded stop's
     locals: Vec<(u64, i32)>,
@@ -524,6 +550,12 @@ fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
         own: Vec::new(),
         inside: false,
         pic: false,
+        slots: slots_of(o),
+        hands: {
+            let mut h = DefaultHasher::new();
+            (o.vars.get(afford::VAR_VERB_SCRIPT).copied(), o.vars.get(afford::VAR_SENTENCE_SCRIPT).copied()).hash(&mut h);
+            h.finish()
+        },
         locals: locals_of(o),
         delta: Vec::new(),
         facts,
@@ -791,6 +823,9 @@ struct Out {
     offer: Value,
     /// the variables the input script wrote in a trial, or that a fifth of the stop's inputs changed
     iface_vars: HashSet<Key>,
+    /// the slots a click changed that changed nothing else (a sentence's line, a page's slots): the interface's
+    /// own state
+    own_slots: HashSet<i32>,
     /// the variables, and the world's other keys, a run with no input changed
     clocks: HashSet<Key>,
     ambient: HashSet<Key>,
@@ -869,6 +904,7 @@ impl Out {
             self.offer = o.offer;
         }
         self.iface_vars.extend(o.iface_vars);
+        self.own_slots.extend(o.own_slots);
         self.clocks.extend(o.clocks);
         self.ambient.extend(o.ambient);
         self.noise.extend(o.noise);
@@ -1155,6 +1191,7 @@ fn clicks(
                             slots.sort_unstable();
                             slots.dedup();
                             let page = slots.len() >= 2;
+                            out.own_slots.extend(slots.iter().copied());
                             trace(&format!("    shows {} depth {depth} ({} slots changed)", r.name, slots.len()));
                             // (the slots shown before it: on this stop and, where pages led to it, on those before)
                             let before = match &m.only {
@@ -1164,6 +1201,11 @@ fn clicks(
                             let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events, paged: m.paged, inside: m.inside };
                             acts.push(Act::Shows { hit: p.hit, page, cand, before });
                             return Ok(PointOut { out, acts, learned, first });
+                        }
+                        // (a sentence half made: the slots it changed are the interface's own)
+                        {
+                            let now: HashSet<(i32, i32, String)> = ob.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect();
+                            out.own_slots.extend(now.symmetric_difference(&shown).map(|x| x.0));
                         }
                         if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                             if depth == 1 {
@@ -1230,6 +1272,9 @@ fn clicks(
                                     slots.dedup();
                                     page = slots.len() >= 2 && tw.2 == scripts_of(&ob);
                                     plain = slots.len() == 1 && tw.1 == places_of(&ob);
+                                    if page || plain {
+                                        out.own_slots.extend(slots.iter().copied());
+                                    }
                                     // (the one slot shows what it does not show at the round's stop: a sentence that
                                     // waits for more, not one that ran and left the line as it was)
                                     begun = plain && now.iter().any(|x| x.0 == slots[0] && !shown0.contains(x));
@@ -2184,6 +2229,7 @@ impl Search {
             *self.wins.entry(*f).or_default() += 1;
         }
         self.policy.iface_vars.extend(out.iface_vars.iter().copied());
+        self.own_slots.extend(out.own_slots.iter().copied());
         self.policy.clocks.extend(out.clocks.iter().copied());
         self.lclocks.extend(out.lclocks.iter().copied());
         self.ambient.extend(out.ambient.iter().copied());
@@ -2454,8 +2500,18 @@ impl Search {
                     class = class.min(1);
                 }
             }
+            // the interface without its own state: the slots but those a click changes alone, and the scripts that
+            // take the clicks
+            let face = {
+                let mut h = DefaultHasher::new();
+                r.hands.hash(&mut h);
+                for x in r.slots.iter().filter(|x| !self.own_slots.contains(&x.0)) {
+                    x.hash(&mut h);
+                }
+                h.finish()
+            };
             // (another picture of the expanded stop and no more is nothing new: the stop's round clicked on from it)
-            if self.ifaces.insert((line, r.iface)) && !r.pic {
+            if self.ifaces.insert((line, face)) && !r.pic {
                 novel.push("iface".into());
                 class = class.min(1);
             }
@@ -2483,7 +2539,7 @@ impl Search {
             sum = sum.wrapping_add(sum_vars);
             let c = {
                 let mut h = DefaultHasher::new();
-                (r.room, r.iface, sum).hash(&mut h);
+                (r.room, face, sum).hash(&mut h);
                 h.finish()
             };
             if self.cells.insert((line, c)) && !r.pic {
@@ -3310,6 +3366,8 @@ fn main() {
         }
     }
     let depth = s.nodes.iter().map(|n| n.depth).max().unwrap_or(0);
+    let mut own_slots: Vec<i32> = s.own_slots.iter().copied().collect();
+    own_slots.sort_unstable();
     let sum = json!({"seconds": t0.elapsed().as_secs_f64(), "workers": cfg.workers, "kept": s.nodes.len(), "by_queue": s.kept,
         "expanded": s.expanded, "trials": s.trials, "skipped": s.skipped, "refused": s.refused, "not_idle": s.not_idle, "rooms": s.rooms,
         "max_depth": depth, "boots": s.boots, "top_level": s.top,
@@ -3318,7 +3376,7 @@ fn main() {
         "explore_seconds": {"waits": s.xt[0], "round": s.xt[1], "windows": s.xt[2], "after_waits": s.xt[3], "walks": s.xt[4], "one_by_one": s.xt[5], "side_by_side": s.xt[6]},
         "commit_seconds": {"world": s.ct[0], "flags": s.ct[1], "atoms": s.ct[2], "new": s.ct[3], "cell": s.ct[4], "kept": s.ct[5]},
         "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
-        "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(),
+        "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(), "own_slots": own_slots,
         "ends": s.ends.iter().map(|(n, x)| json!([n, x])).collect::<Vec<Value>>(),
         "rungs": s.rungs.iter().map(|g| json!({"rung": g.name, "node": g.at.map(|x| x.0), "seconds": g.at.map(|x| x.1)})).collect::<Vec<Value>>(),
         "watch": s.watch.iter().map(|(k, v, at)| json!({"key": format!("{k}"), "value": v, "node": at.map(|x| x.0), "seconds": at.map(|x| x.1)})).collect::<Vec<Value>>()});
