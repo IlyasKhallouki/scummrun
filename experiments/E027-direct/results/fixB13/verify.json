@@ -1,0 +1,3 @@
+{"node":1597,"from_boot":true,"frame":47983,"tick":292039,"room":30,"keys":[["owner:397",1],["bit:320",1],["bit:76",1],["bit:88",1],["bit:89",1]],"clicks":799,"seconds":3.957976069,"ok":true}
+{"node":5627,"from_boot":true,"frame":51428,"tick":312709,"room":59,"keys":[["bit:51",1],["bit:76",1],["bit:88",1],["bit:89",1]],"clicks":870,"seconds":4.53936163,"ok":true}
+{"node":5706,"from_boot":true,"frame":51774,"tick":314785,"room":7,"keys":[["owner:901",1],["owner:902",1],["owner:903",1],["bit:51",1],["bit:76",1],["bit:88",1],["bit:89",1],["var:196",3]],"clicks":877,"seconds":4.847538592,"ok":true}
