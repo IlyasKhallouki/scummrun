@@ -3116,7 +3116,9 @@ fn verify(nodes: &str, id: u64, out: &Path, keys: &str) {
         held.push(json!([k, got]));
     }
     let clicks = events.iter().filter(|x| matches!(x.what, Input::Click(..))).count();
-    println!("{}", json!({"node": id, "from_boot": true, "frame": frame, "room": room, "keys": held, "clicks": clicks,
+    // (the game's own clock at the stop: sixtieths of a second since the boot, as the engine counted them)
+    let tick = e.status().tick;
+    println!("{}", json!({"node": id, "from_boot": true, "frame": frame, "tick": tick, "room": room, "keys": held, "clicks": clicks,
         "seconds": t0.elapsed().as_secs_f64(), "ok": ok}));
     e.quit();
 }
