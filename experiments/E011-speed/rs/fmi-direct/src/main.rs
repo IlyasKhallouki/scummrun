@@ -100,6 +100,15 @@
 //!   entered on the way, with much in it, had every turn otherwise); and a stop at the end of a walk the search
 //!   made has its turn before any line's, and so has a stop made inside a window that is new by a guide
 //!   variable's value (a count the game keeps of what was done while the window was open is followed at once).
+//! * **Carried while it lasts.** An object ego owns at a stop that one of the stop's own waits saw gone is held
+//!   only for a while (what the stop's waits show, not what led to the stop: a key the game was seen to move by
+//!   itself is no input's doing for the rest of a run). A result that still holds it in another room, where no
+//!   stop of its line of gains was seen to hold it, is new (as atoms it is not: the object owned in that room and
+//!   its flag set there were each seen). So is, in the stop's room, an input that changed a key of that object and
+//!   set a flag or the owner of another (it passed on what the first holds), once for a room and the keys set.
+//!   Such stops are expanded before all others, the earliest first. And with `--go` the stop walks at once to
+//!   the nearest GO_ROOMS rooms, one trial a walk, and keeps a walk's stop that still holds the object: a walk
+//!   crosses a room wider than the screen. Flags that go off by themselves are not counted so: there are many.
 //! * **Where to go (`--go`).** A stop that begins a line has won something: an object, a flag. The scripts name
 //!   it somewhere (an owner asked for, the other object of a sentence, a flag tested): from that stop one walk is
 //!   made to each of the nearest GO_ROOMS rooms whose scripts do, over the clicks that were seen to lead from room
@@ -210,8 +219,11 @@ struct Node {
     /// the stop at the end of a walk the search made (`--go`)
     walk: bool,
     /// a stop made inside a window that is new by a guide variable's value (a count the game keeps of what was
-    /// done while the window was open)
+    /// done while the window was open): it has its turn before any line's
     win: bool,
+    /// a stop that carries into another room what the stop before it held only for a while, or where an input
+    /// passed that on: these go before all others, the earliest first
+    carry: bool,
     /// a stop the game led to another room: reached from the expanded stop by a wait alone
     led: bool,
 }
@@ -271,6 +283,14 @@ struct Search {
     seen_at: HashSet<(u64, i32, Key, Val)>,
     sees: HashSet<(u64, i32, i32)>,
     ifaces: HashSet<(u64, u64)>,
+    /// the objects ego owned at a stop that one of its own waits saw gone: what lasts only for a while (a count,
+    /// for the summary)
+    expires: HashSet<Key>,
+    /// per line of gains, room and such a key: a stop was seen to hold it there, come from a stop in another room
+    carried_at: HashSet<(u64, i32, Key)>,
+    /// per line of gains and room: the changes an input made at a stop to an object the stop held only for a
+    /// while (hashed)
+    acted_at: HashSet<(u64, i32, u64)>,
     /// the slots that are the interface's own state: those a click changed that changed nothing else. A stop's
     /// identity for what is new leaves them out (the sentence being made and the inventory's page are no news)
     own_slots: HashSet<i32>,
@@ -1994,6 +2014,8 @@ struct Snap<'a> {
     ambient: &'a HashSet<Key>,
     mentions: &'a Mentions,
     edges: &'a HashMap<(i32, i32), Vec<Hit>>,
+    /// --go
+    go: bool,
 }
 
 /// Every input of the stop tried, at the stop and after the game's own moves. Reads the engine and `snap` only.
@@ -2156,6 +2178,37 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
             }
         }
     }
+    // --go: what the stop holds only for a while (an object ego owns that one of its own waits saw gone) is
+    // taken at once as far as the ways lead: a walk to each of the nearest rooms, one trial a walk, and
+    // the walk's stop is kept where it still holds it. A walk crosses a room wider than the screen; the round's
+    // clicks reach only what the screen shows, and a stop on the way would wait its turn while the thing ran out
+    if snap.go {
+        let mut going: Vec<Key> = out
+            .results
+            .iter()
+            .filter(|r| r.name.starts_with("wait") && !r.name.contains('+'))
+            .flat_map(|r| r.delta.iter().filter(|x| x.0.kind() == K_OWNER && x.1 == ego as Val && x.2 != Some(ego as Val)).map(|x| x.0))
+            .collect();
+        going.sort_unstable();
+        going.dedup();
+        if !going.is_empty() {
+            let mut rooms: Vec<i32> = snap.edges.keys().map(|k| k.1).filter(|&r| r != r0.room).collect();
+            rooms.sort_unstable();
+            rooms.dedup();
+            let mut ways: Vec<Vec<(i32, &Vec<Hit>)>> = rooms.iter().filter_map(|&t| way(snap.edges, r0.room, t)).collect();
+            ways.sort_by_key(|w| (w.len(), w.last().map(|x| x.0)));
+            ways.truncate(GO_ROOMS);
+            trace(&format!("  room {} holds {} keys only for a while: walks to {:?}", r0.room, going.len(), ways.iter().map(|w| w.last().map(|x| x.0)).collect::<Vec<_>>()));
+            for w in ways.iter().rev() {
+                out.trials += 1;
+                if let Some(r) = walk(e, w, ego, cfg, &mut out.bad)? {
+                    if going.iter().any(|&k| r.facts.val(k) == r0.facts.val(k)) {
+                        out.results.push(slim(r, &r0.facts));
+                    }
+                }
+            }
+        }
+    }
     out.xt[4] += tx.elapsed().as_secs_f64();
     let locals0: HashMap<u64, i32> = r0.locals.iter().copied().collect();
     for r in out.results.iter_mut() {
@@ -2295,6 +2348,20 @@ impl Search {
                 sum0 = sum0.wrapping_add(h1(p.0, p.1));
             }
         }
+        // what the stop holds only for a while: the objects ego owns at it that one of its own waits saw gone
+        // (what the game takes back by itself, as the stop's waits show it; nothing of the way to the stop is
+        // asked). Not the flags that go off by themselves: there are many (5 or 6 in each of the two checks from
+        // the VM's stops), and with them `var:196 = 3` came at the 29th stop for the 15th and object 420 not in 30
+        let mut going: Vec<Key> = results
+            .iter()
+            .filter(|r| r.name.starts_with("wait") && !r.name.contains('+'))
+            .flat_map(|r| r.delta.iter().filter(|x| x.0.kind() == K_OWNER && x.1 == ego0 && x.2 != Some(ego0)).map(|x| x.0))
+            .collect();
+        going.sort_unstable();
+        going.dedup();
+        self.expires.extend(going.iter().copied());
+        // (the objects)
+        let going_objs: Vec<_> = going.iter().map(|k| k.a()).collect();
         for (i, r) in results.iter().enumerate() {
             let tc = Instant::now();
             let d = &r.delta;
@@ -2470,6 +2537,42 @@ impl Search {
                     class = class.min(if guide { 3 } else { 4 });
                 }
             }
+            // What the expanded stop holds only for a while (`going`), still held here, in another room, where
+            // no stop of this line of gains was seen to hold it so: carried there while it lasts. Followed like
+            // what is new. (As atoms it is none: an object owned in that room and its flag set there were each
+            // seen before, and the flag stays set on an object that is gone.)
+            let mut carried = false;
+            if r.room != room00 && !r.name.starts_with("wait") {
+                for &k in &going {
+                    if val(k) == base.val(k) && self.carried_at.insert((gline, r.room, k)) {
+                        novel.push(format!("{k}@{}", r.room));
+                        class = 0;
+                        carried = true;
+                    }
+                }
+            }
+            // Or, in the stop's room, an input that changed a key of an object the stop holds only for a while and
+            // set a flag or the owner of another object: it passed what the first holds on to the other. Followed
+            // at once as well, once for a room and the keys it set (as atoms they are nothing new the second time)
+            if r.room == room00 && !r.name.starts_with("wait") && !going_objs.is_empty() {
+                let touched = r.changed.iter().any(|c| matches!(c.0.kind(), K_OWNER | K_CLASS) && going_objs.contains(&c.0.a()));
+                let mut set: Vec<Key> = r
+                    .changed
+                    .iter()
+                    .filter(|c| matches!(c.0.kind(), K_OWNER | K_CLASS) && !going_objs.contains(&c.0.a()) && c.1 != 0 && base.val(c.0) == 0)
+                    .map(|c| c.0)
+                    .collect();
+                if touched && !set.is_empty() {
+                    set.sort_unstable();
+                    let mut h = DefaultHasher::new();
+                    set.hash(&mut h);
+                    if self.acted_at.insert((gline, r.room, h.finish())) {
+                        novel.push(format!("acted@{}", r.room));
+                        class = 0;
+                        carried = true;
+                    }
+                }
+            }
             self.ct[2] += tc.elapsed().as_secs_f64();
             let tc = Instant::now();
             // a local variable of a running script with a value new in the line (a count a dialog keeps of what
@@ -2631,7 +2734,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go"), win: count_new && r.name.contains('>'), led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+') });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go"), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+') });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -3099,7 +3202,7 @@ fn main() {
             "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
         let _ = f.write_all(format!("{first}\n").as_bytes());
     }
-    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false, led: false });
+    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false, carry: false, led: false });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
@@ -3153,6 +3256,8 @@ fn main() {
             // window, the same again inside that one's, and then another: each stop new by the count alone).
             // (A stop new there by a key of the world has the stack of its line; put first as well, such stops
             // took half the turns and the check from vm24's stop held nothing in 30 stops.)
+            // And for a stop that carries into another room what the stop before it held only for a while: on
+            // its line's stack it waited (3 such stops, none expanded in 32) while what it carried ran out.
             let walked = if s.shares && newest {
                 // (the stop, its level, its queue or usize::MAX for the stack, its place there)
                 let mut best: Option<(usize, usize, usize, usize)> = None;
@@ -3174,6 +3279,29 @@ fn main() {
             } else {
                 None
             };
+            // and before those, a stop that carries what lasts only for a while (or where it was passed on): the
+            // earliest first. (The newest first left the first to reach a room unexpanded while later ones came.)
+            let carrying = if s.shares && newest {
+                let mut best: Option<(usize, usize, usize, usize)> = None;
+                for l in 0..s.queues.len() {
+                    for (i, &id) in s.stacks.get(l).into_iter().flatten().enumerate() {
+                        if s.nodes[id].carry && best.map_or(true, |b| id < b.0) {
+                            best = Some((id, l, usize::MAX, i));
+                        }
+                    }
+                    for c in 0..FIRST_QUEUES {
+                        for (i, &id) in s.queues[l][c].iter().enumerate() {
+                            if s.nodes[id].carry && best.map_or(true, |b| id < b.0) {
+                                best = Some((id, l, c, i));
+                            }
+                        }
+                    }
+                }
+                best
+            } else {
+                None
+            };
+            let walked = carrying.or(walked);
             let first = if let Some((_, l, c, i)) = walked {
                 if c == usize::MAX {
                     Some(s.stacks[l].remove(i))
@@ -3272,7 +3400,7 @@ fn main() {
         if batch.is_empty() {
             break;
         }
-        let snap = Snap { motion: &s.motion, wins: &s.wins, noise: &s.noise, lclocks: &s.lclocks, policy: &s.policy, ambient: &s.ambient, mentions: &s.mentions, edges: &s.edges };
+        let snap = Snap { motion: &s.motion, wins: &s.wins, noise: &s.noise, lclocks: &s.lclocks, policy: &s.policy, ambient: &s.ambient, mentions: &s.mentions, edges: &s.edges, go: s.go };
         // side by side: each stop explored, from the search's state at the batch's start
         let n = batch.len();
         let t_batch = Instant::now();
@@ -3376,7 +3504,7 @@ fn main() {
         "explore_seconds": {"waits": s.xt[0], "round": s.xt[1], "windows": s.xt[2], "after_waits": s.xt[3], "walks": s.xt[4], "one_by_one": s.xt[5], "side_by_side": s.xt[6]},
         "commit_seconds": {"world": s.ct[0], "flags": s.ct[1], "atoms": s.ct[2], "new": s.ct[3], "cell": s.ct[4], "kept": s.ct[5]},
         "queued": s.queues.iter().map(|q| q.iter().map(|c| c.len()).collect::<Vec<_>>()).collect::<Vec<_>>(),
-        "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(), "own_slots": own_slots,
+        "iface_vars": s.policy.iface_vars.len(), "clocks": s.policy.clocks.len(), "capped": s.policy.capped.len(), "own_slots": own_slots, "expires": s.expires.len(),
         "ends": s.ends.iter().map(|(n, x)| json!([n, x])).collect::<Vec<Value>>(),
         "rungs": s.rungs.iter().map(|g| json!({"rung": g.name, "node": g.at.map(|x| x.0), "seconds": g.at.map(|x| x.1)})).collect::<Vec<Value>>(),
         "watch": s.watch.iter().map(|(k, v, at)| json!({"key": format!("{k}"), "value": v, "node": at.map(|x| x.0), "seconds": at.map(|x| x.1)})).collect::<Vec<Value>>()});
