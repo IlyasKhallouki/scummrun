@@ -115,7 +115,9 @@
 //!   wait. So in a stop's expansion, after its rounds: of the sentences of its own round, in its room, that moved a
 //!   guide variable of the world (not the clicks that left another picture and no more; a variable those sentences
 //!   left at more than COUNT_FEW values is the sentence's own), a count is a variable whose shortest movers (the
-//!   sentences of the fewest clicks) did at most COUNT_FEW different things. The inputs that move the same counts
+//!   sentences of the fewest clicks) are at most COUNT_FEW, or did at most COUNT_FEW different things. Each of
+//!   the shortest movers is an input where they are few (two that do the same at this stop may differ at the
+//!   next), and counts with the variables it is a shortest mover of. The inputs that move the same counts
 //!   are made again from where they led, breadth first over the states of what they moved, each state once
 //!   (COUNT_STATES states, COUNT_INPUTS inputs, COUNT_GROUPS such groups at most): one trial an input, read PROBE
 //!   frames after its stop. A stop where something beside those keys changed is a result like any other.
@@ -192,7 +194,7 @@ const GO_ROOMS: usize = 6;
 const COUNT_FEW: usize = 4;
 const COUNT_INPUTS: usize = 4;
 const COUNT_GROUPS: usize = 3;
-const COUNT_STATES: usize = 128;
+const COUNT_STATES: usize = 256;
 const GO_HOPS: usize = 14;
 /// Floor clicks a walk may make in one room to bring a thing onto the screen.
 const GO_SCROLLS: usize = 8;
@@ -2329,8 +2331,11 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         }
         cands.retain(|x| !x.2.is_empty());
         // A count is a variable whose shortest movers (the sentences of the fewest clicks that moved it: a verb
-        // with an object, not the same with every thing of the inventory before it) did at most COUNT_FEW
-        // different things. Those are the inputs counted with
+        // with an object, not the same with every thing of the inventory before it) are at most COUNT_FEW, or did
+        // at most COUNT_FEW different things. Those are the inputs counted with: each of the shortest movers where
+        // they are few (two that do the same at this stop may differ at the next: a verb that turns the way the
+        // last turn went), else the first of each thing done. An input counts with the variables it is a
+        // shortest mover of, and no others
         let mut order: Vec<Key> = Vec::new();
         for x in &cands {
             for v in &x.2 {
@@ -2340,25 +2345,26 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
             }
         }
         let mut inputs: Vec<(String, Vec<Hit>, Vec<Key>)> = Vec::new();
-        let mut counts: HashSet<Key> = HashSet::new();
         for &k in &order {
             let movers: Vec<&(String, Vec<Hit>, Vec<(Key, Val)>)> = cands.iter().filter(|x| x.2.iter().any(|v| v.0 == k)).collect();
             let least = movers.iter().map(|x| x.1.len()).min().unwrap_or(0);
-            let mut did: HashSet<&Vec<(Key, Val)>> = HashSet::new();
-            let reps: Vec<&(String, Vec<Hit>, Vec<(Key, Val)>)> = movers.into_iter().filter(|x| x.1.len() == least && did.insert(&x.2)).collect();
+            let mut reps: Vec<&(String, Vec<Hit>, Vec<(Key, Val)>)> = movers.into_iter().filter(|x| x.1.len() == least).collect();
+            if reps.len() > COUNT_FEW {
+                let mut did: HashSet<&Vec<(Key, Val)>> = HashSet::new();
+                reps.retain(|x| did.insert(&x.2));
+            }
             if reps.len() > COUNT_FEW {
                 continue;
             }
-            counts.insert(k);
             for x in reps {
-                if !inputs.iter().any(|y| y.0 == x.0) {
-                    inputs.push((x.0.clone(), x.1.clone(), x.2.iter().map(|v| v.0).collect()));
+                match inputs.iter_mut().find(|y| y.0 == x.0) {
+                    Some(y) => y.2.push(k),
+                    None => inputs.push((x.0.clone(), x.1.clone(), vec![k])),
                 }
             }
         }
-        for x in inputs.iter_mut() {
-            x.2.retain(|k| counts.contains(k));
-        }
+        // (the shortest sentences first: where a group has more inputs than are counted with, those stay)
+        inputs.sort_by_key(|x| x.1.len());
         // the inputs that move the same counts are counted together (COUNT_GROUPS such groups at most, in the
         // round's order)
         let mut groups: Vec<(Vec<Key>, Vec<(String, Vec<Hit>)>)> = Vec::new();
