@@ -1,0 +1,21 @@
+E027 bench, 2026-11-12: one click given at a dead end. A dead end: the stop takes sentences, no wait moved a
+key of the world, and of the stop's own inputs none was more than one click, none moved ego, changed the room or
+a key of the world. There the first stop its inputs came to (kept in the last queue: nothing was new there) is
+expanded next, before any line's turn; once: none is given from that stop. Old: tree 70cdf7c (binary push1).
+
+The first stop in room 20 (from the ship's deck, room 19):
+old tree    fixB13 (VM): 847 stops expanded after it, 10 of them in room 20, each 48 trials, 0 to 2 stops kept,
+            no other room entered from it. part2a (laptop): 9 stops kept in room 20 at 2,259 s, the same.
+this tree   from part2a's stop 865 (room 19, the stop before it), 30 stops: room 20 at the 2nd stop; a dead end,
+            one click given; room 2 at the 4th stop (18.7 s), then rooms 3, 4, 130, 80, 15, 18, 12, 16;
+            15 rooms, top level 7, 28,346 trials.
+
+Five stops from each reference (default flags):  trials  kept  digest       (old: the same)
+p7top       4791   104  5a020cf174
+cake        8213   124  a91ca2c9eb
+crew        3210   271  cb39ef7d95
+meathook    7631    51  a4cee03988
+boot        1549    40  6213300783
+No dead end in any of them.
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before); no dead end.

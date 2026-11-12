@@ -292,6 +292,8 @@ struct Search {
     live: HashMap<usize, Box<dyn Engine>>,
     /// --shares: the lines take turns (the batch's loop), and the turns counted so far
     shares: bool,
+    /// the stops expanded for a dead end (one click given there): none is given from them
+    given: HashSet<usize>,
     /// --motion-once: a key the game moves by itself is new once in a line of gains
     motion_once: bool,
     tick: u64,
@@ -881,6 +883,9 @@ struct Out {
     xt: [f64; 7],
     /// the expanded stop's facts: a result's are these with its `delta`
     base: Facts,
+    /// a dead end: the stop takes sentences, no wait moved a thing, and of its own inputs none was more than one
+    /// click, none moved ego, changed the room or a key of the world
+    dead: bool,
 }
 
 impl Search {
@@ -2149,6 +2154,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         out.noise = out.ambient.iter().filter(|k| !pending.iter().any(|p| p.0 == **k)).copied().collect();
     }
     trace(&format!("  room {} waits done, {} moved", r0.room, waited.len()));
+    let quiet = waited.is_empty() && out.ambient.is_empty();
     out.xt[0] += tx.elapsed().as_secs_f64();
     let tx = Instant::now();
     // the scripts' locals the stop's own waits moved: its clocks, whatever the search knows of them yet
@@ -2161,6 +2167,19 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     let first = out.results.len();
     out.absorb(round0);
     let own_end = out.results.len();
+    // A dead end: nothing the player does counts there, and the game does nothing by itself. (Where the interface
+    // takes sentences a click on the floor walks and a verb's click waits for its object: one click that moves
+    // nothing, and no second, is no game.) The game may have taken the click for itself (a scene that waits for one,
+    // a text to click away), so the search gives one: the first of the stops the inputs came to is expanded next
+    out.dead = quiet
+        && st0.idle.as_deref() == Some("sentence")
+        && own_end > first
+        && out.results[first..own_end].iter().all(|r| {
+            hits_of(&r.name).is_some_and(|h| h.len() == 1) && r.room == r0.room && r.st.ego == st0.ego && !r.delta.iter().any(|d| world_kind(d.0) && d.1 != d.2.unwrap_or(0))
+        });
+    if out.dead {
+        trace(&format!("  room {}: a dead end", r0.room));
+    }
     out.xt[1] += tx.elapsed().as_secs_f64();
     trace(&format!("  room {} round done: {} trials, {} windows found", r0.room, out.trials, cands.len()));
     // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
@@ -3706,9 +3725,26 @@ fn main() {
             s.expanded += 1;
             match r {
                 Ok((e, out)) => {
+                    let (dead, before) = (out.dead, s.nodes.len());
                     s.commit(id, out);
                     s.stamp += 1;
                     s.parents.insert(id, (Arc::new(Mutex::new(e)), s.stamp));
+                    // At a dead end one click is given: the first stop an input of it came to (kept in the last
+                    // queue: nothing was new there) is expanded next, before any line's turn. Once: where that stop
+                    // is a dead end too, no more is given
+                    if dead && !s.given.contains(&id) {
+                        if let Some(c) = (before..s.nodes.len()).find(|&c| !s.nodes[c].events.is_empty()) {
+                            let l = s.nodes[c].level as usize;
+                            for q in s.queues[l].iter_mut() {
+                                q.retain(|&x| x != c);
+                            }
+                            s.stacks[l].retain(|&x| x != c);
+                            s.stacks[l].push(c);
+                            s.nodes[c].win = true;
+                            s.given.insert(c);
+                            eprintln!("[{:7.1}s] DEAD END at node {id} (room {}): one click given, node {c} next", t0.elapsed().as_secs_f64(), s.nodes[id].room);
+                        }
+                    }
                 }
                 Err(x) => eprintln!("node {id}: {x}"),
             }
