@@ -7,7 +7,7 @@
 //!   direct OUT [--minutes M] [--stops N] [--workers W] [--slices S] [--at-once A] [--horizon H] [--no-skips]
 //!              [--guide FILE] [--rungs FILE] [--watch KEY=V,..] [--lines gains] [--flag-lines] [--shares] [--go]
 //!              [--cross-pages]
-//!              [--from NODES ID | --from-run DIR] [--edges FILE] [--news KEY,..]
+//!              [--from NODES ID | --from-run DIR] [--edges FILE] [--news KEY,..] [--ever OBJ,..]
 //!   direct verify NODES.jsonl ID OUT [KEY=V,..]      (a kept stop replayed from boot in a fresh engine)
 //!   direct show | seq | forkbench ...                (measurement tools)
 //!
@@ -2435,9 +2435,15 @@ impl Search {
             // a line with every stop's whole movie was 1.8 GB in two hours). The line is made once and written in
             // one piece (a value written as it is formatted goes to the file in thousands of small writes: that was
             // nearly all of the commit's time)
+            // (what was ever owned on the way to it: the run's first stop's list and its own)
+            let mut ever_all: Vec<u32> = self.root_owned.iter().copied().chain(ever.iter().copied()).collect();
+            ever_all.sort_unstable();
+            ever_all.dedup();
             let mut text = json!({"id": nid, "parent": id, "depth": depth + 1, "frame": r.st.frame, "room": r.room, "level": level,
                 "owned": owned.len(), "class": class, "how": r.name, "novel": novel, "t": (secs * 10.0).round() / 10.0,
-                "news": news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(), "movie": "own",
+                "news": news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(),
+                "ever": ever_all,
+                "movie": "own",
                 "events": events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
             if let Some(f) = self.log.as_mut() {
                 let _ = f.write_all(format!("{text}\n").as_bytes());
@@ -2813,13 +2819,20 @@ fn main() {
         (None, Some(nodes)) => Some((nodes, Some(a[a.iter().position(|x| x == "--from").unwrap() + 2].parse().expect("--from NODES ID")))),
         (None, None) => None,
     };
-    let from: Option<(Vec<Event>, u64, Vec<Key>)> = from_at.map(|(nodes, id)| {
+    let from: Option<(Vec<Event>, u64, Vec<Key>, Vec<u32>)> = from_at.map(|(nodes, id)| {
         let (line, events) = stop_of(&nodes, id);
         let news = line["news"].as_array().map(|v| v.iter().filter_map(|x| x.as_str()).map(Key::parse).collect()).unwrap_or_default();
-        (events, line["frame"].as_u64().unwrap(), news)
+        let ever = line["ever"].as_array().map(|v| v.iter().filter_map(|x| x.as_u64()).map(|x| x as u32).collect()).unwrap_or_default();
+        (events, line["frame"].as_u64().unwrap(), news, ever)
     });
+    // what was owned on the way to the stop the run starts at (its line's "ever"; --ever N,N for a stop of a run
+    // before lines held it): owned again, it is no gain
+    let mut from_ever: Vec<u32> = opt("--ever").map(|t| t.split(',').filter_map(|x| x.parse().ok()).collect()).unwrap_or_default();
     let (root_events, root_frame, from_news) = match from {
-        Some((ev, f, n)) => (ev, Some(f), n),
+        Some((ev, f, n, e)) => {
+            from_ever.extend(e);
+            (ev, Some(f), n)
+        }
         None => (root_events, None, Vec::new()),
     };
     let t0 = Instant::now();
@@ -2895,6 +2908,7 @@ fn main() {
     let r = read(String::new(), Vec::new(), &o, st.clone());
     let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
     s.root_owned = r.facts.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego).map(|p| p.0.a() as u32).collect();
+    s.root_owned.extend(from_ever.iter().copied());
     let gline = line_of(&[], &[]);
     let line = if s.flag_lines {
         let mut h = DefaultHasher::new();
@@ -2926,8 +2940,11 @@ fn main() {
         None => from_news.clone(),
     };
     if let Some(f) = s.log.as_mut() {
+        let mut ever0: Vec<u32> = s.root_owned.iter().copied().collect();
+        ever0.sort_unstable();
         let first = json!({"id": 0, "parent": Value::Null, "depth": 0, "frame": st.frame, "room": r.room, "level": 0, "owned": 0, "class": 0, "how": "", "novel": [], "t": 0.0,
             "news": root_news.iter().map(|k| format!("{k}")).collect::<Vec<_>>(),
+            "ever": ever0,
             "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
         let _ = f.write_all(format!("{first}\n").as_bytes());
     }
