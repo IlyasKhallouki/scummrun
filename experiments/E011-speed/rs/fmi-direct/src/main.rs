@@ -109,6 +109,15 @@
 //!   Such stops are expanded before all others, the earliest first. And with `--go` the stop walks at once to
 //!   the nearest GO_ROOMS rooms, one trial a walk, and keeps a walk's stop that still holds the object: a walk
 //!   crosses a room wider than the screen. Flags that go off by themselves are not counted so: there are many.
+//! * **Counting in place.** A stop of a round holds one value of a count (the turns of a lock, a price asked);
+//!   as a stop of its own it is new by a variable's value and waits its turn, and the next value is another such
+//!   wait. So in a stop's expansion, after its rounds: of the sentences of its own round, in its room, that moved a
+//!   guide variable of the world (not the clicks that left another picture and no more; a variable those sentences
+//!   left at more than COUNT_FEW values is the sentence's own), a count is a variable whose shortest movers (the
+//!   sentences of the fewest clicks) did at most COUNT_FEW different things. The inputs that move the same counts
+//!   are made again from where they led, breadth first over the states of what they moved, each state once
+//!   (COUNT_STATES states, COUNT_INPUTS inputs, COUNT_GROUPS such groups at most): one trial an input, read PROBE
+//!   frames after its stop. A stop where something beside those keys changed is a result like any other.
 //! * **Where to go (`--go`).** A stop that begins a line has won something: an object, a flag. The scripts name
 //!   it somewhere (an owner asked for, the other object of a sentence, a flag tested): from that stop one walk is
 //!   made to each of the nearest GO_ROOMS rooms whose scripts do, over the clicks that were seen to lead from room
@@ -176,6 +185,13 @@ const QUEUES: usize = 5;
 const FIRST_QUEUES: usize = 4;
 /// `--go`: the rooms walked to from a stop that has won something, and the rooms a walk may cross.
 const GO_ROOMS: usize = 6;
+/// Counting in place: a variable that at most COUNT_FEW of a round's inputs moved is a count; the inputs that moved
+/// the same counts (COUNT_INPUTS of them at most, COUNT_GROUPS such groups) are made again from where they led,
+/// until COUNT_STATES states of what they moved were seen.
+const COUNT_FEW: usize = 4;
+const COUNT_INPUTS: usize = 4;
+const COUNT_GROUPS: usize = 3;
+const COUNT_STATES: usize = 128;
 const GO_HOPS: usize = 14;
 /// Floor clicks a walk may make in one room to bring a thing onto the screen.
 const GO_SCROLLS: usize = 8;
@@ -2004,6 +2020,56 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg,
     Ok(Some(r))
 }
 
+/// The hits clicked from the engine's stop, one after the other (a hit's point as the stop offers it), and the stop
+/// the game comes to (with `on`: the stop PROBE frames after that one); None where a hit has no point there or the
+/// game comes to no stop.
+fn again(cur: &mut Box<dyn Engine>, hits: &[Hit], ego: i32, cfg: &Cfg, on: bool) -> EResult<Option<(Vec<Event>, Status)>> {
+    let mut events: Vec<Event> = Vec::new();
+    let mut from = cur.status().frame;
+    for (k, hit) in hits.iter().enumerate() {
+        let o = cur.obs(&NAMES)?;
+        let of = afford::offer_cfg(cur, &o, false, true)?;
+        let point = match *hit {
+            Hit::Verb { id, .. } => of.verbs.iter().find(|p| matches!(p.hit, Hit::Verb { id: i, .. } if i == id)).map(|p| (p.x, p.y)),
+            Hit::Walk(_) => None,
+            other => of.targets.iter().find(|p| p.hit == other).map(|p| (p.x, p.y)),
+        };
+        let Some((x, y)) = point else { return Ok(None) };
+        let park = park_point(cur)?;
+        from = cur.status().frame;
+        let mut evs = vec![Event { frame: from + 1, what: Input::Click(x, y) }];
+        if let Some((px, py)) = park {
+            evs.push(Event { frame: from + 2, what: Input::Move(px, py) });
+        }
+        if cur.inputs(&evs).is_err() {
+            return Ok(None);
+        }
+        events.extend(evs);
+        if k + 1 < hits.len() && go(cur, RunSpec { frame: Some(from + LEAD + CALM), ..Default::default() })?.is_err() {
+            return Ok(None);
+        }
+    }
+    if go(cur, RunSpec { frame: Some(from + LEAD + CALM), ..Default::default() })?.is_err() {
+        return Ok(None);
+    }
+    let st = match calm(cur, from, cfg.horizon, ego)? {
+        Played::Stop(st) => st,
+        _ => return Ok(None),
+    };
+    if !on {
+        return Ok(Some((events, st)));
+    }
+    // and PROBE frames on with no input, as a round reads a sentence's second stop
+    let at = st.frame;
+    if go(cur, RunSpec { frame: Some(at + PROBE), ..Default::default() })?.is_err() {
+        return Ok(None);
+    }
+    match calm(cur, at + PROBE, cfg.horizon, ego)? {
+        Played::Stop(st) => Ok(Some((events, st))),
+        _ => Ok(None),
+    }
+}
+
 /// What `explore` reads of the search: the rooms' motion at the batch's start.
 struct Snap<'a> {
     motion: &'a HashMap<(u32, i32, i32, Key), u32>,
@@ -2089,6 +2155,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     let cands = std::mem::take(&mut round0.cands);
     let first = out.results.len();
     out.absorb(round0);
+    let own_end = out.results.len();
     out.xt[1] += tx.elapsed().as_secs_f64();
     trace(&format!("  room {} round done: {} trials, {} windows found", r0.room, out.trials, cands.len()));
     // a variable a fifth of the stop's own inputs changed echoes the input: counted on the expanded stop's round
@@ -2210,6 +2277,170 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         }
     }
     out.xt[4] += tx.elapsed().as_secs_f64();
+    // Counting in place. An input of the stop's own round that moved a guide variable few of the round's inputs
+    // move (a count: the turns of a lock, how often a thing was asked) is made again from where it led, and
+    // again, with those inputs alone: one trial an input, breadth first over the states of what they moved, each
+    // state once. A stop of the round holds one value of a count, and as a stop of its own it waits its turn among
+    // all that is new by a variable; the fourth turn of a lock is four such waits away. The stops it comes to are
+    // results like any other
+    {
+        // (the round's stops in the stop's room, by one sentence, with the world's variables they moved and the
+        // values: a sentence's first stop and the one read PROBE frames on, where a count is often written only
+        // then)
+        let mut cands: Vec<(String, Vec<Hit>, Vec<(Key, Val)>)> = Vec::new();
+        // (not a click that left another picture and no more: the half of a sentence counts nothing)
+        for r in out.results[first..own_end].iter().filter(|r| r.room == r0.room && !r.pic) {
+            let name = r.name.trim_end_matches('~');
+            let Some(hits) = hits_of(name) else { continue };
+            if hits.iter().any(|h| matches!(h, Hit::Walk(_))) {
+                continue;
+            }
+            let vars: Vec<(Key, Val)> =
+                r.delta.iter().filter(|d| d.0.kind() == K_VAR && snap.policy.world(d.0) && d.1 != d.2.unwrap_or(0)).map(|d| (d.0, d.2.unwrap_or(0))).collect();
+            if vars.is_empty() {
+                continue;
+            }
+            match cands.iter_mut().find(|x| x.0 == name) {
+                Some(x) => {
+                    for v in vars {
+                        match x.2.iter_mut().find(|y| y.0 == v.0) {
+                            Some(y) => y.1 = v.1,
+                            None => x.2.push(v),
+                        }
+                    }
+                }
+                None => cands.push((name.to_string(), hits, vars)),
+            }
+        }
+        // a variable those sentences left at more than COUNT_FEW values is the sentence's own (its verb, its
+        // objects): no count, and no part of what a sentence did
+        let mut values: HashMap<Key, HashSet<Val>> = HashMap::new();
+        for x in &cands {
+            for v in &x.2 {
+                values.entry(v.0).or_default().insert(v.1);
+            }
+        }
+        for x in cands.iter_mut() {
+            x.2.retain(|v| values[&v.0].len() <= COUNT_FEW);
+            x.2.sort_unstable();
+        }
+        cands.retain(|x| !x.2.is_empty());
+        // A count is a variable whose shortest movers (the sentences of the fewest clicks that moved it: a verb
+        // with an object, not the same with every thing of the inventory before it) did at most COUNT_FEW
+        // different things. Those are the inputs counted with
+        let mut order: Vec<Key> = Vec::new();
+        for x in &cands {
+            for v in &x.2 {
+                if !order.contains(&v.0) {
+                    order.push(v.0);
+                }
+            }
+        }
+        let mut inputs: Vec<(String, Vec<Hit>, Vec<Key>)> = Vec::new();
+        let mut counts: HashSet<Key> = HashSet::new();
+        for &k in &order {
+            let movers: Vec<&(String, Vec<Hit>, Vec<(Key, Val)>)> = cands.iter().filter(|x| x.2.iter().any(|v| v.0 == k)).collect();
+            let least = movers.iter().map(|x| x.1.len()).min().unwrap_or(0);
+            let mut did: HashSet<&Vec<(Key, Val)>> = HashSet::new();
+            let reps: Vec<&(String, Vec<Hit>, Vec<(Key, Val)>)> = movers.into_iter().filter(|x| x.1.len() == least && did.insert(&x.2)).collect();
+            if reps.len() > COUNT_FEW {
+                continue;
+            }
+            counts.insert(k);
+            for x in reps {
+                if !inputs.iter().any(|y| y.0 == x.0) {
+                    inputs.push((x.0.clone(), x.1.clone(), x.2.iter().map(|v| v.0).collect()));
+                }
+            }
+        }
+        for x in inputs.iter_mut() {
+            x.2.retain(|k| counts.contains(k));
+        }
+        // the inputs that move the same counts are counted together (COUNT_GROUPS such groups at most, in the
+        // round's order)
+        let mut groups: Vec<(Vec<Key>, Vec<(String, Vec<Hit>)>)> = Vec::new();
+        for x in inputs {
+            match groups.iter_mut().find(|g| x.2.iter().any(|k| g.0.contains(k))) {
+                Some(g) => {
+                    for k in x.2 {
+                        if !g.0.contains(&k) {
+                            g.0.push(k);
+                        }
+                    }
+                    g.1.push((x.0, x.1));
+                }
+                None => groups.push((x.2, vec![(x.0, x.1)])),
+            }
+        }
+        groups.truncate(COUNT_GROUPS);
+        for (vars, mut inputs) in groups {
+            inputs.truncate(COUNT_INPUTS);
+            // a state: the counts, and the world's other keys (no variables: those every sentence writes are not
+            // the count's) that these inputs moved at their own stops
+            let names: HashSet<&str> = inputs.iter().map(|x| x.0.as_str()).collect();
+            let mut keys: Vec<Key> = out.results[first..own_end]
+                .iter()
+                .filter(|r| names.contains(r.name.trim_end_matches('~')))
+                .flat_map(|r| r.delta.iter().filter(|d| world_kind(d.0) && d.1 != d.2.unwrap_or(0)).map(|d| d.0))
+                .chain(vars.iter().copied())
+                .collect();
+            keys.sort_unstable();
+            keys.dedup();
+            let state = |f: &Facts| -> u64 {
+                let mut h = DefaultHasher::new();
+                for &k in &keys {
+                    f.val(k).hash(&mut h);
+                }
+                h.finish()
+            };
+            // what the world is beside those keys (and beside what moves by itself): where counting changed that,
+            // it led to something, and the stop is a result; a state of the counts alone is none (the round's own
+            // stops hold the first, and the counting has been through the rest)
+            let beside = |f: &Facts| -> u64 {
+                let mut h = DefaultHasher::new();
+                for p in snap.policy.world_of(f).iter().filter(|p| keys.binary_search(&p.0).is_err() && !snap.ambient.contains(&p.0) && !motion.contains(&p.0)) {
+                    p.hash(&mut h);
+                }
+                h.finish()
+            };
+            let mut led: HashSet<u64> = HashSet::from([beside(&r0.facts)]);
+            let mut seen: HashSet<u64> = HashSet::from([state(&r0.facts)]);
+            let mut queue: VecDeque<(Box<dyn Engine>, String, Vec<Event>, usize)> = VecDeque::from([(e.fork()?, String::new(), Vec::new(), 0)]);
+            let mut made = 0usize;
+            while let Some((mut at, name, events, depth)) = queue.pop_front() {
+                if seen.len() < COUNT_STATES {
+                    for x in &inputs {
+                        let mut b = at.fork()?;
+                        out.trials += 1;
+                        let Some((evs, st)) = again(&mut b, &x.1, ego, cfg, true)? else {
+                            b.quit();
+                            continue;
+                        };
+                        let ob = b.obs(&NAMES)?;
+                        let mut all = events.clone();
+                        all.extend(evs);
+                        let r = read(if name.is_empty() { x.0.clone() } else { format!("{name}.{}", x.0) }, all.clone(), &ob, st);
+                        let fresh = seen.insert(state(&r.facts));
+                        let here = r.room == r0.room;
+                        let rname = r.name.clone();
+                        trace(&format!("    count {rname}: {:?}{}", keys.iter().map(|k| r.facts.val(*k)).collect::<Vec<_>>(), if fresh { " new" } else { "" }));
+                        // (the first inputs' stops are the round's own results already)
+                        if depth > 0 && (!here || led.insert(beside(&r.facts))) {
+                            made += 1;
+                            out.results.push(slim(r, &r0.facts));
+                        }
+                        if fresh && here && seen.len() < COUNT_STATES {
+                            queue.push_back((b, rname, all, depth + 1));
+                        } else {
+                            b.quit();
+                        }
+                    }
+                }
+                at.quit();
+            }
+            trace(&format!("  room {} counting: inputs {:?}, counts {:?}, keys {:?}, {} states, {} stops", r0.room, inputs.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vars.iter().map(|k| format!("{k}")).collect::<Vec<_>>(), keys.iter().map(|k| format!("{k}")).collect::<Vec<_>>(), seen.len(), made));
+        }
+    }
     let locals0: HashMap<u64, i32> = r0.locals.iter().copied().collect();
     for r in out.results.iter_mut() {
         r.changed = r.delta.iter().filter(|d| (world_kind(d.0) || d.0.kind() == K_VAR) && d.1 != d.2.unwrap_or(0)).map(|d| (d.0, d.2.unwrap_or(0))).collect();

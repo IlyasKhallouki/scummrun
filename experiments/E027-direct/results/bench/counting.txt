@@ -1,0 +1,40 @@
+E027 bench, 2026-11-12: counting in place. In a stop's expansion the sentences of its own round that moved a
+count (a guide variable of the world whose shortest movers did at most 4 different things) are made again from
+where they led, breadth first over the states of what they moved (128 states, 4 inputs, 3 groups at most), one
+trial an input; a stop where something beside those keys changed is a result. Old: tree 3e2441f. Laptop, 6
+threads; trials and stops do not depend on the machine.
+
+From cont14's stop 1980 (room 30, the lock 1, 2, 3, 3), one stop expanded:
+old tree       2,791 trials; object 397 not owned (in cont6, cont8 and cont14 not in 45, 72 and 17 stops of room 30)
+this tree      3,267 trials; object 397 owned; 119 states of the counts seen, 480 trials of counting
+
+cont16 (this tree, from cont15's stop 1727: P13):
+object 397 owned     79.5 s    9th stop    16,029 trials
+bit:51=1 (P10)      647.5 s   89th stop    65,890 trials
+objects 901-903 (P14) 673.0 s  94th stop    67,689 trials
+The three stops replay from boot in 1,178, 1,227 and 1,234 clicks (results/cont16).
+
+The checks (--shares):                      old                          this tree
+p7top: owner:420=1                          stop 26, 46049 trials        stop 33 (60 stops run; not in 30)
+       30 stops                             54843 trials, kept 643       65643 trials, kept 667
+cake:  var:196=3                            stop 15, 16472               stop 15, 16378
+       30 stops                             31974 trials, kept 356       31626 trials, kept 347
+from cont2's stop 1021: P5                  stop 37, 35496               stop 35, 36158
+       60 stops                             39496 trials, kept 1171      64060 trials, kept 1299
+from cont4's stop 3627: var:282=2           stop 5, 537                  stop 2, 241
+       var:282=3                            not in 150 stops             stop 73, 34973
+       150 stops                            25493 trials, kept 2228      74656 trials, kept 2829
+In the check from vm24's stop a stop the counting made in room 31 (a line said twice) holds a new set of flags and
+begins a line; as the newest line it is followed before the stop the old tree followed there (expanded 24th for
+16th), and object 420 comes seven stops later.
+
+Five stops from each reference (default flags):  trials  kept  digest       (old: trials, kept)
+p7top       4752    95  ce73a0d148   (4331, 94)
+cake        8181   116  37702b7df3   (7718, 113)
+crew        2287   240  b11302479f   (2245, 239)
+meathook    7686    50  b5996e53e0   (7559, 47)
+boot        1552    42  fe2a4fbe1a   (1492, 40)
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).
+
+Left as it is: at cont14's stop 1980 the counting leaves 58 stops (49 of them new by their cell alone).
