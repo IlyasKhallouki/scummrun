@@ -31,7 +31,7 @@ meathook    7559    47  072cabd359   (105)
 boot        1492    40  b52a352cf0   (45; 1461 trials)
 
 On the ways to the rungs held so far (boot-long2 to P3: 194 stops; cont1 to P7; cont4 to P5 and the second fight
-won; cont6 to P8 and P9; 645 stops in all) one stop was kept for the interface alone: boot-long2's stop 8876,
+won; cont6 to P8 and P9; the longest way in each run: 194, 57, 84 and 107 stops, 442 in all) one stop was kept for the interface alone: boot-long2's stop 8876,
 room 51, new by the scripts that take the clicks. Those stay in the identity.
 
 The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept, 3 rooms, no error (2921 and 284 before);
