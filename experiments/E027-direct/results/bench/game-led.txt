@@ -21,4 +21,4 @@ cake:  var:196=3        stop 15, 16472 trials      stop 15, 16472             st
 p7top: owner:420=1      stop 26, 46049             not in 70 stops (92085)    stop 26, 46049
 from cont2's stop 1021: P5 at 35433 trials                                    35496 trials
 The depth-first form expands a wait's stop before every input's: of its 70 stops in the check from vm24's stop,
-22 were waits' stops in the room they were made in.
+14 were waits' stops in the room they were made in (counted from the run's stops).
