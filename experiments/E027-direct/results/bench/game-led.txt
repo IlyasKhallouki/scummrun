@@ -1,0 +1,24 @@
+E027 bench, 2026-11-12: of a line's stack, a stop the game led to another room (reached by a wait alone) goes
+before the others (--shares). Old: tree c9ef353. Laptop, 6 threads; trials and stops do not depend on the machine.
+
+cont4 (tree c9ef353, from cont1's stop 8946): P5 at 282.0 s; var:282=1 at 1,443 s (352nd stop, 264,845 trials);
+var:282=2 at 2,054 s (496th stop, 344,392 trials); stopped at 4,654 s (1,151 stops, 743,816 trials) without
+var:282=3. Room 49: 143 of the 1,151 stops, 1.9% of the trials. The stop on the map after the second win was
+expanded 503rd; the stop its wait led to in room 49 was expanded 626th, after 123 stops (84,482 trials) in rooms
+48, 59, 52, 37 and others: the stack's newest stop goes first, and the wait's stop is the first a round finds.
+
+From cont4's stop 3627 (room 85, var:282=1), 150 stops, --shares --go:
+                        the first found first      one the game led first
+                        (depth first, not kept)    (this tree)
+var:282=2               stop 5, 537 trials         stop 5, 537 trials
+var:282=3               stop 139, 24272 trials     not in 150 stops
+stops in room 49        113 of 150                 121 of 150
+trials, 150 stops       31780                      25493
+
+The checks (--shares, 30 stops; 70 for the depth-first form):
+                        c9ef353                    the first found first      one the game led first
+cake:  var:196=3        stop 15, 16472 trials      stop 15, 16472             stop 15, 16472
+p7top: owner:420=1      stop 26, 46049             not in 70 stops (92085)    stop 26, 46049
+from cont2's stop 1021: P5 at 35433 trials                                    35496 trials
+The depth-first form expands a wait's stop before every input's: of its 70 stops in the check from vm24's stop,
+22 were waits' stops in the room they were made in.

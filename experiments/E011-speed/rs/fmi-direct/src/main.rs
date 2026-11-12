@@ -209,6 +209,8 @@ struct Node {
     /// a stop made inside a window that is new by a guide variable's value (a count the game keeps of what was
     /// done while the window was open)
     win: bool,
+    /// a stop the game led to another room: reached from the expanded stop by a wait alone
+    led: bool,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -2573,7 +2575,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go"), win: count_new && r.name.contains('>') });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go"), win: count_new && r.name.contains('>'), led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+') });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -3041,7 +3043,7 @@ fn main() {
             "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
         let _ = f.write_all(format!("{first}\n").as_bytes());
     }
-    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false });
+    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false, led: false });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
@@ -3123,9 +3125,12 @@ fn main() {
                     s.queues[l][c].remove(i)
                 }
             } else if let Some((l, f)) = shared {
-                // of that line: the stack's newest stop, then queues 1, 2 and 3, each its earliest
+                // of that line: the stack's newest stop, one the game led to another room before the others (with
+                // no input ego stood in another room: an encounter, a scene the game began; what the game starts
+                // by itself is followed before the rooms the inputs lead to), then queues 1, 2 and 3, each its
+                // earliest
                 let nodes = &s.nodes;
-                match s.stacks.get(l).and_then(|st| (0..st.len()).filter(|&i| nodes[st[i]].fline == f).max_by_key(|&i| st[i])) {
+                match s.stacks.get(l).and_then(|st| (0..st.len()).filter(|&i| nodes[st[i]].fline == f).max_by_key(|&i| (nodes[st[i]].led, st[i]))) {
                     Some(i) => Some(s.stacks[l].remove(i)),
                     None => (0..FIRST_QUEUES).find_map(|c| {
                         let i = (0..s.queues[l][c].len()).find(|&i| nodes[s.queues[l][c][i]].fline == f)?;
