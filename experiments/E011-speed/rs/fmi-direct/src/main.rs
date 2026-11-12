@@ -38,6 +38,14 @@
 //!   showed on a page before is the same thing in another place, and is not clicked. A slot's click after which
 //!   the interface is another, ego stands where it stood and the world is the no-input twin's at the same frame
 //!   is a sentence half made too, whatever scripts ran (an object's own script runs for its slot).
+//!   A click that left another picture and no more, but took longer than LEAD frames to, is read where the game
+//!   has settled and set against the twin at that frame (the room, ego's place, the scripts that take the clicks
+//!   and the world the same). With several slots changed and every running script as the twin's, locals and all,
+//!   it is a page like one that showed at once. With one slot changed and every script at the twin's place (a
+//!   local may hold what was picked) it is a sentence half made; where that slot shows what the round's stop did
+//!   not, the sentence waits for more and is clicked on from. Neither is a stop for its interface or its cell
+//!   alone (`pic`): as a stop of its own it would be the round's clicks made again. A dialog's line is neither:
+//!   its script is at another place.
 //! * **A round** is all that from one stop. It is one list of half-made stops, each clicked on from once (at most
 //!   MAX_MIDS of them, counted apart for those a page led to: a guard for a room that leaves one for every click).
 //!   A half-made stop's clicks read the round's lists and write none; what the round decides (which stops are
@@ -393,6 +401,15 @@ fn scripts_of(o: &Obs) -> u64 {
     h.finish()
 }
 
+/// Where the scripts running at a stop are: each one's place and delay (`scripts_of` without the local variables).
+fn places_of(o: &Obs) -> u64 {
+    let mut v: Vec<(i32, i32, u64, i32, i32)> = o.slots.iter().map(|sl| (sl.where_, sl.number, sl.offs, sl.frozen, sl.delay)).collect();
+    v.sort_unstable();
+    let mut h = DefaultHasher::new();
+    v.hash(&mut h);
+    h.finish()
+}
+
 /// One stop as read from its engine: the facts, and what is not in them.
 struct Res {
     name: String,
@@ -412,6 +429,11 @@ struct Res {
     /// window or after a wait
     own: Vec<(Key, Val)>,
     inside: bool,
+    /// the click left another picture and no more: beside the round's twin at the same frame the room, ego's place,
+    /// the scripts that take the clicks and the world are the same, and either one slot is another with every
+    /// running script at the twin's place (a sentence half made; a local may hold what was picked), or several are
+    /// with every script as the twin's, locals and all (a page of the interface). No stop for its interface alone
+    pic: bool,
     /// the local variables of the scripts that run at the stop: (script and index hashed, value); after `explore`
     /// only those that differ from the expanded stop's
     locals: Vec<(u64, i32)>,
@@ -495,6 +517,7 @@ fn read(name: String, events: Vec<Event>, o: &Obs, st: Status) -> Res {
         changed: Vec::new(),
         own: Vec::new(),
         inside: false,
+        pic: false,
         locals: locals_of(o),
         delta: Vec::new(),
         facts,
@@ -658,12 +681,17 @@ struct MidOut {
 /// asked so far. The stops of a round worked on side by side each run a fork of their own.
 struct Twins {
     src: Mutex<Option<Box<dyn Engine>>>,
-    at: Mutex<HashMap<u64, Option<Facts>>>,
+    at: Mutex<HashMap<u64, Option<(Facts, u64, u64)>>>,
 }
 
 impl Twins {
     /// The world of the round's stop run to frame `f` with no input (None: no twin, or its run ended before).
     fn world(&self, twin: &mut Option<Box<dyn Engine>>, f: u64) -> EResult<Option<Facts>> {
+        Ok(self.at(twin, f)?.map(|x| x.0))
+    }
+
+    /// The same, with where its running scripts are there (`places_of`), and with their locals (`scripts_of`).
+    fn at(&self, twin: &mut Option<Box<dyn Engine>>, f: u64) -> EResult<Option<(Facts, u64, u64)>> {
         if let Some(w) = self.at.lock().unwrap().get(&f) {
             return Ok(w.clone());
         }
@@ -679,7 +707,8 @@ impl Twins {
         let t = twin.as_mut().unwrap();
         let alive = t.status().frame == f || go(t, RunSpec { frame: Some(f), ..Default::default() })?.is_ok();
         let w = if alive {
-            Some(Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()))
+            let o = t.obs(&NAMES)?;
+            Some((Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()), places_of(&o), scripts_of(&o)))
         } else {
             if let Some(t) = twin.take() {
                 t.quit();
@@ -882,6 +911,8 @@ fn clicks(
     let sentence = r0.facts.val(Key::var(afford::VAR_SENTENCE_SCRIPT as u64)) as i32;
     let input0 = r0.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32;
     let ego = r0.facts.val(Key::pack(K_EGO, 0, 0, 0)) as i32;
+    // what the slots show at the round's stop
+    let shown0: HashSet<(i32, i32, String)> = o0.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect();
     // a stop inside a sentence or a dialog, for the round: what the interface shows there, and the running scripts'
     // locals but the clocks (a dialog that shows the same choices again has counted the line said)
     let mkey = |r: &Res| -> u64 {
@@ -900,8 +931,9 @@ fn clicks(
     let mut frontier: Vec<Mid> = vec![Mid { engine: None, clicks: Vec::new(), events: lead.to_vec(), iface: r0.iface, only: None, paged: false, inside: false }];
     // the stops that are windows (the module's text, "After an input"), MAX_WINDOWS of them at most
     let mut found = 0;
-    // the twin: a copy of the round's stop to fork it from, and its world at the frames asked
-    let twins = Twins { src: Mutex::new(if motion.is_some() { Some(e.fork()?) } else { None }), at: Mutex::new(HashMap::new()) };
+    // the twin: a copy of the round's stop to fork it from, and its world at the frames asked (every round has one:
+    // what a click left is held against it; what an input changed in the world is asked only where `motion` is given)
+    let twins = Twins { src: Mutex::new(Some(e.fork()?)), at: Mutex::new(HashMap::new()) };
     // the verb slots as the first clicks left them (a half-made stop's interface), and those a later click need not
     // try: a slot that from the first half-made stop gave what it gave from the round's stop (it only picks another
     // verb), or gave that stop again (it does nothing)
@@ -1166,14 +1198,53 @@ fn clicks(
                             afford::composing(r.st.idle.as_deref().or(Some("sentence")), &runs.runs, mf + 1, &input, sentence)
                         };
                         // or a slot's click left the interface another and the world what it is with no input at
-                        // the same frame (an object's own script ran for the slot, and no sentence): half made too
+                        // the same frame (an object's own script ran for the slot, and no sentence): half made too.
+                        // (In the stop's own round. After a wait or inside a window the round is the shorter one
+                        // it was: measured, such sentences there cost 41 to 80% more trials to the same stops.)
                         let half = half
-                            || (matches!(p.hit, Hit::Verb { .. }) && r.room == r0.room && ob.ego_pos == mego && r.st.idle.as_deref() == Some("sentence") && r.iface != m.iface && {
+                            || (motion.is_some() && matches!(p.hit, Hit::Verb { .. }) && r.room == r0.room && ob.ego_pos == mego && r.st.idle.as_deref() == Some("sentence") && r.iface != m.iface && {
                                 let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
                                 twins.world(twin, r.st.frame)?.is_some_and(|tw| tw.diff(&mine).is_empty())
                             });
+                        // What the stop is beside the twin at its frame, where the click left another picture in the
+                        // same room, with ego where it stood and the same scripts taking the clicks
+                        let (mut page, mut plain, mut begun) = (false, false, false);
+                        if r.iface != m.iface
+                            && r.room == r0.room
+                            && ob.ego_pos == mego
+                            && r.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32 == input0
+                            && r.facts.val(Key::var(afford::VAR_SENTENCE_SCRIPT as u64)) as i32 == sentence
+                        {
+                            if let Some(tw) = twins.at(twin, r.st.frame)? {
+                                let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
+                                if tw.0.diff(&mine).is_empty() {
+                                    let now: HashSet<(i32, i32, String)> = ob.verbs.iter().map(|x| (x.slot, x.id, x.name.clone().unwrap_or_default())).collect();
+                                    let mut slots: Vec<i32> = now.symmetric_difference(&shown).map(|x| x.0).collect();
+                                    slots.sort_unstable();
+                                    slots.dedup();
+                                    page = slots.len() >= 2 && tw.2 == scripts_of(&ob);
+                                    plain = slots.len() == 1 && tw.1 == places_of(&ob);
+                                    // (the one slot shows what it does not show at the round's stop: a sentence that
+                                    // waits for more, not one that ran and left the line as it was)
+                                    begun = plain && now.iter().any(|x| x.0 == slots[0] && !shown0.contains(x));
+                                }
+                            }
+                        }
+                        r.pic = page || plain;
                         out.phase[3] += t.elapsed().as_secs_f64();
                         if half {
+                            // another page of the interface, as one that showed at once; it only took longer than
+                            // LEAD frames
+                            if page {
+                                trace(&format!("    shows {} depth {depth} (a page, settled)", r.name));
+                                let before = match &m.only {
+                                    Some(b) => Arc::new(b.union(&shown_all).cloned().collect()),
+                                    None => shown_all.clone(),
+                                };
+                                let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events, paged: m.paged, inside: m.inside };
+                                acts.push(Act::Shows { hit: p.hit, page: true, cand, before });
+                                return Ok(PointOut { out, acts, learned, first });
+                            }
                             if matches!(p.hit, Hit::Verb { .. }) && m.only.is_none() {
                                 if depth == 1 {
                                     acts.push(Act::Gave(p.hit, r.iface));
@@ -1182,15 +1253,30 @@ fn clicks(
                                 }
                             }
                             // a stop to click on from. The game ran on before it took a click again (a dialog's
-                            // line, not a verb's slot): a stop like any other, too
+                            // line, not a verb's slot): a stop like any other, too (but for its interface alone
+                            // where it is a sentence half made, `pic`: the round clicks on from it, and as a stop
+                            // of its own it would be the same clicks made again)
                             let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events.clone(), paged: m.paged, inside: m.inside };
                             acts.push(Act::Half { cand, only: None, always: true });
                             out.results.push(slim(r, base));
                             return Ok(PointOut { out, acts, learned, first });
                         } else {
+                            // a sentence half made that neither test saw (a room's object took the verb, and the
+                            // sentence waits for another): in the stop's own round a stop to click on from, like
+                            // one that showed at once
+                            if begun && motion.is_some() {
+                                let before = match &m.only {
+                                    Some(b) => Arc::new(b.union(&shown_all).cloned().collect()),
+                                    None => shown_all.clone(),
+                                };
+                                let cand = MidCand { base: mkey(&r), engine: b, clicks: cl, iface: r.iface, events: r.events.clone(), paged: m.paged, inside: m.inside };
+                                acts.push(Act::Shows { hit: p.hit, page: false, cand, before });
+                                out.results.push(slim(r, base));
+                                return Ok(PointOut { out, acts, learned, first });
+                            }
                             // what the input changed: the stop against the twin at its frame (each with its old value)
                             let mut touched: Vec<(Key, Val)> = Vec::new();
-                            if r.room == r0.room {
+                            if r.room == r0.room && motion.is_some() {
                                 if let Some(tw) = twins.world(twin, r.st.frame)? {
                                     let mine = Facts(r.facts.iter().filter(|p| world_kind(p.0)).copied().collect());
                                     touched = tw
@@ -2039,7 +2125,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
             return true;
         }
         let mut h = DefaultHasher::new();
-        (r.room, r.iface, &r.vis, r.walkbox, r.cam, r.inside, &r.locals, &r.own).hash(&mut h);
+        (r.room, r.iface, &r.vis, r.walkbox, r.cam, r.inside, r.pic, &r.locals, &r.own).hash(&mut h);
         for c in r.changed.iter().filter(|c| snap.policy.world(c.0)) {
             c.hash(&mut h);
         }
@@ -2360,7 +2446,8 @@ impl Search {
                     class = class.min(1);
                 }
             }
-            if self.ifaces.insert((line, r.iface)) {
+            // (another picture of the expanded stop and no more is nothing new: the stop's round clicked on from it)
+            if self.ifaces.insert((line, r.iface)) && !r.pic {
                 novel.push("iface".into());
                 class = class.min(1);
             }
@@ -2391,7 +2478,7 @@ impl Search {
                 (r.room, r.iface, sum).hash(&mut h);
                 h.finish()
             };
-            if self.cells.insert((line, c)) {
+            if self.cells.insert((line, c)) && !r.pic {
                 class = class.min(4);
             }
             self.ct[4] += tc.elapsed().as_secs_f64();
