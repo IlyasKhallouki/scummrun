@@ -63,8 +63,9 @@ pub const W: u64 = 1600;
 const VERB_DXY: [(i32, i32); 4] = [(2, 2), (4, 3), (1, 1), (0, 0)];
 /// Fractions (in quarters) of an object's on-screen box tried for its point, in order (M4).
 const GRID: [i32; 5] = [2, 1, 3, 0, 4];
-/// Heights over an actor's feet tried for its point, in order (M4).
-const ACTOR_DY: [i32; 4] = [-20, -30, -10, -40];
+/// Heights over an actor's feet tried for its point, in order (M4's four first; then at the feet, for a figure a few
+/// pixels tall: one drawn small on a map has no point 10 pixels up).
+const ACTOR_DY: [i32; 8] = [-20, -30, -10, -40, -5, -2, -1, 0];
 /// Walk boxes (boxes.h): a locked box ends a walk before it (actor.cpp:1284); an invisible one is skipped for the
 /// player when a walk's end is put in a box (actor.cpp:2040); a v5 game's boxes start at 1 (actor.cpp:1990).
 pub const BOX_LOCKED: u8 = 0x40;
