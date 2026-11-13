@@ -419,6 +419,8 @@ struct Cfg {
     /// --cross-pages: inside a sentence that has its first object the page may be turned, for a second object on
     /// another page (two things of the inventory that no page shows together). 25 to 48% more trials a late stop
     cross_pages: bool,
+    /// --runs-on: a trial's stop where a script the input started runs on is read again PROBE frames on
+    runs_on: bool,
     /// --ends: a trial that comes to no stop within the horizon (the game takes no input again: an ending, a scene
     /// with no end in sight) is a result all the same, read where the horizon ends: a stop that is never expanded
     ends: bool,
@@ -491,6 +493,14 @@ fn scripts_of(o: &Obs) -> u64 {
     let mut h = DefaultHasher::new();
     v.hash(&mut h);
     h.finish()
+}
+
+/// The scripts running at a stop, each once: (where, number), sorted.
+fn running(o: &Obs) -> Vec<(i32, i32)> {
+    let mut v: Vec<(i32, i32)> = o.slots.iter().map(|sl| (sl.where_, sl.number)).collect();
+    v.sort_unstable();
+    v.dedup();
+    v
 }
 
 /// Where the scripts running at a stop are: each one's place and delay (`scripts_of` without the local variables).
@@ -784,7 +794,7 @@ struct MidOut {
 /// asked so far. The stops of a round worked on side by side each run a fork of their own.
 struct Twins {
     src: Mutex<Option<Box<dyn Engine>>>,
-    at: Mutex<HashMap<u64, Option<(Facts, u64, u64)>>>,
+    at: Mutex<HashMap<u64, Option<(Facts, u64, u64, Vec<(i32, i32)>)>>>,
 }
 
 impl Twins {
@@ -794,7 +804,7 @@ impl Twins {
     }
 
     /// The same, with where its running scripts are there (`places_of`), and with their locals (`scripts_of`).
-    fn at(&self, twin: &mut Option<Box<dyn Engine>>, f: u64) -> EResult<Option<(Facts, u64, u64)>> {
+    fn at(&self, twin: &mut Option<Box<dyn Engine>>, f: u64) -> EResult<Option<(Facts, u64, u64, Vec<(i32, i32)>)>> {
         if let Some(w) = self.at.lock().unwrap().get(&f) {
             return Ok(w.clone());
         }
@@ -811,7 +821,7 @@ impl Twins {
         let alive = t.status().frame == f || go(t, RunSpec { frame: Some(f), ..Default::default() })?.is_ok();
         let w = if alive {
             let o = t.obs(&NAMES)?;
-            Some((Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()), places_of(&o), scripts_of(&o)))
+            Some((Facts(t.facts()?.iter().filter(|p| world_kind(p.0)).copied().collect()), places_of(&o), scripts_of(&o), running(&o)))
         } else {
             if let Some(t) = twin.take() {
                 t.quit();
@@ -1409,9 +1419,18 @@ fn clicks(
                             if !touched.is_empty() {
                                 r.own = touched.clone();
                             }
+                            // --runs-on: a script the input started runs on at the stop (one that is not running in
+                            // the twin there, and not the scripts that take the clicks): what it does after the stop
+                            // is the input's too, and it is read PROBE frames on as well. (A sentence's script that
+                            // plays out over 20 frames while the game takes clicks: its count, written at the end,
+                            // was no stop's.)
+                            let runs_on = cfg.runs_on && touched.is_empty() && r.room == r0.room && motion.is_some() && {
+                                let mine = running(&ob);
+                                twins.at(twin, r.st.frame)?.is_some_and(|tw| mine.iter().any(|x| !tw.3.contains(x) && x.1 != input0 && x.1 != sentence && x.1 != r.facts.val(Key::var(afford::VAR_VERB_SCRIPT as u64)) as i32))
+                            };
                             // the keys back at their old value PROBE frames on, or PROBE_LONG frames on
                             let mut back: Vec<Key> = Vec::new();
-                            if !touched.is_empty() {
+                            if !touched.is_empty() || runs_on {
                                 let mut pb = b.fork()?;
                                 out.trials += 1;
                                 let at = pb.status().frame;
@@ -1423,7 +1442,7 @@ fn clicks(
                                         back = touched.iter().filter(|&&(k, old)| r2.facts.val(k) == old).map(|t| t.0).collect();
                                         let room2 = r2.room;
                                         out.results.push(slim(r2, base));
-                                        if back.is_empty() && room2 == r0.room && go(&mut pb, RunSpec { frame: Some(at + PROBE_LONG), ..Default::default() })?.is_ok() {
+                                        if !touched.is_empty() && back.is_empty() && room2 == r0.room && go(&mut pb, RunSpec { frame: Some(at + PROBE_LONG), ..Default::default() })?.is_ok() {
                                             let w3 = pb.facts()?;
                                             back = touched.iter().filter(|&&(k, old)| w3.val(k) == old).map(|t| t.0).collect();
                                         }
@@ -3524,6 +3543,7 @@ fn main() {
         max_mids: std::env::var("DIRECT_MAX_MIDS").ok().and_then(|v| v.parse().ok()).unwrap_or(MAX_MIDS),
         cross_pages: a.iter().any(|x| x == "--cross-pages"),
         ends: a.iter().any(|x| x == "--ends"),
+        runs_on: a.iter().any(|x| x == "--runs-on"),
     };
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let root_events = if a.iter().any(|x| x == "--no-skips") {
@@ -3638,6 +3658,18 @@ fn main() {
         let g: Value = serde_json::from_str(&std::fs::read_to_string(&p).expect("--guide")).expect("the guide's JSON");
         s.policy.guide = g["keys"].as_object().expect("the guide's keys").keys().map(|k| Key::parse(k)).collect();
         eprintln!("guide: {} keys, {} of them variables", s.policy.guide.len(), s.policy.guide.iter().filter(|k| k.kind() == K_VAR).count());
+    }
+    // --counts-world (with --go): the counts the scripts of a few rooms keep (`Mentions::vars`: added to or taken
+    // from in at most GLOBAL_ROOMS rooms' scripts, and read by a room's own scripts) are of the world too, beside
+    // the guide's variables. The guide is regressed from a goal through the scripts' writers and misses a count
+    // whose effect is an object taken by an indirect write (a crewman tickled twice drops a jug: its count was
+    // in no guide, so the first tickle was no stop)
+    if a.iter().any(|x| x == "--counts-world") {
+        let before = s.policy.guide.len();
+        for &x in s.mentions.vars.keys() {
+            s.policy.guide.insert(Key::var(x as u64));
+        }
+        eprintln!("counts: {} variables the scripts of a few rooms count, {} of them not in the guide", s.mentions.vars.len(), s.policy.guide.len() - before);
     }
     if let Some(p) = opt("--rungs") {
         s.rungs = rungs_of(&p);
