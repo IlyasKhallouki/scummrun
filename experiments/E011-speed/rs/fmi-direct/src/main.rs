@@ -247,6 +247,8 @@ struct Node {
     carry: bool,
     /// a stop the game led to another room: reached from the expanded stop by a wait alone
     led: bool,
+    /// a result of the stop that began its line, in that stop's room (`--born-first`)
+    born: bool,
 }
 
 /// The line of a stop: its gains (`ever`) and the objects it owns now (so its losses), hashed.
@@ -300,6 +302,19 @@ struct Search {
     went: HashSet<(u64, i32, Key, Val)>,
     /// --motion-once: a key the game moves by itself is new once in a line of gains
     motion_once: bool,
+    /// --born-first: in a line's turn the results of the stop that began the line go before its other stops
+    born_first: bool,
+    /// --count-lines: a walk made with a count whose stop is new by more than the count's value begins a line
+    /// (the first for the count's value in a line of gains)
+    count_lines: bool,
+    count_line: HashSet<(u64, Key, Val)>,
+    /// --stay-lines: the lines a set of flags began (the stop, its line of gains, the set it held then; true for
+    /// a line a count's walk began: it has no set of its own), and those whose set, without the flags seen unset
+    /// since, an older line of their line of gains holds all of: they have their turns after the others
+    stay_lines: bool,
+    flines: Vec<(usize, u64, Vec<u64>, bool)>,
+    junk: HashSet<usize>,
+    toggles_log: Option<std::fs::File>,
     tick: u64,
     /// the engines of expanded stops, each with the count at its last use: a stop that comes of one of them, or of
     /// a stop that does, is made from it
@@ -2680,6 +2695,8 @@ impl Search {
         let gv0: Vec<(Key, Val)> = base.iter().filter(|p| p.0.kind() == K_VAR && self.policy.guide.contains(&p.0)).copied().collect();
         let own0: Vec<u32> = base.iter().filter(|p| p.0.kind() == K_OWNER && p.1 == ego0).map(|p| p.0.a() as u32).filter(|o| !self.root_owned.contains(o)).collect();
         let mut set0: Vec<u64> = Vec::new();
+        // (a flag was seen unset for the first time in this commit: the lines are judged again at its end)
+        let mut retoggle = false;
         let mut sum0 = 0u64;
         for p in base.iter().filter(|p| world_kind(p.0)) {
             if flaglike(p.0) && p.1 != 0 && !self.toggles.contains(&p.0) {
@@ -2774,6 +2791,11 @@ impl Search {
             let tc = Instant::now();
             for c in r.changed.iter().filter(|c| flaglike(c.0) && c.1 == 0) {
                 if self.toggles.insert(c.0) {
+                    // (kept beside the stops, OUT/toggles.txt, for a run that starts from one of them)
+                    if let Some(f) = self.toggles_log.as_mut() {
+                        let _ = writeln!(f, "{}", c.0);
+                    }
+                    retoggle = true;
                     // seen unset: it counts no more, for this stop's later results too
                     let n = bit_of(c.0);
                     if let Some(w) = set0.get_mut(n / 64) {
@@ -2804,6 +2826,7 @@ impl Search {
             let moved = gline != self.nodes[id].gline || r.changed.iter().any(|c| flaglike(c.0));
             if moved && !tops.iter().any(|m| within(&set, m)) {
                 tops.retain(|m| !within(m, &set));
+                self.flines.push((self.nodes.len(), gline, set.clone(), false));
                 tops.push(set);
                 dive = true;
             }
@@ -2857,11 +2880,13 @@ impl Search {
             // a walk made with a count goes first once for the room and the count's value in a line of gains (in
             // every line a set of flags begins it would be first again: 16 of 40 stops in one check)
             let mut count_went = false;
+            let mut went_with: Option<(Key, Val)> = None;
             for &(k, val) in &atoms {
                 let guide = self.policy.guide.contains(&k);
                 if k.kind() == K_VAR {
                     if r.name.starts_with("gone") && self.mentions.vars.contains_key(&(k.a() as u32)) && self.went.insert((gline, r.room, k, val)) {
                         count_went = true;
+                        went_with = Some((k, val));
                     }
                     if self.seen.insert((line, k, val)) {
                         count_new = true;
@@ -3015,6 +3040,26 @@ impl Search {
             }
             let tc = Instant::now();
             let nid = self.nodes.len();
+            // --count-lines: a walk made with a count whose stop is new by more than the count's value (a thing
+            // seen there, the interface, a key of the world) in a room its line knows: the value did something in
+            // the room that reads it.
+            // Such a stop begins a line as a new set of flags does, the first for the count's value in its line
+            // of gains: every room and input counts again from it. (A count is no flag and began no line: where
+            // an actor followed ego for it, the rooms on the way were known, their stops new by nothing, and
+            // the way through a room that scrolls was not made again.)
+            let (fline, line, dive) = match went_with {
+                // (in a room the line knows: a stop new by its room is new by everything)
+                Some((k, v)) if self.count_lines && self.flag_lines && class <= 1 && !novel.iter().any(|x| x.starts_with("room=")) && self.count_line.insert((gline, k, v)) => {
+                    novel.insert(0, format!("line:{k}={v}"));
+                    self.flines.push((nid, gline, Vec::new(), true));
+                    let mut h = DefaultHasher::new();
+                    (gline, nid).hash(&mut h);
+                    (nid, h.finish(), true)
+                }
+                _ => (fline, line, dive),
+            };
+            // (a result of the stop that began this line, in its room, and no line's first stop itself)
+            let born = self.nodes[id].fline == id && fline == id && r.room == room00;
             let events = r.events.clone();
             let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
             let mut first_held = false;
@@ -3091,7 +3136,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") && (count_went || !r.name.starts_with("gone")), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+') });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") && (count_went || !r.name.starts_with("gone")), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+'), born });
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
@@ -3114,6 +3159,44 @@ impl Search {
             } else {
                 self.queues[level][class].push_back(nid);
             }
+        }
+        if retoggle && self.stay_lines {
+            self.rejudge();
+        }
+    }
+
+    /// --stay-lines: a line a set of flags began is a line while those flags stay. Each line's set without the
+    /// flags seen unset since; a line whose set an older line of its line of gains then holds all of began with
+    /// nothing that stayed (a door's state, the classes a room's entry sets by the way ego came): it has its
+    /// turns after all the others. (The newest line has every second turn, and such lines kept being the
+    /// newest: 7 of them in 20 minutes on one island, the line that had won something at a 128th of the turns.)
+    fn rejudge(&mut self) {
+        let mut mask: Vec<u64> = Vec::new();
+        for k in &self.toggles {
+            let n = if k.kind() == K_BIT { k.a() as usize } else { 4096 + (k.a() as usize) * 32 + (k.b() as usize & 31) };
+            if mask.len() <= n / 64 {
+                mask.resize(n / 64 + 1, 0);
+            }
+            mask[n / 64] |= 1 << (n % 64);
+        }
+        let within = |a: &[u64], b: &[u64]| a.iter().enumerate().all(|(i, w)| w & !b.get(i).copied().unwrap_or(0) == 0);
+        let before = self.junk.len();
+        self.junk.clear();
+        let mut kept: HashMap<u64, Vec<Vec<u64>>> = HashMap::new();
+        for (id, g, set, fixed) in &self.flines {
+            if *fixed {
+                continue;
+            }
+            let s: Vec<u64> = set.iter().enumerate().map(|(i, w)| w & !mask.get(i).copied().unwrap_or(0)).collect();
+            let tops = kept.entry(*g).or_default();
+            if tops.iter().any(|t| within(&s, t)) {
+                self.junk.insert(*id);
+            } else {
+                tops.push(s);
+            }
+        }
+        if self.junk.len() != before {
+            trace(&format!("  lines: {} of {} began with flags that did not stay", self.junk.len(), self.flines.len()));
         }
     }
 
@@ -3467,6 +3550,9 @@ fn main() {
     s.flag_lines = a.iter().any(|x| x == "--flag-lines");
     s.shares = a.iter().any(|x| x == "--shares");
     s.motion_once = a.iter().any(|x| x == "--motion-once");
+    s.born_first = a.iter().any(|x| x == "--born-first");
+    s.count_lines = a.iter().any(|x| x == "--count-lines");
+    s.stay_lines = a.iter().any(|x| x == "--stay-lines");
     s.go = a.iter().any(|x| x == "--go");
     let mut loaded: Vec<String> = Vec::new();
     if s.go {
@@ -3499,6 +3585,22 @@ fn main() {
         }
         eprintln!("mentions: {} objects, {} flags named in rooms' scripts; {} ways from room to room seen, {} more the scripts advise", s.mentions.objs.len(), s.mentions.bits.len(), seen, s.edges.len() - seen);
         trace(&format!("mentions: {} variables a few rooms' scripts count on", s.mentions.vars.len()));
+    }
+    // --toggles FILE: the flags an earlier run saw unset again (its OUT/toggles.txt)
+    let toggles_file = opt("--toggles").or_else(|| from_run.as_ref().map(|d| d.join("toggles.txt").to_string_lossy().into_owned()).filter(|p| Path::new(p).exists()));
+    if let Some(p) = toggles_file {
+        for l in std::fs::read_to_string(&p).expect("--toggles").lines().filter(|l| !l.is_empty()) {
+            s.toggles.insert(Key::parse(l));
+        }
+        eprintln!("toggles: {} flags an earlier run saw unset again", s.toggles.len());
+    }
+    s.toggles_log = std::fs::File::create(out.join("toggles.txt")).ok();
+    if let Some(f) = s.toggles_log.as_mut() {
+        let mut ks: Vec<String> = s.toggles.iter().map(|k| format!("{k}")).collect();
+        ks.sort();
+        for k in ks {
+            let _ = writeln!(f, "{k}");
+        }
     }
     s.edges_log = std::fs::File::create(out.join("edges.jsonl")).ok();
     if let Some(f) = s.edges_log.as_mut() {
@@ -3563,7 +3665,7 @@ fn main() {
             "events": root_events.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
         let _ = f.write_all(format!("{first}\n").as_bytes());
     }
-    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false, carry: false, led: false });
+    s.nodes.push(Node { events: root_events, parent: usize::MAX, frame: st.frame, depth: 0, ever: Vec::new(), level: 0, line, room: r.room, pending: Vec::new(), inside: false, flags: flags0, fline: 0, gline, news: root_news, walk: false, win: false, carry: false, led: false, born: false });
     s.queues.push(Default::default());
     s.stacks.push(Vec::new());
     s.queues[0][0].push_back(0);
@@ -3603,6 +3705,10 @@ fn main() {
                 }
                 lines.sort_unstable_by(|a, b| b.cmp(a));
                 lines.dedup();
+                if s.stay_lines {
+                    // (stable: the lines whose flags did not stay after the others, each part newest first)
+                    lines.sort_by_key(|x| s.junk.contains(&x.1));
+                }
                 let r = s.tick.trailing_zeros() as usize;
                 lines.get(if r < lines.len() { r } else { 0 }).copied()
             } else {
@@ -3675,12 +3781,33 @@ fn main() {
                 // by itself is followed before the rooms the inputs lead to), then queues 1, 2 and 3, each its
                 // earliest
                 let nodes = &s.nodes;
+                // --born-first: of that line the results of the stop that began it, in that stop's room, before
+                // its other stops (the stack's, then the queues'). What a new set of flags changes is looked for
+                // first where it was set: the line's stack is the walk through the rooms, every one of them new
+                // again, and the stop two clicks before a room no line had entered (new in its line by a walk
+                // box, the third queue) waited for that walk to end
+                let news = if s.born_first {
+                    match s.stacks.get(l).and_then(|st| (0..st.len()).filter(|&i| nodes[st[i]].fline == f && nodes[st[i]].born).max_by_key(|&i| (nodes[st[i]].led, st[i]))) {
+                        Some(i) => Some(s.stacks[l].remove(i)),
+                        None => (0..FIRST_QUEUES).find_map(|c| {
+                            let i = (0..s.queues[l][c].len()).find(|&i| nodes[s.queues[l][c][i]].fline == f && nodes[s.queues[l][c][i]].born)?;
+                            s.queues[l][c].remove(i)
+                        }),
+                    }
+                } else {
+                    None
+                };
+                let nodes = &s.nodes;
+                if news.is_some() {
+                    news
+                } else {
                 match s.stacks.get(l).and_then(|st| (0..st.len()).filter(|&i| nodes[st[i]].fline == f).max_by_key(|&i| (nodes[st[i]].led, st[i]))) {
                     Some(i) => Some(s.stacks[l].remove(i)),
                     None => (0..FIRST_QUEUES).find_map(|c| {
                         let i = (0..s.queues[l][c].len()).find(|&i| nodes[s.queues[l][c][i]].fline == f)?;
                         s.queues[l][c].remove(i)
                     }),
+                }
                 }
             } else {
                 (0..s.queues.len()).rev().find_map(|l| {
