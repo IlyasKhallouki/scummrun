@@ -419,6 +419,9 @@ struct Cfg {
     /// --cross-pages: inside a sentence that has its first object the page may be turned, for a second object on
     /// another page (two things of the inventory that no page shows together). 25 to 48% more trials a late stop
     cross_pages: bool,
+    /// --ends: a trial that comes to no stop within the horizon (the game takes no input again: an ending, a scene
+    /// with no end in sight) is a result all the same, read where the horizon ends: a stop that is never expanded
+    ends: bool,
 }
 
 static DIRS: AtomicU64 = AtomicU64::new(0);
@@ -1443,7 +1446,18 @@ fn clicks(
                         }
                     }
                     Played::Ended(st) => out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason)),
-                    Played::NotIdle => out.not_idle += 1,
+                    Played::NotIdle => {
+                        out.not_idle += 1;
+                        if cfg.ends {
+                            // (named with a '!': no stop of the game's, and none to click on from. The sentence
+                            // that ends a game is such a trial: after it the game plays on by itself for good)
+                            let ob = b.obs(&NAMES)?;
+                            let st = b.status().clone();
+                            let mut r = read(format!("{}!", name_of(pre, &cl)), events, &ob, st);
+                            r.inside = !pre.is_empty();
+                            out.results.push(slim(r, base));
+                        }
+                    }
                 }
                 let t = Instant::now();
                 b.quit();
@@ -2193,7 +2207,14 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                     }
                 }
                 Played::Ended(st) => out.ends.push(format!("wait{n} {}", st.reason)),
-                Played::NotIdle => out.not_idle += 1,
+                Played::NotIdle => {
+                    out.not_idle += 1;
+                    if cfg.ends {
+                        let ob = b.obs(&NAMES)?;
+                        let st = b.status().clone();
+                        out.results.push(slim(read(format!("wait{n}!"), Vec::new(), &ob, st), &r0.facts));
+                    }
+                }
             },
         }
         b.quit();
@@ -3140,7 +3161,10 @@ impl Search {
             self.kept[class] += 1;
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
-            keep.push((i, nid, level as usize, class, dive || (self.flag_lines && class == 0)));
+            // (a stop where the game takes no input is kept and never expanded)
+            if !r.name.ends_with('!') {
+                keep.push((i, nid, level as usize, class, dive || (self.flag_lines && class == 0)));
+            }
             self.ct[5] += tc.elapsed().as_secs_f64();
         }
         if let Some(f) = self.offers.as_mut() {
@@ -3499,6 +3523,7 @@ fn main() {
         at_once: opt("--at-once").map(|v| v.parse().unwrap()).unwrap_or(0),
         max_mids: std::env::var("DIRECT_MAX_MIDS").ok().and_then(|v| v.parse().ok()).unwrap_or(MAX_MIDS),
         cross_pages: a.iter().any(|x| x == "--cross-pages"),
+        ends: a.iter().any(|x| x == "--ends"),
     };
     let host = Host::new(HostCfg::from_env()).expect("the host");
     let root_events = if a.iter().any(|x| x == "--no-skips") {

@@ -1,0 +1,21 @@
+E027 bench, 2026-11-13: --ends. A trial that comes to no stop within the horizon (1,600 frames; 6,400 in a
+cutscene) was counted and dropped. With --ends it is a result, read where the horizon ends, named with a '!',
+kept by what is new there and never expanded (after a click's trial and after a wait). The sentence that ends a
+game is such a trial. Old: tree 742ef29 (binary born2). Off: as before.
+
+Part IV from the game's own start (FMI_BOOT_PARAM=1212: room 83, frame 2), the flags of part3d:
+old tree    part4a: room 59 at 84.2 s, owner:733 at 124.2 s, bit:565 never in 2,767 s (232 stops, 141,300
+            trials, 2 threads); 1,531 trials came to no stop
+--ends      part4b: owner:733 at 48.3 s, bit:565 = 1 at 48.5 s (the 18th stop; 20 stops, 7,333 trials, 3
+            threads); its stop replays from that start in 20 clicks
+From part4a's stop 260 (room 59), one stop expanded with --ends: 1,646 trials, 7 such stops kept, bit:565 = 1
+at the stop of a sentence of three clicks (room 89, frame 8,178).
+
+The flag off, five stops from each reference (default flags): as the old tree
+p7top       4843   104  9cba4c7715
+cake        8306   124  a91ca2c9eb
+crew        3212   271  cb39ef7d95
+meathook    7919    51  a4cee03988
+boot        1549    40  6213300783
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept, with --ends and without (no trial of
+those stops comes to no stop).
