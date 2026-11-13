@@ -1,0 +1,12 @@
+boot: frame 2 room 83 idle Some("sentence") in 0.2 s
+mentions: 342 objects, 211 flags named in rooms' scripts; 0 ways from room to room seen, 105 more the scripts advise
+guide: 805 keys, 115 of them variables
+[    3.2s] WATCH var:194=122 first held by node 25
+[    6.2s] WATCH room=35 first held by node 29
+[   11.7s] WATCH room=34 first held by node 68
+[   23.4s] WATCH room=78 first held by node 101
+[   27.7s] WATCH room=45 first held by node 111
+[   30.2s] WATCH room=59 first held by node 120
+[   48.3s] WATCH owner:733=1 first held by node 252
+[   48.5s] WATCH bit:565=1 first held by node 262
+[   64.9s] kept 314 [142, 7, 80, 7, 77], expanded 20, level 2 (4 queued there), queued [0, 6, 74, 5, 74], trials 7333 (122/s), rooms 10, rungs ["P0", "P6", "P7", "P8", "P10"], boots 0
