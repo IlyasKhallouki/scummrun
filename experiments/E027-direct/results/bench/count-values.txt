@@ -1,0 +1,33 @@
+E027 bench, 2026-11-13: the counts' walks are made for each value, not for each state. In the counting step, for
+the counts some other room's scripts read: at each new value of those counts (8 values at most) one walk to each
+of the rooms that read one (6 at most, the nearest first), one trial a walk. Before: from each new state of the
+counting, 8 walks in all. Many states hold one value. Old: tree 8ac50ce (binary feet1).
+
+From part3c's stop 109 (room 21), the counting, by a trace: 4 inputs (four sentences of three clicks, each made
+once), var:145 from 1 to 5, 26 states of var:145 and the 4 owners the inputs move; no state is a stop.
+From part3c's stop 129 (room 21, var:145 = 1), one stop expanded:
+old tree    part3c itself: 8 walks, to rooms 2, 3, 4 and 5 from the first two states (both var:145 = 2); var:145
+            above 2 at no stop in 769 s (192 stops, 97,174 trials)
+this tree   16 walks, to rooms 2, 3, 4 and 5 at the values 2, 3, 4 and 5; at the value 5 the stops in rooms 3 and
+            4 are new by an actor seen there
+part3d (this tree, from part3b's stop 787): var:145 = 5 at 74.2 s; room 12 entered from such a stop at 230.1 s.
+
+From part3a's stop 6988 (room 16), 40 stops (--shares), against the tree before the two changes of this day
+(94997da, binary aim3):
+                                            94997da                      this tree
+bit:530 set                                 4th stop, 5919 trials        5th stop, 8062 trials
+room 20 entered                             30th stop, 31380             31st stop, 38856
+40 stops                                    31722 trials, kept 397       41055 trials, kept 464
+walks' stops expanded                       6                            12 (6 of them from room 21, entered at
+                                                                         the 32nd stop)
+In room 16 the count has 7 values and one room reads it: 7 walks now, and the 6 of them that are new go first (5
+before); a stop of room 11 costs 1,623 trials (1,449: an actor is a target there since 8ac50ce).
+
+Five stops from each reference (default flags):  trials  kept  digest       (old: the same)
+p7top       4843   104  9cba4c7715
+cake        8306   124  a91ca2c9eb
+crew        3212   271  cb39ef7d95
+meathook    7919    51  a4cee03988
+boot        1549    40  6213300783
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).

@@ -195,7 +195,7 @@ const COUNT_FEW: usize = 4;
 const COUNT_INPUTS: usize = 4;
 const COUNT_GROUPS: usize = 3;
 const COUNT_STATES: usize = 256;
-/// `--go`: the walks made from the states of one group of counts to the rooms whose scripts read them
+/// `--go`: the values of one group of counts from which a walk is made to each of the rooms whose scripts read them
 const COUNT_WALKS: usize = 8;
 const GO_HOPS: usize = 14;
 /// Floor clicks a walk may make in one room to bring a thing onto the screen.
@@ -2471,16 +2471,21 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
             };
             // --go: a count counts where the scripts read it, and that may be another room (what is set here is
             // asked for there). For the counts the scripts of a few rooms add to or take from (`Mentions::vars`):
-            // from each state of the counts a walk to the other rooms whose scripts read one, the nearest first,
-            // one trial a walk, COUNT_WALKS at most. A walk's stop is a walk's stop like any other: new there by
-            // the count's value if it is, and expanded before the lines' turns. (A state of the counts alone is no
-            // stop here, and as a stop of its own it is new by a variable's value alone and waits: 633 such stops
-            // stood before it in one run)
+            // at each value of those counts that the counting comes to, a walk to the other rooms whose scripts
+            // read one, the nearest first, one trial a walk, COUNT_WALKS values at most. The room that reads a
+            // count reads its value, and many states hold one value (five things given one by one: 26 states,
+            // 5 values; a walk for each state had spent its walks at the first value). A walk's stop is a walk's
+            // stop like any other: new there by the count's value if it is, and expanded before the lines' turns.
+            // (A state of the counts alone is no stop here, and as a stop of its own it is new by a variable's
+            // value alone and waits: 633 such stops stood before it in one run)
             let mut ways: Vec<Vec<(i32, &Vec<Hit>)>> = Vec::new();
+            let mut read_vars: Vec<Key> = Vec::new();
             if snap.go {
                 let mut rooms: Vec<i32> = Vec::new();
                 for k in &vars {
-                    for &r in snap.mentions.vars.get(&(k.a() as u32)).into_iter().flatten() {
+                    let Some(rs) = snap.mentions.vars.get(&(k.a() as u32)) else { continue };
+                    read_vars.push(*k);
+                    for &r in rs {
                         if r != r0.room && !rooms.contains(&r) {
                             rooms.push(r);
                         }
@@ -2490,6 +2495,8 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                 ways.sort_by_key(|w| (w.len(), w.last().map(|x| x.0)));
                 ways.truncate(GO_ROOMS);
             }
+            let value = |f: &Facts| -> Vec<Val> { read_vars.iter().map(|&k| f.val(k)).collect() };
+            let mut walked: HashSet<Vec<Val>> = HashSet::from([value(&r0.facts)]);
             let mut walks = 0usize;
             let mut led: HashSet<u64> = HashSet::from([beside(&r0.facts)]);
             let mut seen: HashSet<u64> = HashSet::from([state(&r0.facts)]);
@@ -2510,6 +2517,7 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                         let r = read(if name.is_empty() { x.0.clone() } else { format!("{name}.{}", x.0) }, all.clone(), &ob, st);
                         let fresh = seen.insert(state(&r.facts));
                         let here = r.room == r0.room;
+                        let val = value(&r.facts);
                         let rname = r.name.clone();
                         trace(&format!("    count {rname}: {:?}{}", keys.iter().map(|k| r.facts.val(*k)).collect::<Vec<_>>(), if fresh { " new" } else { "" }));
                         // (the first inputs' stops are the round's own results already)
@@ -2517,11 +2525,8 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                             made += 1;
                             out.results.push(slim(r, &r0.facts));
                         }
-                        if fresh && here {
+                        if here && !ways.is_empty() && walked.len() <= COUNT_WALKS && walked.insert(val) {
                             for w in &ways {
-                                if walks >= COUNT_WALKS {
-                                    break;
-                                }
                                 walks += 1;
                                 out.trials += 1;
                                 if let Some(mut r) = walk(&mut b, w, ego, cfg, &mut out.bad)? {
