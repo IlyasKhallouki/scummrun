@@ -21,6 +21,13 @@ pub const GAMEID: &str = "monkey";
 pub const PLATFORM: &str = "pc";
 pub const TALKSPEED: u32 = 255;
 pub const BOOT_PARAM: i32 = 0;
+
+/// The number given to the game's boot script: 0 (a boot as a player's), or FMI_BOOT_PARAM. A game's boot script may
+/// hold starts of its own for other numbers (its makers' shortcuts into later parts): a run from such a start is a
+/// test of that part, and its stops replay from that start, not from the boot.
+pub fn boot_param() -> i32 {
+    std::env::var("FMI_BOOT_PARAM").ok().and_then(|v| v.parse().ok()).unwrap_or(BOOT_PARAM)
+}
 pub const MAX_TICKS: u64 = 10_000_000;
 pub const MAX_FRAME: u64 = 200_000;
 /// replay_part1.ANY_SEED: never used
@@ -397,7 +404,7 @@ impl Host {
         let mut cmd = Command::new(&h.bin);
         cmd.arg(format!("--config={}", ini.display()))
             .arg(format!("--savepath={}", saves.display()))
-            .arg(format!("--boot-param={BOOT_PARAM}"))
+            .arg(format!("--boot-param={}", boot_param()))
             .arg("--disable-sdl-audio")
             .arg(format!("--random-seed={}", cfg.seed))
             .arg(&h.target);
