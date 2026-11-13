@@ -3755,7 +3755,10 @@ fn main() {
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
     // --stall M: the run ends when the highest level was not raised for M minutes (a driver goes on from its top
-    // stop, as a run begun from the stop it ended at)
+    // stop, as a run begun from the stop it ended at). Only once the level was raised over the first stop's: in a run
+    // that has gained nothing the top stop is a line begun next to its first stop, and a run from there would do
+    // again what this one did (full1, 2026-11-13: seven legs of an hour each began within 44 frames of one another,
+    // and each won the same two or three fights and lost them at its end)
     let stall: Option<Duration> = opt("--stall").map(|v| Duration::from_secs_f64(v.parse::<f64>().expect("--stall M") * 60.0));
     // --stops N: the run ends after N stops are expanded (a measure that is the same on any machine)
     let max_stops: Option<u64> = opt("--stops").map(|v| v.parse().expect("--stops N"));
@@ -3764,7 +3767,7 @@ fn main() {
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
     while t0.elapsed() < limit && max_stops.map_or(true, |n| s.expanded < n) && !s.done {
         if let Some(m) = stall {
-            if s.top_at.unwrap_or(t0).elapsed() > m {
+            if s.top > 0 && s.top_at.unwrap_or(t0).elapsed() > m {
                 eprintln!("[{:7.1}s] STALL: the highest level ({}) not raised for {:.0} minutes: the run ends", t0.elapsed().as_secs_f64(), s.top, m.as_secs_f64() / 60.0);
                 break;
             }
