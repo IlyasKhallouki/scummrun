@@ -302,8 +302,10 @@ struct Search {
     went: HashSet<(u64, i32, Key, Val)>,
     /// --motion-once: a key the game moves by itself is new once in a line of gains
     motion_once: bool,
-    /// --born-first: in a line's turn the results of the stop that began the line go before its other stops
+    /// --born-first: in a line's turn the results of the stop that began the line go before its other stops;
+    /// --walk-born: so do the results of a walk the search made for the line's news, in the room walked to
     born_first: bool,
+    walk_born: bool,
     /// --count-lines: a walk made with a count whose stop is new by more than the count's value begins a line
     /// (the first for the count's value in a line of gains)
     count_lines: bool,
@@ -3098,8 +3100,11 @@ impl Search {
                 }
                 _ => (fline, line, dive),
             };
-            // (a result of the stop that began this line, in its room, and no line's first stop itself)
-            let born = self.nodes[id].fline == id && fline == id && r.room == room00;
+            // (a result of the stop that began this line, in its room, and no line's first stop itself; or of a
+            // walk the search made for the line's news, in the room it walked to: the scripts name that room for
+            // what the line won, and what the gain does there is looked at first. In one run the crate opened by
+            // the tools the line had won waited under 230 stops of newer walks through the maze)
+            let born = r.room == room00 && ((self.nodes[id].fline == id && fline == id) || (self.walk_born && self.nodes[id].walk && fline == self.nodes[id].fline));
             let events = r.events.clone();
             let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
             let mut first_held = false;
@@ -3596,6 +3601,7 @@ fn main() {
     s.shares = a.iter().any(|x| x == "--shares");
     s.motion_once = a.iter().any(|x| x == "--motion-once");
     s.born_first = a.iter().any(|x| x == "--born-first");
+    s.walk_born = a.iter().any(|x| x == "--walk-born");
     s.count_lines = a.iter().any(|x| x == "--count-lines");
     s.stay_lines = a.iter().any(|x| x == "--stay-lines");
     s.go = a.iter().any(|x| x == "--go");
