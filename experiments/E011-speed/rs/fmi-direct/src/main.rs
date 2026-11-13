@@ -306,6 +306,10 @@ struct Search {
     /// --walk-born: so do the results of a walk the search made for the line's news, in the room walked to
     born_first: bool,
     walk_born: bool,
+    /// when the highest level was last raised (--stall), and the values whose first holding ends the run (--until)
+    top_at: Option<Instant>,
+    until: Vec<(Key, Val)>,
+    done: bool,
     /// --count-lines: a walk made with a count whose stop is new by more than the count's value begins a line
     /// (the first for the count's value in a line of gains)
     count_lines: bool,
@@ -3113,6 +3117,10 @@ impl Search {
                     first_held = true;
                     w.2 = Some((nid, secs));
                     eprintln!("[{secs:7.1}s] WATCH {}={} first held by node {nid}", w.0, w.1);
+                    if self.until.contains(&(w.0, w.1)) {
+                        eprintln!("[{secs:7.1}s] UNTIL {}={} held: the run ends", w.0, w.1);
+                        self.done = true;
+                    }
                 }
             }
             for g in self.rungs.iter_mut().filter(|g| g.at.is_none()) {
@@ -3183,6 +3191,9 @@ impl Search {
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
             self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") && (count_went || !r.name.starts_with("gone")), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+'), born });
             self.kept[class] += 1;
+            if level > self.top {
+                self.top_at = Some(Instant::now());
+            }
             self.top = self.top.max(level);
             // with --flag-lines every stop of queue 0 goes on the stack: the newest line is the one worked on
             // (a stop where the game takes no input is kept and never expanded)
@@ -3684,6 +3695,15 @@ fn main() {
         let (k, v) = w.split_once('=').expect("--watch KEY=V");
         s.watch.push((Key::parse(k), v.parse().expect("a value"), None));
     }
+    // --until K=V,..: watched values whose first holding ends the run (an evaluation's stop rule, as --minutes)
+    for w in opt("--until").unwrap_or_default().split(',').filter(|x| !x.is_empty()) {
+        let (k, v) = w.split_once('=').expect("--until KEY=V");
+        let (k, v): (Key, Val) = (Key::parse(k), v.parse().expect("a value"));
+        if !s.watch.iter().any(|x| x.0 == k && x.1 == v) {
+            s.watch.push((k, v, None));
+        }
+        s.until.push((k, v));
+    }
     let o = e.obs(&NAMES).expect("the root's dump");
     let r = read(String::new(), Vec::new(), &o, st.clone());
     let ego = r.facts.val(Key::pack(K_EGO, 0, 0, 0));
@@ -3734,12 +3754,21 @@ fn main() {
     s.queues[0][0].push_back(0);
     s.live.insert(0, e);
     let limit = Duration::from_secs_f64(minutes * 60.0);
+    // --stall M: the run ends when the highest level was not raised for M minutes (a driver goes on from its top
+    // stop, as a run begun from the stop it ended at)
+    let stall: Option<Duration> = opt("--stall").map(|v| Duration::from_secs_f64(v.parse::<f64>().expect("--stall M") * 60.0));
     // --stops N: the run ends after N stops are expanded (a measure that is the same on any machine)
     let max_stops: Option<u64> = opt("--stops").map(|v| v.parse().expect("--stops N"));
     let (mut last, mut printed) = (0u64, Instant::now());
     type Job = (usize, Option<Box<dyn Engine>>, Option<Arc<Mutex<Box<dyn Engine>>>>, Vec<Event>, Vec<Event>, u64, u32, Vec<(Key, Val)>, bool, Vec<Key>);
     type Done = (usize, Result<(Box<dyn Engine>, Out), String>, bool);
-    while t0.elapsed() < limit && max_stops.map_or(true, |n| s.expanded < n) {
+    while t0.elapsed() < limit && max_stops.map_or(true, |n| s.expanded < n) && !s.done {
+        if let Some(m) = stall {
+            if s.top_at.unwrap_or(t0).elapsed() > m {
+                eprintln!("[{:7.1}s] STALL: the highest level ({}) not raised for {:.0} minutes: the run ends", t0.elapsed().as_secs_f64(), s.top, m.as_secs_f64() / 60.0);
+                break;
+            }
+        }
         // a batch: the next stops in the queues' order, each with its kept engine if it has one
         let mut batch: Vec<Mutex<Option<Job>>> = Vec::new();
         let at_once = if cfg.at_once > 0 { cfg.at_once } else { (cfg.workers / cfg.slices.max(1)).max(1) };
