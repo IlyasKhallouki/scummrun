@@ -1,4 +1,6 @@
-"""keep.py OUT BIN: keeps the chain in OUT going until the game's end value is held.
+"""keep.py OUT BIN [CHAIN OPTIONS..]: keeps the chain in OUT going until the game's end value is held.
+
+E028: the options after BIN (chain.py's --game, --watch, --until, --guide, --rungs, --engine) go to every continuation.
 
 When a chain (run/chain.py) ends for any reason other than the end value (its hours spent, a failed search, no top
 stop, three idle legs), a new chain starts from the furthest stop the last chains reached (the newest leg with a
@@ -84,7 +86,7 @@ for n in range(1, 7):
     out = D / f"cont{n}"
     out.mkdir()
     cmd = ["systemd-inhibit", "--what=idle:sleep", "--why=scummrun full run", "nice", "-n", "5", CHAIN, str(out),
-           "--hours", "14", "--stall", "60", "--workers", "7", "--bin", BIN]
+           "--hours", "14", "--stall", "60", "--workers", "7", "--bin", BIN] + sys.argv[3:]
     if leg is not None:
         line = open(leg / "top.jsonl").read()
         tid = json.loads(line[:line.find(',"events"')] + "}")["id"]

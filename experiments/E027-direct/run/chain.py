@@ -1,4 +1,5 @@
 """chain.py OUT [--hours H] [--stall M] [--workers W] [--bin BIN] [--from NODES ID] [--edges F] [--toggles F]
+          [--game ENV|K=V,..] [--watch K=V,..|none] [--until K=V|none] [--guide F|none] [--rungs F|none] [--engine BIN]
 
 E027: the direct search from the boot to the game's end in legs, with no hand between them. A leg is one run of the
 search (`direct`) with `--stall M`: it ends when its highest level was not raised for M minutes. The next leg begins
@@ -11,6 +12,9 @@ The rule is the one the chain of 2026-11-12/13 followed by hand (a run that stal
 stop), without the hand. Each leg's stops replay from the boot, as every run's do.
 
 Settings: experiments/E027-direct/run/env.sh, through chain.sh (the engine, the game, the guide and the rungs).
+E028: another game's settings by option: --game names env.sh's list of the game's settings (MI, the default; DEMO) or
+gives them (FMI_GAME_ID=..,FMI_GAME_DIR=..); --watch, --until, --guide and --rungs are Monkey Island's unless given
+(`none`: not given to the search); --engine another engine. Without them every leg's command is as before.
 """
 import json, os, subprocess, sys, time
 from pathlib import Path
@@ -31,11 +35,14 @@ def opt(a, name, default=None, n=1):
     return a[i + 1] if n == 1 else a[i + 1:i + 1 + n]
 
 
-def env():
+def env(game="MI", engine=None):
     # the settings env.sh sets (chain.sh sources it and exports ON, MI, GUIDE27 and RUNGS27): ON and MI are lists of
-    # K=V for the engine and the search
+    # K=V for the engine and the search (--game: another list's name, or the list itself, K=V,..)
     e = dict(os.environ)
-    for kv in (e.get("ON", "") + " " + e.get("MI", "")).split():
+    kvs = game.replace(",", " ") if "=" in game else e.get(game, "")
+    if engine:
+        e["FMI_ENGINE_BIN"] = engine
+    for kv in (e.get("ON", "") + " " + kvs).split():
         if "=" in kv:
             k, v = kv.split("=", 1)
             e[k] = v
@@ -63,7 +70,11 @@ def main():
     start = opt(a, "--from", None, 2)
     edges = opt(a, "--edges")
     toggles = opt(a, "--toggles")
-    e, guide, rungs = env()
+    e, guide, rungs = env(opt(a, "--game", "MI"), opt(a, "--engine"))
+    guide = opt(a, "--guide", guide)
+    rungs = opt(a, "--rungs", rungs)
+    watch = opt(a, "--watch", WATCH)
+    until = opt(a, "--until", UNTIL)
     t0 = time.time()
     log = open(out / "chain.txt", "a")
 
@@ -83,7 +94,12 @@ def main():
         leg = out / f"leg{n:02d}"
         leg.mkdir(exist_ok=True)
         cmd = [binary, str(leg), "--minutes", f"{left:.1f}", "--stall", stall, "--workers", workers, "--slices", workers,
-               "--batch", "1", "--at-once", "1", "--guide", guide, "--rungs", rungs, "--watch", WATCH, "--until", UNTIL] + FLAGS
+               "--batch", "1", "--at-once", "1"]
+        cmd += [] if guide == "none" else ["--guide", guide]
+        cmd += [] if rungs == "none" else ["--rungs", rungs]
+        cmd += [] if watch == "none" else ["--watch", watch]
+        cmd += [] if until == "none" else ["--until", until]
+        cmd += FLAGS
         if start:
             cmd += ["--from", start[0], start[1]]
         if edges:
