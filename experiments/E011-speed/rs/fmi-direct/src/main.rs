@@ -314,6 +314,11 @@ struct Search {
     /// begins a line as a new set of flags does (a count of fights won, asked for by another room's script)
     high_lines: bool,
     var_max: HashMap<Key, Val>,
+    /// --arrivals: a result of a stop with news, in a room the scripts name for that news (the rooms --go walks to),
+    /// is the walk's whichever click brought it there: first of its queue, and its own results in that room go
+    /// first (--walk-born). Once for a line and a room
+    arrivals: bool,
+    arrived: HashSet<(usize, i32)>,
     /// when the highest level was last raised (--stall), and the values whose first holding ends the run (--until)
     top_at: Option<Instant>,
     until: Vec<(Key, Val)>,
@@ -1728,6 +1733,9 @@ struct Mentions {
     /// per variable, the values a script's test of it against a number turns at (`>= K`, `< K`: K; `> K`, `<= K`:
     /// K + 1): where a count is enough for something
     turns: HashMap<u32, Vec<i64>>,
+    /// per variable, the rooms whose scripts test it so (a global script is its block's room's: `stored in LFLF of
+    /// room N` in the dump's header)
+    turn_rooms: HashMap<u32, Vec<i32>>,
 }
 
 /// The integers that follow each `pat` in `line`.
@@ -1825,6 +1833,8 @@ fn mentions_of(dir: &Path) -> Mentions {
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
             let (objs, bits, vars, counted) = names_of(&text);
             m.counters.extend(counted.iter().copied());
+            let block = text.lines().take(8).find_map(|l| l.find("stored in LFLF of room ").map(|i| l[i + 23..].chars().take_while(|c| c.is_ascii_digit()).collect::<String>())).and_then(|d| d.parse::<i32>().ok());
+            let tester = room.or(block);
             for l in text.lines().filter(|l| !l.starts_with('#')) {
                 let mut at = 0;
                 while let Some(i) = l[at..].find("Var[") {
@@ -1840,6 +1850,12 @@ fn mentions_of(dir: &Path) -> Mentions {
                                 let v = m.turns.entry(n).or_default();
                                 if !v.contains(&(k + add)) {
                                     v.push(k + add);
+                                }
+                                if let Some(r) = tester {
+                                    let v = m.turn_rooms.entry(n).or_default();
+                                    if !v.contains(&r) {
+                                        v.push(r);
+                                    }
                                 }
                             }
                             break;
@@ -2386,7 +2402,13 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
     if !news.is_empty() {
         let mut rooms: Vec<i32> = Vec::new();
         for k in news {
-            let named = if k.kind() == K_BIT { snap.mentions.bits.get(&(k.a() as u32)) } else { snap.mentions.objs.get(&(k.a() as u32)) };
+            let named = if k.kind() == K_BIT {
+                snap.mentions.bits.get(&(k.a() as u32))
+            } else if k.kind() == K_VAR {
+                snap.mentions.turn_rooms.get(&(k.a() as u32))
+            } else {
+                snap.mentions.objs.get(&(k.a() as u32))
+            };
             for &r in named.into_iter().flatten() {
                 if r != r0.room && !rooms.contains(&r) {
                     rooms.push(r);
@@ -2806,6 +2828,30 @@ impl Search {
         self.expires.extend(going.iter().copied());
         // (the objects)
         let going_objs: Vec<_> = going.iter().map(|k| k.a()).collect();
+        // --arrivals: the rooms the scripts name for the expanded stop's news (as --go's walks: a flag's rooms, a
+        // count's testers' rooms, an object's rooms). test-high5b, 2026-11-14: the third fight won began a line on the
+        // map; the map's own click to the room that asks for three reached it in the same round as the walk, its
+        // stop was of the second queue and was never expanded, and the walk's stop, the same, was dropped as nothing new
+        let named: Vec<i32> = if self.arrivals {
+            let mut v: Vec<i32> = Vec::new();
+            for k in &self.nodes[id].news {
+                let rs = if k.kind() == K_BIT {
+                    self.mentions.bits.get(&(k.a() as u32))
+                } else if k.kind() == K_VAR {
+                    self.mentions.turn_rooms.get(&(k.a() as u32))
+                } else {
+                    self.mentions.objs.get(&(k.a() as u32))
+                };
+                for &x in rs.into_iter().flatten() {
+                    if x != room00 && !v.contains(&x) {
+                        v.push(x);
+                    }
+                }
+            }
+            v
+        } else {
+            Vec::new()
+        };
         for (i, r) in results.iter().enumerate() {
             let tc = Instant::now();
             let d = &r.delta;
@@ -2920,6 +2966,7 @@ impl Search {
             // alone, the third queue, and was not expanded in 80 minutes; the room that asks for three (a global
             // script's test) was entered from stops with two, and sent ego back
             let mut high = false;
+            let mut passed: Vec<Key> = Vec::new();
             if self.high_lines && !r.name.starts_with("wait") {
                 // (a wait may move it too: a fight goes on by itself after the line chosen; but not a wait's stop)
                 // (only where it passes a value a script tests it at: in a fight the counts of what was said rise
@@ -2931,6 +2978,7 @@ impl Search {
                     if c.1 > *m {
                         if turns.iter().any(|&t| (*m as i64) < t && t <= c.1 as i64) {
                             high = true;
+                            passed.push(c.0);
                         }
                         *m = c.1;
                     }
@@ -2949,11 +2997,14 @@ impl Search {
             }
             self.ct[1] += tc.elapsed().as_secs_f64();
             // what the stop won, where it begins a line: the objects it gained, the flags it set
+            // (and a count that passed a value a script tests: the rooms whose scripts test it are walked to, as
+            // the rooms that name a thing won are)
             let news: Vec<Key> = if dive {
                 r.changed
                     .iter()
                     .filter(|c| (c.0.kind() == K_OWNER && c.1 == ego) || (flaglike(c.0) && c.1 != 0 && !self.toggles.contains(&c.0)))
                     .map(|c| c.0)
+                    .chain(passed.iter().copied())
                     .collect()
             } else {
                 Vec::new()
@@ -3152,6 +3203,12 @@ impl Search {
             if class == QUEUES {
                 continue;
             }
+            // --arrivals: the first stop in a room named for the expanded stop's news is the walk's
+            let arrival = !named.is_empty() && named.contains(&r.room) && !r.name.starts_with("wait") && self.arrived.insert((id, r.room));
+            if arrival {
+                novel.insert(0, format!("arrived={}", r.room));
+                class = 0;
+            }
             if !self.rooms.contains(&r.room) {
                 self.rooms.push(r.room);
             }
@@ -3260,7 +3317,7 @@ impl Search {
             }
             pending.truncate(PENDING);
             let inside = r.inside || (self.nodes[id].inside && r.name.starts_with("wait"));
-            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: r.name.starts_with("go") && (count_went || !r.name.starts_with("gone")), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+'), born });
+            self.nodes.push(Node { events, parent: id, frame: r.st.frame, depth: depth + 1, ever, level, line, room: r.room, pending, inside, flags, fline, gline, news, walk: arrival || (r.name.starts_with("go") && (count_went || !r.name.starts_with("gone"))), win: count_new && r.name.contains('>'), carry: carried, led: r.room != room00 && r.name.starts_with("wait") && !r.name.contains('+'), born });
             self.kept[class] += 1;
             if level > self.top {
                 self.top_at = Some(Instant::now());
@@ -3686,6 +3743,7 @@ fn main() {
     s.walk_born = a.iter().any(|x| x == "--walk-born");
     s.said_flags = a.iter().any(|x| x == "--said-flags");
     s.high_lines = a.iter().any(|x| x == "--high-lines");
+    s.arrivals = a.iter().any(|x| x == "--arrivals");
     s.count_lines = a.iter().any(|x| x == "--count-lines");
     s.stay_lines = a.iter().any(|x| x == "--stay-lines");
     s.go = a.iter().any(|x| x == "--go");
