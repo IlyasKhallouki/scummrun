@@ -1,0 +1,565 @@
+E028: SCUMM v1-v2 in the bridge: the input and sentence scripts the engine runs, the sentence line and the inventory as
+slots, actors in pixels
+
+SCUMM v1-v2 (Maniac Mansion) have no VAR_VERB_SCRIPT and VAR_SENTENCE_SCRIPT (both 0xFF): the engine always runs global
+4 for a click and global 2 for a sentence. The idle rule, the input log and the skips read them through
+inputScript()/sentenceScript(), which give 4 and 2 on v<=2 and the variables' values otherwise. On v1-v2 a waiting
+message is the bare opcode 0xAE (o2_waitForMessage), '.' is on when VAR_TALKSTOP_KEY is 0xFF (the engine's own gate),
+and a running global 4 is no idle blocker by itself (each click restarts it; MM's hover loop on one verb).
+
+The v1-v2 verb screen draws more than the verb slots. uiSlots() lists, after them (slots from _numVerbs, ids from 256):
+the sentence line (id 256, named by the ids in the four sentence variables, while it is drawn), the inventory boxes that
+show an object (ids 257-260, named "#" and the object's id, the image verbs' convention) and the scroll arrows whose
+click turns a page (261, 262). stateJson, stateLiteJson, wireObs and wireBlock list them; hitSlot(), used by the "at"
+reply, wireAt and the input log, answers ScummEngine_v2::checkExecVerbs()'s order read-only (never checkV2Inventory(),
+which scrolls): 0 on the sentence line (a click there runs no verb), a box's or an arrow's slot. Actor and ego
+positions use getPos() and the elevation is scaled to pixels on v1-v2 (getPos() is getRealPos() on v3 and later).
+No pixel and no game text leaves the process.
+
+Every change is inside a version <= 2 branch or gives the same values on v3 and later: Monkey Island's and the Fate of
+Atlantis demo's free runs (frames.jsonl, trace.jsonl, state-start.json) are byte-identical.
+
+On top of patches 0001-0011 (the tree of svm-e027); the engine built with it is svm-e028.
+
+--- a/engines/scumm/scumm_v2.h
++++ b/engines/scumm/scumm_v2.h
+@@ -30,6 +30,8 @@
+  * Engine for version 2 SCUMM games.
+  */
+ class ScummEngine_v2 : public ScummEngine_v3old {
++	// E028 (patch 0012): the bridge reads the verb screen's boxes, the inventory offset and the sentence variables
++	friend class SpeedrunBridge;
+ protected:
+ 	struct V2MouseoverBox {
+ 		Common::Rect rect;
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -649,7 +649,8 @@
+ 		const int ego = e._scummVars[e.VAR_EGO];
+ 		if (ego > 0 && ego < e._numActors && e._actors[ego]->isInCurrentRoom()) {
+ 			const Actor *a = e._actors[ego];
+-			f.addRaw("e", JsonArray().add(a->getRealPos().x).add(a->getRealPos().y).str())
++			// E028 (patch 0012): getPos(), pixels on v1-v2 too (the same values on v3 and later)
++			f.addRaw("e", JsonArray().add(a->getPos().x).add(a->getPos().y).str())
+ 			 .add("mv", (int)a->_moving).add("box", (int)a->_walkbox);
+ 		}
+ 		_frameFile.writeLine(f.str());
+@@ -660,7 +661,7 @@
+ 		rec.add("kind", _lastIdle.kind == kIdleSentence ? "sentence" : "dialog").add("room", (int)_vm->_currentRoom);
+ 		const int ego = _vm->_scummVars[_vm->VAR_EGO];
+ 		if (ego > 0 && ego < _vm->_numActors && _vm->_actors[ego]->isInCurrentRoom())
+-			rec.addRaw("ego_pos", JsonArray().add(_vm->_actors[ego]->getRealPos().x).add(_vm->_actors[ego]->getRealPos().y).str());
++			rec.addRaw("ego_pos", JsonArray().add(_vm->_actors[ego]->getPos().x).add(_vm->_actors[ego]->getPos().y).str()); // E028: getPos()
+ 		writeRecord(rec);
+ 	}
+ 	// What keeps the run from progressing at this decision point: not being
+@@ -752,7 +753,8 @@
+ 	const int ego = _vm->_scummVars[_vm->VAR_EGO];
+ 	if (ego > 0 && ego < _vm->_numActors && _vm->_actors[ego]->isInCurrentRoom()) {
+ 		const Actor *a = _vm->_actors[ego];
+-		rec.addRaw("ego_pos", JsonArray().add(a->getRealPos().x).add(a->getRealPos().y).str()).add("ego_box", (int)a->_walkbox);
++		// E028 (patch 0012): getPos(), pixels on v1-v2 too (the same values on v3 and later)
++		rec.addRaw("ego_pos", JsonArray().add(a->getPos().x).add(a->getPos().y).str()).add("ego_box", (int)a->_walkbox);
+ 	}
+ 	writeRecord(rec);
+ 	_stallTick = _ticks;
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -38,6 +38,7 @@
+ 
+ namespace Scumm {
+ 
++class Actor;
+ class ScummEngine;
+ 
+ /** One C3 condition (docs/plan.md, contract C3). */
+@@ -284,7 +285,10 @@
+  *  - SPEEDRUN_IDLE=handler       E014: the decision point without verb ids: the click gate is
+  *                                open, the input handler (VAR_VERB_SCRIPT) is set and idle, and
+  *                                nothing the last input started still runs; its kind is always
+- *                                "sentence" (unset: the rule with MI's verb ids, as before)
++ *                                "sentence" (unset: the rule with MI's verb ids, as before).
++ *                                E028 (patch 0012): on SCUMM v1-v2 the handler is global 4 and the
++ *                                sentence script global 2, as the engine runs them, and a running
++ *                                global 4 is no blocker by itself (each click restarts it)
+  *  - SPEEDRUN_VERB_IMAGES=1      E027: an image verb's name is "#" and a hash of the image it shows (an
+  *                                 inventory slot shows another object after a page turn; its id, mode and place
+  *                                 are the same on every page). Off: an image verb has no name, as before.
+@@ -467,6 +471,38 @@
+ 	bool verbVisible(int slot) const;
+ 	bool anyVisibleVerb(int firstId, int lastId) const;
+ 	/**
++	 * E028 (patch 0012): the script a click or key starts and the sentence script, as the engine picks them: SCUMM
++	 * v1-v2 have no VAR_VERB_SCRIPT and VAR_SENTENCE_SCRIPT (both 0xFF) and always run global 4 and global 2
++	 * (ScummEngine_v2::runInputScript(), checkAndRunSentenceScript(), script.cpp); later versions read the variables.
++	 */
++	int inputScript() const;
++	int sentenceScript() const;
++	/**
++	 * E028 (patch 0012): what SCUMM v1-v2 draw in the verb screen besides the verb slots, listed as slots after them
++	 * (slot numbers from _numVerbs on, ids from 256 on, past v2's one-byte verb ids): the sentence line (named by the
++	 * ids in the sentence variables), the inventory boxes that show an object (named "#" and the object id) and the
++	 * scroll arrows whose click would turn a page. Never indexes _verbs or rtVerb. Empty for every other version.
++	 */
++	struct UiSlot {
++		int slot, id, x, y;
++		Common::String name;
++	};
++	Common::Array<UiSlot> uiSlots() const;
++	Common::String uiSlotJson(const UiSlot &u) const;
++	/**
++	 * The slot a click at screen (@p x, @p y) meets: findVerbAtPos(), and on SCUMM v1-v2
++	 * ScummEngine_v2::checkExecVerbs()'s own order (the sentence line: 0, a click there runs no verb; the inventory's
++	 * arrows and boxes: their uiSlots() slot). Reads only: never checkV2Inventory(), which scrolls the inventory.
++	 */
++	int hitSlot(int x, int y) const;
++	/** An actor's elevation in the units getPos() gives (v1-v2 keep it in half pixels: Actor_v2's drawing). */
++	int actorElevation(const Actor *a) const;
++	// uiSlots()' and hitSlot()'s parts: SCUMM v1-v2 (ScummEngine_v2's checkExecVerbs()); ego's idx-th object (1-based,
++	// findInventory() without its read hook; idx 0: the count); whether a click on arrow 0 (up) or 1 (down) turns a page
++	bool v12() const;
++	int egoInventoryAt(int idx) const;
++	bool v2ArrowTurns(int down) const;
++	/**
+ 	 * The code a script slot runs, read through the raw resource pointers
+ 	 * (no LRU update). @p offs indexes it like ScriptSlot::offs. False if
+ 	 * the slot's code is not loaded.
+--- a/engines/scumm/speedrun/speedrun_conditions.cpp
++++ b/engines/scumm/speedrun/speedrun_conditions.cpp
+@@ -309,10 +309,10 @@
+ 			actual = a->_room;
+ 		else if (c.kind == SpeedrunCondition::kActorMoving)
+ 			actual = a->_moving ? 1 : 0;
+-		else if (c.kind == SpeedrunCondition::kActorX)
+-			actual = a->getRealPos().x;
++		else if (c.kind == SpeedrunCondition::kActorX) // E028 (patch 0012): getPos(), the dumps' units on v1-v2 too
++			actual = a->getPos().x;
+ 		else
+-			actual = a->getRealPos().y;
++			actual = a->getPos().y;
+ 		break;
+ 	}
+ 	}
+--- a/engines/scumm/speedrun/speedrun_control.cpp
++++ b/engines/scumm/speedrun/speedrun_control.cpp
+@@ -162,7 +162,8 @@
+ 	const int ego = e._scummVars[e.VAR_EGO];
+ 	if (ego > 0 && ego < e._numActors && e._actors[ego]->isInCurrentRoom()) {
+ 		const Actor *a = e._actors[ego];
+-		s.addRaw("ego", JsonArray().add(a->getRealPos().x).add(a->getRealPos().y).str())
++		// E028 (patch 0012): getPos(), pixels on v1-v2 too (the same values on v3 and later)
++		s.addRaw("ego", JsonArray().add(a->getPos().x).add(a->getPos().y).str())
+ 		 .add("mv", (int)a->_moving).add("box", (int)a->_walkbox);
+ 	}
+ 	s.add("cam", (int)e.camera._cur.x).add("xstart", (int)e._virtscr[kMainVirtScreen].xstart)
+@@ -390,7 +391,7 @@
+ 					at.add("vx", virtX).add("vy", virtY).add("obj", _vm->findObject(virtX, virtY))
+ 					  .add("actor", _vm->getActorFromPos(virtX, virtY));
+ 				}
+-				at.add("verb_slot", _vm->findVerbAtPos(x, y));
++				at.add("verb_slot", hitSlot(x, y)); // E028 (patch 0012): and v1-v2's sentence line and inventory
+ 				controlSend("{\"at\":" + at.str() + "}");
+ 			}
+ 		} else if (cmd == "input_log") {
+--- a/engines/scumm/speedrun/speedrun_inputs.cpp
++++ b/engines/scumm/speedrun/speedrun_inputs.cpp
+@@ -316,7 +316,7 @@
+ 			return;
+ 		}
+ 		_rec.zone = zone->number;
+-		_rec.slot = e.findVerbAtPos(e._mouse.x, e._mouse.y);
++		_rec.slot = hitSlot(e._mouse.x, e._mouse.y); // E028 (patch 0012): findVerbAtPos(), and v1-v2's verb screen
+ 	}
+ 	// runInputScript() decides the rest (onInputScriptBegin())
+ }
+@@ -325,13 +325,14 @@
+ 	if (!_recOpen)
+ 		return;
+ 	const ScummEngine &e = *_vm;
+-	const int verbScript = e._scummVars[e.VAR_VERB_SCRIPT];
++	const int verbScript = inputScript(); // E028 (patch 0012): v1-v2 run global 4, not a variable's script
+ 	_rec.area = area;
+ 	_rec.value = val;
+ 	_rec.mode = mode;
+ 	_rec.handler = verbScript;
+-	// runInputScript()'s own read: the script VAR_VERB_SCRIPT names (none: nothing starts)
+-	addTouch(_rec.reads, kTouchVar, (int)e.VAR_VERB_SCRIPT, 0, verbScript, verbScript);
++	// runInputScript()'s own read: the script VAR_VERB_SCRIPT names (none: nothing starts); v1-v2 read no variable
++	if (e._game.version > 2)
++		addTouch(_rec.reads, kTouchVar, (int)e.VAR_VERB_SCRIPT, 0, verbScript, verbScript);
+ 	if (!verbScript) {
+ 		closeRecord(1, "handler");
+ 		return;
+--- a/engines/scumm/speedrun/speedrun_skips.cpp
++++ b/engines/scumm/speedrun/speedrun_skips.cpp
+@@ -137,7 +137,9 @@
+ 	// would not end in this frame anyway.
+ 	const ScummEngine &e = *_vm;
+ 	waitSlot = -1;
+-	if (e.VAR_TALKSTOP_KEY == 0xFF || e._scummVars[e.VAR_TALKSTOP_KEY] == 0)
++	// E028 (patch 0012): on v1-v2 the engine's own gate, talkstopKeyEnabled in processKeyboard() (input.cpp:965):
++	// no VAR_TALKSTOP_KEY (0xFF) means '.' is on. Later versions as before.
++	if (e.VAR_TALKSTOP_KEY == 0xFF ? e._game.version > 2 : e._scummVars[e.VAR_TALKSTOP_KEY] == 0)
+ 		return false; // disabled '.' would reach the input script as key 46
+ 	if (!e._haveMsg || e._talkDelay <= CLIP(delta, 0, kMaxDelta))
+ 		return false;
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -33,6 +33,7 @@
+ #include "scumm/object.h"
+ #include "scumm/resource.h"
+ #include "scumm/scumm.h"
++#include "scumm/scumm_v2.h"
+ #include "scumm/sound.h"
+ #include "scumm/verbs.h"
+ #include "scumm/speedrun/speedrun_bridge.h"
+@@ -156,6 +157,146 @@
+ 	return false;
+ }
+ 
++#pragma mark - E028: the input script and verb screen of SCUMM v1-v2 (patch 0012)
++
++namespace {
++
++// ScummEngine_v2's verb screen boxes, _mouseOverBoxesV2 (verbs.cpp:36-39, initV2MouseOver()): 0-3 the inventory
++// boxes, then the two scroll arrows and the sentence line.
++const int kV2Boxes = 4, kV2UpArrow = 4, kV2DownArrow = 5, kV2SentenceLine = 6;
++// The ids uiSlots() gives, past v2's one-byte verb ids (o2_verbOps): the sentence line, the boxes, the arrows.
++const int kUiSentenceId = 256, kUiBoxId = 257, kUiUpId = 261, kUiDownId = 262;
++
++} // End of anonymous namespace
++
++bool SpeedrunBridge::v12() const {
++	// The games whose clicks ScummEngine_v2::checkExecVerbs() dispatches (v0 has its own, verbs.cpp
++	// ScummEngine_v0::checkExecVerbs())
++	return _vm->_game.version >= 1 && _vm->_game.version <= 2;
++}
++
++int SpeedrunBridge::egoInventoryAt(int idx) const {
++	// findInventory(VAR_EGO, idx) (object.cpp), read from the tables themselves: its getOwner() is the input log's
++	// read hook. 0 past the last object; with @p idx 0, the count of objects (getInventoryCount(VAR_EGO)).
++	const ScummEngine &e = *_vm;
++	const int ego = e._scummVars[e.VAR_EGO];
++	int count = 0;
++	for (int i = 0; i < e._numInventory; i++) {
++		const int obj = e._inventory[i];
++		if (obj && e._objectOwnerTable[obj] == ego && ++count == idx)
++			return obj;
++	}
++	return idx ? 0 : count;
++}
++
++bool SpeedrunBridge::v2ArrowTurns(int down) const {
++	// What a click on scroll arrow 0 (up) or 1 (down) does: turn the page, under checkV2Inventory()'s tests
++	// (verbs.cpp:413-423), which are redrawV2Inventory()'s for drawing the arrow (the offset moves by 2)
++	const ScummEngine_v2 &e = *static_cast<const ScummEngine_v2 *>(_vm);
++	if (!down)
++		return e._inventoryOffset >= 2;
++	const int shown = e._game.platform == Common::kPlatformNES ? 2 : 4;
++	return e._inventoryOffset + shown < egoInventoryAt(0);
++}
++
++int SpeedrunBridge::inputScript() const {
++	const ScummEngine &e = *_vm;
++	return e._game.version <= 2 ? 4 : e._scummVars[e.VAR_VERB_SCRIPT];
++}
++
++int SpeedrunBridge::sentenceScript() const {
++	const ScummEngine &e = *_vm;
++	return e._game.version <= 2 ? 2 : e._scummVars[e.VAR_SENTENCE_SCRIPT];
++}
++
++Common::Array<SpeedrunBridge::UiSlot> SpeedrunBridge::uiSlots() const {
++	Common::Array<UiSlot> out;
++	if (!v12())
++		return out;
++	const ScummEngine_v2 &e = *static_cast<const ScummEngine_v2 *>(_vm);
++	const int top = e._virtscr[kVerbVirtScreen].topline;
++	const int base = e._numVerbs;
++	// The sentence line while drawSentence() draws it (string.cpp ScummEngine_v2::drawSentence()), named by the
++	// variables it is drawn from: verb, first object, preposition, second object (ids, no text)
++	if ((e._userState & USERSTATE_IFACE_SENTENCE) ||
++	    (e._game.platform == Common::kPlatformNES && (e._userState & USERSTATE_IFACE_ALL))) {
++		const Common::Rect &r = e._mouseOverBoxesV2[kV2SentenceLine].rect;
++		UiSlot s;
++		s.slot = base;
++		s.id = kUiSentenceId;
++		s.x = r.left;
++		s.y = r.top + top;
++		s.name = Common::String::format("%d %d %d %d", e._scummVars[e.VAR_SENTENCE_VERB], e._scummVars[e.VAR_SENTENCE_OBJECT1],
++		                                e._scummVars[e.VAR_SENTENCE_PREPOSITION], e._scummVars[e.VAR_SENTENCE_OBJECT2]);
++		out.push_back(s);
++	}
++	// The inventory while redrawV2Inventory() draws it: each box whose click gives an object (checkV2Inventory():
++	// findInventory(ego, k + 1 + _inventoryOffset)), named "#" and the object's id, the name an image verb has
++	// (verbText()); then each arrow whose click turns the page
++	if (e._userState & USERSTATE_IFACE_INVENTORY) {
++		for (int k = 0; k < kV2Boxes; k++) {
++			const int obj = egoInventoryAt(k + 1 + e._inventoryOffset);
++			if (obj <= 0)
++				continue;
++			const Common::Rect &r = e._mouseOverBoxesV2[k].rect;
++			UiSlot s;
++			s.slot = base + 1 + k;
++			s.id = kUiBoxId + k;
++			s.x = r.left;
++			s.y = r.top + top;
++			s.name = Common::String::format("#%08x", (uint32)obj);
++			out.push_back(s);
++		}
++		for (int d = 0; d < 2; d++) {
++			if (!v2ArrowTurns(d))
++				continue;
++			const Common::Rect &r = e._mouseOverBoxesV2[d ? kV2DownArrow : kV2UpArrow].rect;
++			UiSlot s;
++			s.slot = base + 1 + kV2Boxes + d;
++			s.id = d ? kUiDownId : kUiUpId;
++			s.x = r.left;
++			s.y = r.top + top;
++			out.push_back(s);
++		}
++	}
++	return out;
++}
++
++int SpeedrunBridge::hitSlot(int x, int y) const {
++	if (!v12())
++		return _vm->findVerbAtPos(x, y);
++	// ScummEngine_v2::checkExecVerbs()'s mouse branch (verbs.cpp:758-784), with the screen point for _mouse
++	const ScummEngine_v2 &e = *static_cast<const ScummEngine_v2 *>(_vm);
++	VirtScreen *zone = _vm->findVirtScreen(y);
++	if (!zone)
++		return 0;
++	const int inventoryArea = e._game.platform == Common::kPlatformNES ? 48 : 32;
++	if (zone->number == kVerbVirtScreen && y <= zone->topline + 8)
++		return 0; // the sentence line: runInputScript(kSentenceClickArea, 0, 0), no verb
++	if (zone->number == kVerbVirtScreen && y >= zone->topline + inventoryArea) {
++		// checkV2Inventory()'s tests (verbs.cpp:403-435) in its order, without its page turn
++		const int vy = y - zone->topline;
++		if (e._mouseOverBoxesV2[kV2UpArrow].rect.contains(x, vy)) {
++			if (v2ArrowTurns(0))
++				return e._numVerbs + 1 + kV2Boxes;
++		} else if (e._mouseOverBoxesV2[kV2DownArrow].rect.contains(x, vy)) {
++			if (v2ArrowTurns(1))
++				return e._numVerbs + 1 + kV2Boxes + 1;
++		}
++		for (int k = 0; k < kV2Boxes; k++) {
++			if (e._mouseOverBoxesV2[k].rect.contains(x, vy))
++				return egoInventoryAt(k + 1 + e._inventoryOffset) > 0 ? e._numVerbs + 1 + k : 0;
++		}
++		return 0;
++	}
++	return _vm->findVerbAtPos(x, y);
++}
++
++int SpeedrunBridge::actorElevation(const Actor *a) const {
++	// Actor_v2::prepareDrawActorCostume() (actor.cpp) draws at (_pos.y - _elevation) * V12_Y_MULTIPLIER on v1-v2
++	return _vm->_game.version <= 2 ? a->getElevation() * V12_Y_MULTIPLIER : a->getElevation();
++}
++
+ bool SpeedrunBridge::slotCode(int i, const byte *&code, uint32 &size) const {
+ 	// The code base a slot's offs is relative to (script.cpp
+ 	// getScriptBaseAddress()), read through the raw resource pointers:
+@@ -210,7 +351,13 @@
+ 	const ScriptSlot &ss = _vm->vm.slot[i];
+ 	const byte *code = nullptr;
+ 	uint32 size = 0;
+-	if (!slotCode(i, code, size) || ss.offs + 1 >= size)
++	if (!slotCode(i, code, size) || ss.offs >= size)
++		return false;
++	// E028 (patch 0012): in SCUMM v1-v2, 0xAE is o2_waitForMessage, with no sub-opcode; it rewinds to itself
++	// (script_v2.cpp:258, 695-700). (v0's table has o_print there.)
++	if (v12())
++		return code[ss.offs] == kOpWait;
++	if (ss.offs + 1 >= size)
+ 		return false;
+ 	return code[ss.offs] == kOpWait && (code[ss.offs + 1] & 0x1F) == kWaitForMessage;
+ }
+@@ -335,8 +482,9 @@
+ 	if (e.vm.cutSceneStackPointer > 0)
+ 		return blocked("cutscene");
+ 
+-	const int sentenceScript = e._scummVars[e.VAR_SENTENCE_SCRIPT];
+-	const int verbScript = e._scummVars[e.VAR_VERB_SCRIPT];
++	// E028 (patch 0012): the scripts the engine runs (v1-v2: globals 2 and 4, not the variables, which v2 lacks)
++	const int sentenceScript = this->sentenceScript();
++	const int verbScript = inputScript();
+ 
+ 	// A visible dialogue menu is answerable whenever the engine's click gate
+ 	// is open, so no text, sentence or object script check applies to it:
+@@ -364,7 +512,11 @@
+ 		// sentence script does not block a new sentence.
+ 		if (ss.number == sentenceScript && ss.freezeCount == 0)
+ 			return blocked("sentence_script", i, ss.number);
+-		if (ss.number == verbScript)
++		// E028 (patch 0012): on v1-v2 a running input script is no blocker by itself. Each click restarts global 4
++		// (runScript() stops the running one first, script.cpp:65-66), and ScummEngine_v2::checkExecVerbs() gates
++		// on _userPut alone (verbs.cpp:701): where it runs on, it waits for the player (MM's hover loop on one verb,
++		// a breakHere loop that only the next click ends). What it starts still blocks below.
++		if (ss.number == verbScript && !(e._game.version <= 2 && ss.where == WIO_GLOBAL))
+ 			return blocked("input_script", i, ss.number);
+ 		// Verb scripts of objects can outlive the sentence script.
+ 		if ((ss.where == WIO_ROOM || ss.where == WIO_INVENTORY || ss.where == WIO_FLOBJECT) &&
+@@ -496,6 +648,14 @@
+ 	return j.str();
+ }
+ 
++Common::String SpeedrunBridge::uiSlotJson(const UiSlot &u) const {
++	// E028 (patch 0012): a uiSlots() slot with verbJson()'s fields: shown (mode 1, saveid 0), text, no key
++	JsonObject j;
++	j.add("slot", u.slot).add("id", u.id).add("name", u.name).add("mode", 1).add("saveid", 0).add("type", (int)kTextVerbType)
++	 .add("key", 0).add("x", u.x).add("y", u.y);
++	return j.str();
++}
++
+ #pragma mark - State dump (C7)
+ 
+ Common::String SpeedrunBridge::stateJson(bool exact) const {
+@@ -506,7 +666,7 @@
+ 	JsonObject s;
+ 	s.add("tick", _ticks).add("frame", _frames).add("room", (int)e._currentRoom).add("ego", ego);
+ 	if (egoActor)
+-		s.addRaw("ego_pos", pointJson(egoActor->getRealPos().x, egoActor->getRealPos().y));
++		s.addRaw("ego_pos", pointJson(egoActor->getPos().x, egoActor->getPos().y)); // E028: getPos(), pixels on v1-v2 too
+ 	else
+ 		s.addNull("ego_pos");
+ 	if (ConfMan.hasKey("random_seed"))
+@@ -568,6 +728,9 @@
+ 		if (verbVisible(slot))
+ 			verbs.addRaw(verbJson(slot, true));
+ 	}
++	const Common::Array<UiSlot> ui = uiSlots(); // E028 (patch 0012): v1-v2's sentence line and inventory, after them
++	for (uint k = 0; k < ui.size(); k++)
++		verbs.addRaw(uiSlotJson(ui[k]));
+ 	s.addRaw("verbs", verbs.str());
+ 
+ 	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
+@@ -646,8 +809,9 @@
+ 		if (!a || !a->isInCurrentRoom() || !a->_visible)
+ 			continue;
+ 		JsonObject o;
+-		o.add("id", i).add("x", (int)a->getRealPos().x).add("y", (int)a->getRealPos().y)
+-		 .add("elevation", (int)a->getElevation()).add("moving", (int)a->_moving);
++		// E028 (patch 0012): getPos() and the elevation in pixels on v1-v2 too (the same values on v3 and later)
++		o.add("id", i).add("x", (int)a->getPos().x).add("y", (int)a->getPos().y)
++		 .add("elevation", actorElevation(a)).add("moving", (int)a->_moving);
+ 		actors.addRaw(o.str());
+ 	}
+ 	s.addRaw("actors", actors.str());
+@@ -667,7 +831,7 @@
+ 	JsonObject s;
+ 	s.add("tick", _ticks).add("frame", _frames).add("room", (int)e._currentRoom).add("ego", ego);
+ 	if (egoActor)
+-		s.addRaw("ego_pos", pointJson(egoActor->getRealPos().x, egoActor->getRealPos().y));
++		s.addRaw("ego_pos", pointJson(egoActor->getPos().x, egoActor->getPos().y)); // E028: getPos(), pixels on v1-v2 too
+ 	else
+ 		s.addNull("ego_pos");
+ 	if (ConfMan.hasKey("random_seed"))
+@@ -706,6 +870,9 @@
+ 		if (verbVisible(slot))
+ 			verbs.addRaw(verbJson(slot, true));
+ 	}
++	const Common::Array<UiSlot> ui = uiSlots(); // E028 (patch 0012): v1-v2's sentence line and inventory, after them
++	for (uint k = 0; k < ui.size(); k++)
++		verbs.addRaw(uiSlotJson(ui[k]));
+ 	s.addRaw("verbs", verbs.str());
+ 
+ 	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
+@@ -784,8 +951,9 @@
+ 		if (!a || !a->isInCurrentRoom() || !a->_visible)
+ 			continue;
+ 		JsonObject o;
+-		o.add("id", i).add("x", (int)a->getRealPos().x).add("y", (int)a->getRealPos().y)
+-		 .add("elevation", (int)a->getElevation()).add("moving", (int)a->_moving);
++		// E028 (patch 0012): getPos() and the elevation in pixels on v1-v2 too (the same values on v3 and later)
++		o.add("id", i).add("x", (int)a->getPos().x).add("y", (int)a->getPos().y)
++		 .add("elevation", actorElevation(a)).add("moving", (int)a->_moving);
+ 		actors.addRaw(o.str());
+ 	}
+ 	s.addRaw("actors", actors.str());
+--- a/engines/scumm/speedrun/speedrun_wire.cpp
++++ b/engines/scumm/speedrun/speedrun_wire.cpp
+@@ -322,8 +322,8 @@
+ 	if (ego > 0 && ego < e._numActors && e._actors[ego]->isInCurrentRoom()) {
+ 		const Actor *a = e._actors[ego];
+ 		o.u8(1);
+-		o.i32(a->getRealPos().x);
+-		o.i32(a->getRealPos().y);
++		o.i32(a->getPos().x); // E028 (patch 0012): getPos(), pixels on v1-v2 too (the same values on v3 and later)
++		o.i32(a->getPos().y);
+ 		o.u8(1);
+ 		o.i32((int)a->_moving);
+ 		o.u8(1);
+@@ -362,8 +362,8 @@
+ 	o.i32(ego);
+ 	if (egoActor) {
+ 		o.u8(1);
+-		o.i32(egoActor->getRealPos().x);
+-		o.i32(egoActor->getRealPos().y);
++		o.i32(egoActor->getPos().x); // E028 (patch 0012): getPos(), as wireStatus()
++		o.i32(egoActor->getPos().y);
+ 	} else {
+ 		o.u8(0);
+ 	}
+@@ -511,6 +511,25 @@
+ 			}
+ 			n++;
+ 		}
++		// E028 (patch 0012): v1-v2's sentence line and inventory after the verb slots, as stateJson() lists them
++		const Common::Array<UiSlot> ui = uiSlots();
++		for (uint k = 0; k < ui.size(); k++) {
++			o.i32(ui[k].slot);
++			o.i32(ui[k].id);
++			o.i32(1);              // mode: shown
++			o.i32(0);              // saveid
++			o.i32(kTextVerbType);  // type
++			o.i32(0);              // key
++			o.i32(ui[k].x);
++			o.i32(ui[k].y);
++			if (names) {
++				o.u8(1);
++				putText(o, (const byte *)ui[k].name.c_str());
++			} else {
++				o.u8(0);
++			}
++			n++;
++		}
+ 		o.setU32(at, n);
+ 	}
+ 	{
+@@ -590,9 +609,10 @@
+ 			if (!a || !a->isInCurrentRoom() || !a->_visible)
+ 				continue;
+ 			o.i32(i);
+-			o.i32((int)a->getRealPos().x);
+-			o.i32((int)a->getRealPos().y);
+-			o.i32((int)a->getElevation());
++			// E028 (patch 0012): getPos() and the elevation in pixels on v1-v2 too (the same values on v3 and later)
++			o.i32((int)a->getPos().x);
++			o.i32((int)a->getPos().y);
++			o.i32(actorElevation(a));
+ 			o.i32((int)a->_moving);
+ 			n++;
+ 		}
+@@ -808,6 +828,12 @@
+ 			nv++;
+ 		}
+ 	}
++	// E028 (patch 0012): v1-v2's sentence line and inventory, as wireObs() lists them
++	const Common::Array<UiSlot> ui = uiSlots();
++	for (uint k = 0; k < ui.size(); k++) {
++		o.i32(ui[k].id);
++		nv++;
++	}
+ 	o.setU32(at2, nv);
+ }
+ 
+@@ -925,7 +951,7 @@
+ 	} else {
+ 		o.u8(0);
+ 	}
+-	o.i32(_vm->findVerbAtPos(x, y));
++	o.i32(hitSlot(x, y)); // E028 (patch 0012): findVerbAtPos(), and v1-v2's sentence line and inventory
+ }
+ 
+ void SpeedrunBridge::wireBoxes(SpeedrunBytes &o) const {
