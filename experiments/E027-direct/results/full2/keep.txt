@@ -1,0 +1,2 @@
+2026-11-13 23:22:09 UTC  keep: watching /var/tmp/fast-mi/direct/full2
+2026-11-14 07:10:44 UTC  stopped by hand: leg02 at level 0 for 2 h 25 min (the gate's flag seen unset); --said-flags

@@ -306,6 +306,9 @@ struct Search {
     /// --walk-born: so do the results of a walk the search made for the line's news, in the room walked to
     born_first: bool,
     walk_born: bool,
+    /// --said-flags: a flag seen unset again counts once more at a stop whose own sentence set it, in the room the
+    /// sentence was made in (a door a sentence opens and the room's entry closes again)
+    said_flags: bool,
     /// when the highest level was last raised (--stall), and the values whose first holding ends the run (--until)
     top_at: Option<Instant>,
     until: Vec<(Key, Val)>,
@@ -2850,12 +2853,22 @@ impl Search {
                 }
             }
             let mut set = set0.clone();
+            // --said-flags: the stop's own sentence (a verb and an object, in the room it stays in) set it; full2,
+            // 2026-11-14: a gate opened by a sentence and closed again by the room's entry was seen unset, so its
+            // opening began no line and the place behind it was new to none (the stop two clicks on was never made)
+            let said = self.said_flags && r.room == room00 && !r.name.starts_with("wait") && !r.name.starts_with("go") && {
+                let b = r.name.as_bytes();
+                b.windows(2).any(|w| w[0] == b't' && w[1].is_ascii_digit())
+            };
+            let mut said_set = false;
             for x in d.iter().filter(|x| flaglike(x.0)) {
                 let n = bit_of(x.0);
                 if set.len() <= n / 64 {
                     set.resize(n / 64 + 1, 0);
                 }
-                if x.2.is_some_and(|v| v != 0) && !self.toggles.contains(&x.0) {
+                let again = said && self.toggles.contains(&x.0) && r.changed.iter().any(|c| c.0 == x.0 && c.1 != 0);
+                said_set |= again && x.2.is_some_and(|v| v != 0);
+                if x.2.is_some_and(|v| v != 0) && (!self.toggles.contains(&x.0) || again) {
                     set[n / 64] |= 1u64 << (n % 64);
                 } else {
                     set[n / 64] &= !(1u64 << (n % 64));
@@ -2872,7 +2885,8 @@ impl Search {
             let moved = gline != self.nodes[id].gline || r.changed.iter().any(|c| flaglike(c.0));
             if moved && !tops.iter().any(|m| within(&set, m)) {
                 tops.retain(|m| !within(m, &set));
-                self.flines.push((self.nodes.len(), gline, set.clone(), false));
+                // (a line a flag seen unset began is not judged again by its flags: they did not stay before it)
+                self.flines.push((self.nodes.len(), gline, set.clone(), said_set));
                 tops.push(set);
                 dive = true;
             }
@@ -3613,6 +3627,7 @@ fn main() {
     s.motion_once = a.iter().any(|x| x == "--motion-once");
     s.born_first = a.iter().any(|x| x == "--born-first");
     s.walk_born = a.iter().any(|x| x == "--walk-born");
+    s.said_flags = a.iter().any(|x| x == "--said-flags");
     s.count_lines = a.iter().any(|x| x == "--count-lines");
     s.stay_lines = a.iter().any(|x| x == "--stay-lines");
     s.go = a.iter().any(|x| x == "--go");
