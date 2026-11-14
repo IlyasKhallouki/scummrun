@@ -17,7 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 FLAGS = ["--lines", "gains", "--flag-lines", "--shares", "--go", "--motion-once", "--count-lines", "--stay-lines",
-         "--born-first", "--walk-born", "--runs-on", "--counts-world", "--ends", "--said-flags"]
+         "--born-first", "--walk-born", "--runs-on", "--counts-world", "--ends", "--said-flags", "--high-lines"]
 # what is read to report (evaluation only: rooms entered and values held, first by which stop and when)
 WATCH = ("room=20,room=12,room=69,room=39,room=70,room=75,room=83,room=59,owner:901=1,owner:902=1,owner:903=1,"
          "owner:761=1,owner:823=1,owner:733=1")

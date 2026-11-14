@@ -309,6 +309,11 @@ struct Search {
     /// --said-flags: a flag seen unset again counts once more at a stop whose own sentence set it, in the room the
     /// sentence was made in (a door a sentence opens and the room's entry closes again)
     said_flags: bool,
+    /// --high-lines: a count (a variable some script adds to) raised by a stop's input (not a wait) over every value
+    /// the run saw it at,
+    /// begins a line as a new set of flags does (a count of fights won, asked for by another room's script)
+    high_lines: bool,
+    var_max: HashMap<Key, Val>,
     /// when the highest level was last raised (--stall), and the values whose first holding ends the run (--until)
     top_at: Option<Instant>,
     until: Vec<(Key, Val)>,
@@ -1718,6 +1723,11 @@ struct Mentions {
     vars: HashMap<u32, Vec<i32>>,
     /// (from room, to room, object): the object's own code leads ego from its room to the other
     exits: Vec<(i32, i32, i32)>,
+    /// every variable some script (a room's or a global one) adds to or takes from: a count
+    counters: HashSet<u32>,
+    /// per variable, the values a script's test of it against a number turns at (`>= K`, `< K`: K; `> K`, `<= K`:
+    /// K + 1): where a count is enough for something
+    turns: HashMap<u32, Vec<i64>>,
 }
 
 /// The integers that follow each `pat` in `line`.
@@ -1814,6 +1824,29 @@ fn mentions_of(dir: &Path) -> Mentions {
             let name = f.file_name().and_then(|x| x.to_str()).unwrap_or("").to_string();
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
             let (objs, bits, vars, counted) = names_of(&text);
+            m.counters.extend(counted.iter().copied());
+            for l in text.lines().filter(|l| !l.starts_with('#')) {
+                let mut at = 0;
+                while let Some(i) = l[at..].find("Var[") {
+                    let from = at + i + 4;
+                    let digits: String = l[from..].chars().take_while(|c| c.is_ascii_digit()).collect();
+                    let after = &l[from + digits.len()..];
+                    at = from;
+                    let Ok(n) = digits.parse::<u32>() else { continue };
+                    for (op, add) in [("] >= ", 0i64), ("] <= ", 1), ("] < ", 0), ("] > ", 1)] {
+                        if let Some(r) = after.strip_prefix(op) {
+                            let num: String = r.chars().enumerate().take_while(|(j, c)| c.is_ascii_digit() || (*j == 0 && *c == '-')).map(|x| x.1).collect();
+                            if let Ok(k) = num.parse::<i64>() {
+                                let v = m.turns.entry(n).or_default();
+                                if !v.contains(&(k + add)) {
+                                    v.push(k + add);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
             match room {
                 Some(r) => {
                     let me = num(&name, "obj-");
@@ -2883,7 +2916,31 @@ impl Search {
             // only a stop that changed a flag, or stands in another line of gains than the expanded stop, can hold
             // a set that is new
             let moved = gline != self.nodes[id].gline || r.changed.iter().any(|c| flaglike(c.0));
-            if moved && !tops.iter().any(|m| within(&set, m)) {
+            // --high-lines: full3, 2026-11-14: the fourth fight won (var:282 = 4) was a stop new by a variable's value
+            // alone, the third queue, and was not expanded in 80 minutes; the room that asks for three (a global
+            // script's test) was entered from stops with two, and sent ego back
+            let mut high = false;
+            if self.high_lines && !r.name.starts_with("wait") {
+                // (a wait may move it too: a fight goes on by itself after the line chosen; but not a wait's stop)
+                // (only where it passes a value a script tests it at: in a fight the counts of what was said rise
+                // at every line chosen, and a line begun at each new high took the whole search: 139 lines in 30
+                // minutes, none of them to the room that asks for three)
+                for c in r.changed.iter().filter(|c| c.0.kind() == K_VAR && self.mentions.counters.contains(&(c.0.a() as u32))) {
+                    let Some(turns) = self.mentions.turns.get(&(c.0.a() as u32)) else { continue };
+                    let m = self.var_max.entry(c.0).or_insert(base.val(c.0));
+                    if c.1 > *m {
+                        if turns.iter().any(|&t| (*m as i64) < t && t <= c.1 as i64) {
+                            high = true;
+                        }
+                        *m = c.1;
+                    }
+                }
+            }
+            if high && (!moved || tops.iter().any(|m| within(&set, m))) {
+                // (its line holds the flags of the expanded stop's; it is new by the count, not by a set)
+                self.flines.push((self.nodes.len(), gline, set.clone(), true));
+                dive = true;
+            } else if moved && !tops.iter().any(|m| within(&set, m)) {
                 tops.retain(|m| !within(m, &set));
                 // (a line a flag seen unset began is not judged again by its flags: they did not stay before it)
                 self.flines.push((self.nodes.len(), gline, set.clone(), said_set));
@@ -3628,6 +3685,7 @@ fn main() {
     s.born_first = a.iter().any(|x| x == "--born-first");
     s.walk_born = a.iter().any(|x| x == "--walk-born");
     s.said_flags = a.iter().any(|x| x == "--said-flags");
+    s.high_lines = a.iter().any(|x| x == "--high-lines");
     s.count_lines = a.iter().any(|x| x == "--count-lines");
     s.stay_lines = a.iter().any(|x| x == "--stay-lines");
     s.go = a.iter().any(|x| x == "--go");
