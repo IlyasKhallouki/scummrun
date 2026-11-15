@@ -1242,6 +1242,9 @@ fn clicks(
                                         let to = tw.obs(&NAMES)?;
                                         at[k] = scripts_of(&to);
                                         w[k] = Some(facts_of(&to));
+                                    } else {
+                                        // the copy ended (a fork exits at its end): no run more is sent to it
+                                        break;
                                     }
                                 }
                                 tw.quit();
@@ -2042,6 +2045,10 @@ fn walk(e: &mut Box<dyn Engine>, path: &[(i32, &Vec<Hit>)], ego: i32, cfg: &Cfg,
             // towards first, floor click by floor click at the screen's edge on its side, until it shows
             let mut point = None;
             for _ in 0..GO_SCROLLS {
+                // the game ended while the room scrolled on (a fork exits at its end): the walk is cut short there
+                if cur.status().ended {
+                    break;
+                }
                 let o = cur.obs(&NAMES)?;
                 let of = afford::offer_cfg(&mut cur, &o, false, true)?;
                 let (top, h) = cur.status().screen.map(|s| (s.0, s.1)).unwrap_or((0, afford::SCREEN_H));
