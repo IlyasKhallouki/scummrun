@@ -1,33 +1,98 @@
 # scummrun
 
-An automated speedrunner for ScummVM games, starting with *The Secret of Monkey Island*
-(SCUMM v5). It plays on a patched ScummVM.
+scummrun plays SCUMM adventure games by searching the running game. It drives a patched ScummVM, tries what the
+game's interface offers, keeps the moments that show something new, and proves every result by replaying its
+recorded clicks from boot. No language model runs in the system, and no move is written by hand.
 
-[![The bot's Any% run, DOS CD, 21:01.483](https://img.youtube.com/vi/lHQrHf5b_5o/maxresdefault.jpg)](https://youtu.be/lHQrHf5b_5o)
+## Results
 
-The bot's best Any% run on the DOS CD release is 21:01.483, 50.9 s under the human record
-(21:52.4 by saruya). [Watch it on YouTube.](https://youtu.be/lHQrHf5b_5o)
+### The Secret of Monkey Island, from boot to the ending (15 November 2026)
 
-The time comes from replaying the run's input file from boot twice: once with the bridge's
-automatic text and cutscene skips, and once with every skip written out as a key press. Both
-replays end on frame 14820.
+One unattended run of the search played the DOS CD release from the first frame to the end of the game: one
+binary, 5.49 hours on a cloud machine with 8 threads, no human input during the run. The ending replays from boot
+in a fresh engine in a few seconds: 1,994 clicks, frame 114,978.
 
-That run was made with CD track 6 missing from the game folder. The "Last Part" card waits for
-that track to finish, so it lasts 130 s when the track plays and 0.2 s when the file is
-missing. In the record's video it lasts about 6 s. With the track present, the same route runs
-23:11.3.
+What the run was given: the game's files; a decompilation of its scripts, made from those files, with a list derived
+from it of the variables the scripts test; the variable that marks the game's end (bit 565, picked by hand, used only
+to stop the run); and general rules for adventure-game mechanics, developed while working on this game. The search's
+code holds no room, object or variable number of the game (the engine patches keep a few Monkey Island values from
+earlier work, switched off for these runs). The checkpoint files used to follow a run's progress are read only to
+report it.
 
-The repo holds two projects that share the engine bridge: the Any% bot below, and the
-original glitchless Part I planner after it.
+- Results, the exact settings, and the whole input movie: [`experiments/E027-direct/results/full5`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments/E027-direct/results/full5) (branch `direct`).
+- The lab notebook of the search: [`notes/log/2026-11-10-e027-direct.md`](https://github.com/IlyasKhallouki/scummrun/blob/direct/notes/log/2026-11-10-e027-direct.md).
+
+### Indiana Jones and the Fate of Atlantis, the playable demo (9 November 2026)
+
+[![Indiana Jones and the Fate of Atlantis demo, 3:51](https://img.youtube.com/vi/npbKSDtlLX8/maxresdefault.jpg)](https://youtu.be/npbKSDtlLX8)
+
+The earlier version of the system found a route from boot to the end of the demo (experiment E022), then shortened
+its own route (E024) to 92 clicks: 3:46.8 of game time on seed 1, 3:51.5 in real time in the video. The route is
+verified from boot, and no click in it was written by hand. [Watch it on YouTube.](https://youtu.be/npbKSDtlLX8)
+Plan and results: [`experiments/E024-shorten/plan.md`](https://github.com/IlyasKhallouki/scummrun/blob/direct/experiments/E024-shorten/plan.md).
+
+### Before that: a hand-routed Any% run of Monkey Island (October 2026)
+
+The project began with a bot that replays a route of 532 moves written by hand after the human record's route:
+21:01.483 on the DOS CD release with CD track 6 removed, 23:11.3 with it ([video](https://youtu.be/lHQrHf5b_5o)). It is
+a baseline, not a result of the search. It is described under "Earlier work" below.
+
+## How the search works
+
+1. The game runs inside ScummVM, patched so a program can drive it (the bridge, `patches/`): it steps the game frame
+   by frame on a virtual clock, sends clicks at exact frames, reads the game's state, and copies the running game at
+   any moment.
+2. The search keeps a set of stops: moments where the game waits for the player.
+3. At each stop it tries what the screen offers (waiting, every verb with every object, walking), each try in its own
+   copy of the game, and keeps the results that show something new as new stops.
+4. Progress is measured mainly by the objects the player has ever held. General rules decide which stop is tried
+   next, and send the search to the rooms whose scripts mention what it has just gained.
+5. A run goes in legs: when one stops gaining, the next starts from its best stop.
+6. Every result replays from boot with its recorded clicks, and every change to the code must leave a fixed set of
+   reference stops exactly as they were before it is used for a run.
+
+## Code and notes
+
+- Branch [`direct`](https://github.com/IlyasKhallouki/scummrun/tree/direct): the search ([`experiments/E011-speed/rs/fmi-direct`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments/E011-speed/rs/fmi-direct)),
+  the engine patches ([`patches/`](https://github.com/IlyasKhallouki/scummrun/tree/direct/patches), 0001 to 0013), the run and check scripts
+  ([`experiments/E027-direct/run`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments/E027-direct/run)), the lab notes ([`notes/log`](https://github.com/IlyasKhallouki/scummrun/tree/direct/notes/log)) and every
+  experiment's plan and results ([`experiments/`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments)).
+- Branch `main` (this page): the earlier planner and Any% bot, the survey of related work
+  ([`docs/related-work.md`](docs/related-work.md)), and the paper's working files (`paper/`).
+
+## Checking the Monkey Island result
+
+You need your own DOS CD files (`MONKEY.000`, `MONKEY.001` and the CD audio as `track2.flac` to `track25.flac`; their
+checksums are in `results/full5/settings.md`), the patched engine, and the search built from branch `direct`:
+
+```sh
+# on branch direct, with the game in game/dos-cd and the engine built (see below)
+cd experiments/E011-speed/rs && cargo build --profile fast -p fmi-direct && cd -
+export FMI_ENGINE_E027=/path/to/patched/scummvm
+source experiments/E027-direct/run/env.sh
+mkdir -p out/verify-full5
+env $ON $MI experiments/E011-speed/rs/target/fast/direct verify \
+  experiments/E027-direct/results/full5/end-stop.jsonl 7895 out/verify-full5 bit:565=1
+```
+
+It should print `"frame":114978`, `"clicks":1994` and `"ok":true`.
+
+The engine is ScummVM v2026.3.0 with patches 0001 to 0011 applied (0012 and 0013 act only for other games). The build
+the runs used is not yet scripted end to end: its tree holds a small trace hook that is in no patch file and that no
+run uses. To rerun the search itself, see `experiments/E027-direct/run/chain.sh` and the notebook; check a new build
+first with `experiments/E027-direct/run/bench.sh`, whose digests must match `results/full5/gate-vm.txt`.
 
 ## Research
 
-This repo is also a research project, written up as a paper with the working title *Speedrunning as
-Search: Script-Derived Planning and Engine-Verified Optimization for ScummVM Games*. The research
-question, the decisions and the lab notebook are in `notes/`, planned and finished experiments in
-`experiments/`, and the paper outline and claims table in `paper/`.
+A paper on the search is in preparation. `notes/` on branch `direct` holds the decisions, the open questions and the
+lab notebook; `experiments/` holds each experiment's plan (question, prediction, stop rule) and results.
 
-## Any%
+## Earlier work: the planner and the Any% bot (October 2026)
+
+Everything below describes the system on this branch (`main`) before the search: the Any% bot of the video above
+and the glitchless Part I planner. It is kept as it was.
+
+### Any%
 
 The route follows saruya's record and uses the same glitches: the logo speed glitch, Credit
 Early, the item slide carried into Part II, the oars, monkey and feather skips, and getting
@@ -78,7 +143,7 @@ after every goal so a run can be resumed.
 `docs/research/anypercent-*.md` the engine and route research, and
 `routes/anypercent/README.md` the route notes.
 
-## Glitchless Part I
+### Glitchless Part I
 
 It works in three stages:
 
@@ -108,37 +173,7 @@ seeds, with a stdev of 48. The visible demo reproduces the headless run tick for
 `docs/optimization.md` describes the method, and `docs/comparison.md` compares the route
 with the human route.
 
-## Where this is going
-
-The long-term goal is a system that plans and replays glitchless speedruns for all, or
-most, of the games ScummVM supports. Monkey Island Part I is the first target, chosen to
-prove the pipeline end to end.
-
-Some parts are already game-agnostic:
-
-- The engine bridge works at the level of the SCUMM engine rather than any one game. It
-  pushes sentences into the engine's sentence queue, clicks verb slots through the game's
-  input script, answers dialogue menus (which are ordinary verbs), detects when the game
-  accepts input, keeps a tick clock, advances audio in ticks, and presses `.` and Esc
-  through the engine's own key handling.
-- The Python pipeline (extract data, dump objects, plan, compile, measure, optimize) only
-  needs a segment definition (`segment.toml`), step templates (`steps.toml`) and a PDDL
-  model.
-- Phase 7 showed that six blind extractor agents, reading only decompiled scripts, can
-  produce a cited model over engine-state atoms. After three defects were fixed, the
-  extracted model reached the hand-written model's optimum (`docs/extraction-diff.md`).
-  The extraction also found a second exit at the forest fork, path 686, that the
-  hand-written model lacked. The route takes it twice, 54 ticks faster each time than the
-  usual exit, and it gave the route its last improvement.
-  Extracting the model from decompiled scripts is the route to new games without
-  hand-writing a model for each one.
-
-Other parts are still specific to Monkey Island: the dialogue verb range (120 to 128), the
-inventory slot layout, the island map's hover-label idle rule, the Mac disk extraction, and
-the `monkeycdalt` id used by the script dumper. `docs/next.md` lists the steps toward other
-games.
-
-## Quick start
+### Quick start
 
 Requirements: Linux, a C++ toolchain, SDL2, CMake, git and
 [uv](https://docs.astral.sh/uv/). Python 3.12 is pinned, and uv installs it.
@@ -153,7 +188,7 @@ scripts/dump-scripts.sh                 # optional: decompile every script into 
 uv run speedrun demo part1              # watch Guybrush play the route hands-free
 ```
 
-## Commands
+### Commands
 
 | Command | What it does |
 |---|---|
@@ -172,7 +207,7 @@ action-count plan otherwise; `--objective actions|time` picks one explicitly. Ev
 writes `trace.jsonl`, `state-start.json` and `state-end.json` to
 `out/runs/<timestamp>-<mode>/`.
 
-## How it fits together
+### How it fits together
 
 ```
 game/ ──extract──► game/classic/ ──descumm──► data/scripts/ (gitignored)
@@ -197,7 +232,7 @@ count, but this leaves the demo silent.
 `rules/glitchless.md` has the rules for the glitchless category, the pinned engine settings
 and the click-equivalence rules.
 
-## Game data
+### Game data
 
 You must supply your own copy of the game in `game/`. That folder is gitignored, as are all
 derived files, decompiled scripts, dumps and traces. `speedrun extract` detects:
@@ -210,7 +245,7 @@ derived files, decompiled scripts, dumps and traces. `speedrun extract` detects:
 - the Special Edition `Monkey1.pak`. ScummVM reads it directly, but script dumping needs
   the classic files.
 
-## Tests
+### Tests
 
 ```sh
 uv run pytest            # unit + integration (real patched ScummVM, real game data)
@@ -220,7 +255,7 @@ uv run pytest -m "not slow"
 If the game data or a build is missing, the integration tests skip loudly: a banner at the
 end lists every skipped test, so that a skip is not mistaken for a pass.
 
-## Documents
+### Documents
 
 - `docs/plan.md`: the implementation plan and all interface contracts.
 - `docs/part1/`: cited script analysis and `model.md`, which describes the PDDL model.
