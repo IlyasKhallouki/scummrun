@@ -1,0 +1,27 @@
+== 0s  1. clone (submodules from GitHub)
+ec4d410 repro: DUMP_ALLOW_PROBLEMS=1 lets a demo's dump finish (its room list names rooms its files do not hold); unset, as before; README: uv, the demo's dump command
+2d1e891fe52df707c30185e52c50cd92  game/dos-cd/MONKEY.000
+d074150de681d49ff350e8ad60ee4abd  game/dos-cd/MONKEY.001
+035deab53b47bc43abc763560d0f8d4b  game/fate-play-demo/PLAYFATE.000
+== 145s  2. decompile the scripts
+}
+==> done: data/scripts-dos-cd/INDEX.md
+}
+==> done: data/scripts-fate-play-demo/INDEX.md
+scripts-dos-cd
+scripts-fate-play-demo
+== 168s  3a. the engine
+-rwxr-xr-x 1 ilyask ilyask 33373584 Nov 15 20:31 /var/tmp/fast-mi/repro/scummrun/build/svm-direct/build/scummvm
+== 397s  3b. the search
+-rwxr-xr-x 2 ilyask ilyask 51838064 Nov 15 20:32 experiments/E011-speed/rs/target/fast/direct
+== 510s  4. the gate
+p7top     trials   7337 kept  134 digest aa25d4c5a4  same
+cake      trials  10800 kept  154 digest c738a50ae4  same
+crew      trials   5329 kept  306 digest b9ce9c2930  same
+meathook  trials  10799 kept   56 digest 22e11af161  same
+boot      trials   2219 kept   52 digest 644e9e311c  same
+demo      trials   3163 kept  225 digest d2549dd5c3  same
+PASS
+== 645s  5. replay the ending
+{"node":7895,"from_boot":true,"frame":114978,"tick":694701,"room":89,"keys":[["bit:565",1]],"clicks":1994,"seconds":2.9492179419999998,"ok":true}
+== 648s  done
