@@ -323,6 +323,11 @@ struct Search {
     top_at: Option<Instant>,
     until: Vec<(Key, Val)>,
     done: bool,
+    /// --until end (E030): the game's own end ends the run: a trial the engine ended by a restart or quit that a
+    /// script ran ("restart@SITE", "quit@SITE": E014's end, which names nothing of the game). Every such trial is
+    /// written to OUT/ends.jsonl with its whole movie, with or without the option
+    until_end: bool,
+    ends_log: Option<std::fs::File>,
     /// --count-lines: a walk made with a count whose stop is new by more than the count's value begins a line
     /// (the first for the count's value in a line of gains)
     count_lines: bool,
@@ -674,6 +679,15 @@ enum Played {
     NotIdle,
 }
 
+/// E030: the game's own end, by E014's rule: the engine ended the trial by a restart or quit that a script ran (with
+/// SPEEDRUN_END_SITE it names the script's site after '@'). A restart or quit key is never an input of the search.
+/// The trial's own events after the stop, the reason and the frame go to `Out::site_ends`.
+fn site_end(out: &mut Out, events: &[Event], st: &Status) {
+    if st.reason.contains('@') && matches!(fmi_core::end_base(&st.reason), "restart" | "quit") {
+        out.site_ends.push((events.to_vec(), st.reason.clone(), st.frame));
+    }
+}
+
 fn go(b: &mut Box<dyn Engine>, spec: RunSpec) -> EResult<Result<Status, Status>> {
     match b.run(&spec) {
         Ok(s) => Ok(Ok(s)),
@@ -898,6 +912,9 @@ struct Out {
     cands: Vec<Cand>,
     results: Vec<Res>,
     ends: Vec<String>,
+    /// the trials the engine ended at a script's restart or quit (the game's own end): the trial's own events after
+    /// the stop, the end's reason and frame
+    site_ends: Vec<(Vec<Event>, String, u64)>,
     trials: u64,
     refused: u64,
     not_idle: u64,
@@ -989,6 +1006,7 @@ impl Out {
         self.cands.extend(o.cands);
         self.results.extend(o.results);
         self.ends.extend(o.ends);
+        self.site_ends.extend(o.site_ends);
         self.trials += o.trials;
         self.refused += o.refused;
         self.not_idle += o.not_idle;
@@ -1195,6 +1213,7 @@ fn clicks(
                 let early = match go(&mut b, RunSpec { frame: Some(mf + LEAD), ..Default::default() })? {
                     Ok(st) => st,
                     Err(st) => {
+                        site_end(&mut out, &events, &st);
                         out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                         b.quit();
                         return Ok(PointOut { out, acts, learned, first });
@@ -1264,7 +1283,8 @@ fn clicks(
                         let shown3 = iface(&ob);
                         match go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
                             Err(st) => {
-                                out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
+                                site_end(&mut out, &events, &st);
+                        out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                                 b.quit();
                                 return Ok(PointOut { out, acts, learned, first });
                             }
@@ -1323,6 +1343,7 @@ fn clicks(
                 }
                 if !ran_on {
                     if let Err(st) = go(&mut b, RunSpec { frame: Some(mf + LEAD + CALM), ..Default::default() })? {
+                        site_end(&mut out, &events, &st);
                         out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason));
                         b.quit();
                         return Ok(PointOut { out, acts, learned, first });
@@ -1488,7 +1509,10 @@ fn clicks(
                             out.results.push(slim(r, base));
                         }
                     }
-                    Played::Ended(st) => out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason)),
+                    Played::Ended(st) => {
+                        site_end(&mut out, &events, &st);
+                        out.ends.push(format!("{} {}", name_of(pre, &cl), st.reason))
+                    }
                     Played::NotIdle => {
                         out.not_idle += 1;
                         if cfg.ends {
@@ -2267,7 +2291,10 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
         let mut b = e.fork()?;
         out.trials += 1;
         match go(&mut b, RunSpec { frame: Some(st0.frame + n), ..Default::default() })? {
-            Err(st) => out.ends.push(format!("wait{n} {}", st.reason)),
+            Err(st) => {
+                site_end(&mut out, &[], &st);
+                out.ends.push(format!("wait{n} {}", st.reason))
+            }
             Ok(_) => match calm(&mut b, st0.frame + n, cfg.horizon, ego)? {
                 Played::Stop(st) => {
                     let ob = b.obs(&NAMES)?;
@@ -2292,7 +2319,10 @@ fn explore(e: &mut Box<dyn Engine>, level: u32, pending: &[(Key, Val)], inside: 
                         continue;
                     }
                 }
-                Played::Ended(st) => out.ends.push(format!("wait{n} {}", st.reason)),
+                Played::Ended(st) => {
+                    site_end(&mut out, &[], &st);
+                    out.ends.push(format!("wait{n} {}", st.reason))
+                }
                 Played::NotIdle => {
                     out.not_idle += 1;
                     if cfg.ends {
@@ -2772,6 +2802,23 @@ impl Search {
         self.not_idle += out.not_idle;
         for x in out.ends {
             self.ends.push((id, x));
+        }
+        // E030: the game's own end (`site_end`): the trial's whole movie to ends.jsonl; with --until end, the run ends
+        for (ev, reason, frame) in out.site_ends {
+            let mut movie = self.movie(id);
+            movie.extend(ev);
+            let clicks = movie.iter().filter(|x| matches!(x.what, Input::Click(..))).count();
+            if let Some(f) = self.ends_log.as_mut() {
+                let line = json!({"stop": id, "reason": reason, "frame": frame, "clicks": clicks,
+                    "events": movie.iter().map(fmi_explore::events::event_json).collect::<Vec<Value>>()});
+                let _ = writeln!(f, "{line}");
+            }
+            let secs = self.t0.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
+            eprintln!("[{secs:7.1}s] END {reason} at frame {frame} by a trial of node {id} ({clicks} clicks from boot)");
+            if self.until_end && !self.done {
+                eprintln!("[{secs:7.1}s] UNTIL end held: the run ends");
+                self.done = true;
+            }
         }
         let results = out.results;
         let (depth, ever0) = (self.nodes[id].depth, self.nodes[id].ever.clone());
@@ -3501,6 +3548,34 @@ fn show(nodes: &str, id: u64, out: &Path, frames: u64) {
 
 /// `direct verify NODES.jsonl ID OUT [KEY=V,..]`: the kept stop's movie played from boot in a fresh engine, to its
 /// frame; prints the room and each key's value there, and whether each equals V.
+/// `direct verify-end ENDS IDX OUT` (E030): line IDX (from 0) of a run's ends.jsonl, its whole movie played from boot
+/// in a fresh engine and on to the engine's end: ok when the game ends by the same reason (the same script's site)
+/// at the same frame.
+fn verify_end(ends: &str, idx: usize, out: &Path) {
+    let text = std::fs::read_to_string(ends).expect("the ends' file");
+    let line: Value = serde_json::from_str(text.lines().nth(idx).expect("the end's line")).expect("the end's line read");
+    let a = line["events"].as_array().expect("the end's events");
+    let events: Vec<Event> = a.iter().filter_map(fmi_explore::events::event_of).collect();
+    assert_eq!(events.len(), a.len(), "every event read");
+    let (reason, frame) = (line["reason"].as_str().expect("its reason").to_string(), line["frame"].as_u64().expect("its frame"));
+    std::fs::create_dir_all(out).expect("OUT");
+    let host = Host::new(HostCfg::from_env()).expect("the host");
+    let t0 = Instant::now();
+    let mut e = host
+        .boot(&BootCfg { seed: 1, events: events.clone(), frame: None, dump_locals: true, lean: true, out_dir: eng_dir(out) })
+        .expect("the boot");
+    // on to the engine's end: it must come by the recorded frame
+    let (got, at) = match go(&mut e, RunSpec { max_frame: Some(frame + 1), ..Default::default() }) {
+        Ok(Err(st)) => (st.reason.clone(), st.frame),
+        Ok(Ok(st)) => (format!("no end by frame {}", st.frame), st.frame),
+        Err(x) => (format!("error: {x}"), 0),
+    };
+    let clicks = events.iter().filter(|x| matches!(x.what, Input::Click(..))).count();
+    println!("{}", json!({"end": idx, "from_boot": true, "reason": got, "frame": at, "clicks": clicks,
+        "seconds": t0.elapsed().as_secs_f64(), "ok": got == reason && at == frame}));
+    e.quit();
+}
+
 fn verify(nodes: &str, id: u64, out: &Path, keys: &str) {
     let (line, events) = stop_of(nodes, Some(id));
     let frame = line["frame"].as_u64().unwrap();
@@ -3680,6 +3755,9 @@ fn main() {
     if a.first().map(String::as_str) == Some("show") {
         return show(&a[1], a[2].parse().expect("ID"), Path::new(&a[3]), a.get(4).and_then(|x| x.parse().ok()).unwrap_or(6400));
     }
+    if a.first().map(String::as_str) == Some("verify-end") {
+        return verify_end(&a[1], a[2].parse().expect("IDX"), Path::new(&a[3]));
+    }
     if a.first().map(String::as_str) == Some("verify") {
         return verify(&a[1], a[2].parse().expect("ID"), Path::new(&a[3]), a.get(4).map(String::as_str).unwrap_or(""));
     }
@@ -3739,6 +3817,7 @@ fn main() {
         log: Some(std::fs::File::create(out.join("nodes.jsonl")).expect("nodes.jsonl")),
         offers: Some(std::fs::File::create(out.join("offers.jsonl")).expect("offers.jsonl")),
         rung_log: Some(std::fs::File::create(out.join("rung-stops.jsonl")).expect("rung-stops.jsonl")),
+        ends_log: Some(std::fs::File::create(out.join("ends.jsonl")).expect("ends.jsonl")),
         top_path: Some(out.join("top.jsonl")),
         t0: Some(t0),
         live_max: LIVE_MAX.max(8 * cfg.workers),
@@ -3837,7 +3916,12 @@ fn main() {
     }
     // --until K=V,..: watched values whose first holding ends the run (an evaluation's stop rule, as --minutes)
     for w in opt("--until").unwrap_or_default().split(',').filter(|x| !x.is_empty()) {
-        let (k, v) = w.split_once('=').expect("--until KEY=V");
+        // `end` (E030): the game's own end (`site_end`)
+        if w == "end" {
+            s.until_end = true;
+            continue;
+        }
+        let (k, v) = w.split_once('=').expect("--until KEY=V or end");
         let (k, v): (Key, Val) = (Key::parse(k), v.parse().expect("a value"));
         if !s.watch.iter().any(|x| x.0 == k && x.1 == v) {
             s.watch.push((k, v, None));
