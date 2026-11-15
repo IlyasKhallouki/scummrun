@@ -193,6 +193,14 @@ impl HostCfg {
         ] {
             s.push_str(&format!("{k}={v}\n"));
         }
+        // FMI_GAME_INI: more of the game's ScummVM settings, K=V,K=V (unset: none). The MI2 demo's
+        // `disable_mi2_ni_demo=true` turns off its recorded playback, so it takes clicks.
+        if let Ok(extra) = std::env::var("FMI_GAME_INI") {
+            for kv in extra.split(',').filter(|kv| kv.contains('=')) {
+                s.push_str(kv.trim());
+                s.push('\n');
+            }
+        }
         s
     }
 }
