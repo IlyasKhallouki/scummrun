@@ -6,5 +6,5 @@
 ROOT27=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 source "$ROOT27/experiments/E026-part1/run/env.sh"
 export FMI_ENGINE_BIN=${FMI_ENGINE_E027:-/var/tmp/fast-mi/svm-e027/build/scummvm/scummvm}
-GUIDE27=$HOME/.cache/fast-mi-e026/size-cost/guide-part1.json
+GUIDE27=${FMI_GUIDE27:-$ROOT27/experiments/E027-direct/guide/guide-end.json}
 RUNGS27=$ROOT27/experiments/E011-speed/rs/fmi-checks/rungs/rungs-part1.json

@@ -107,6 +107,9 @@ def main():
         if toggles:
             cmd += ["--toggles", toggles]
         say(f"leg {n:02d}: begins" + (f" at {start[0]} stop {start[1]}" if start else " at the boot"))
+        # the record: the leg's exact command and the settings it was given (read by nothing; for reproducing a run)
+        (leg / "cmd.txt").write_text(" ".join(cmd) + "\n" + "".join(
+            f"{k}={v}\n" for k, v in sorted(e.items()) if k.startswith(("FMI_", "SPEEDRUN_", "DIRECT_"))))
         with open(leg / "out.txt", "w") as fo, open(leg / "err.txt", "w") as fe:
             rc = subprocess.run(cmd, env=e, stdout=fo, stderr=fe, stdin=subprocess.DEVNULL).returncode
         err = (leg / "err.txt").read_text(errors="replace")
