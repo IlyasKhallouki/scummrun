@@ -648,6 +648,10 @@ def main() -> int:
         print(f"PROBLEM: {p}", file=sys.stderr)
     for f in failures:
         print(f"FAILED: {f['file']}: {'; '.join(f['errors'])}", file=sys.stderr)
+    # DUMP_ALLOW_PROBLEMS=1: the problems are reported but do not fail the dump, only a script descumm could not
+    # decompile does (a demo's room list names the full game's rooms, which its files do not hold). Unset: as before.
+    if os.environ.get("DUMP_ALLOW_PROBLEMS") == "1":
+        return 1 if failures else 0
     return 1 if (failures or problems) else 0
 
 

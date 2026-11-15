@@ -65,7 +65,7 @@ a baseline, not a result of the search. It is described under "Earlier work" bel
 
 Everything runs on Linux. You need git, a C++ compiler with make, CMake, the development files of
 SDL2, libFLAC and zlib (libFLAC plays the CD audio; without it the game's timing differs and the build stops), Python 3,
-and Rust with cargo.
+[uv](https://docs.astral.sh/uv/) (the decompiling step runs its Python with it), and Rust with cargo.
 
 **1. Get the code and the game files.**
 
@@ -87,8 +87,12 @@ The game files are never in the repository; bring your own:
 
 ```sh
 GAME_DIR=game/dos-cd scripts/dump-scripts.sh
-GAME_DIR=game/fate-play-demo SCUMMRP_GAME=atlantis INDEX_NAME=PLAYFATE.000 RELEASE=fate-play-demo scripts/dump-scripts.sh
+GAME_DIR=game/fate-play-demo SCUMMRP_GAME=atlantis INDEX_NAME=PLAYFATE.000 RELEASE=fate-play-demo \
+  DUMP_ALLOW_PROBLEMS=1 scripts/dump-scripts.sh
 ```
+
+The demo's dump lists `PROBLEM: RNAM room N has no LFLF` for the rooms its files do not hold (it has 11 of the game's);
+`DUMP_ALLOW_PROBLEMS=1` lets it finish. Both end with a count of files and `"files_with_errors": 0`.
 
 **3. Build the engine and the search.**
 
