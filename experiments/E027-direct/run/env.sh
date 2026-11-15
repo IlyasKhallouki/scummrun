@@ -5,6 +5,7 @@
 #   FMI_ENGINE_E027=PATH   another build of the engine
 ROOT27=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 source "$ROOT27/experiments/E026-part1/run/env.sh"
-export FMI_ENGINE_BIN=${FMI_ENGINE_E027:-/var/tmp/fast-mi/svm-e027/build/scummvm/scummvm}
+# the engine: engine.sh's build in the repository (ScummVM v2026.3.0 with patches/), unless FMI_ENGINE_E027 names another
+export FMI_ENGINE_BIN=${FMI_ENGINE_E027:-$ROOT27/build/svm-direct/build/scummvm}
 GUIDE27=${FMI_GUIDE27:-$ROOT27/experiments/E027-direct/guide/guide-end.json}
 RUNGS27=$ROOT27/experiments/E011-speed/rs/fmi-checks/rungs/rungs-part1.json

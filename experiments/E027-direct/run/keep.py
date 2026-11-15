@@ -1,6 +1,7 @@
 """keep.py OUT BIN [CHAIN OPTIONS..]: keeps the chain in OUT going until the game's end value is held.
 
 E028: the options after BIN (chain.py's --game, --watch, --until, --guide, --rungs, --engine) go to every continuation.
+KEEP_HOURS, KEEP_STALL, KEEP_WORKERS: the continuations' settings (unset: 14 h, 60 min, 7 threads, the laptop's).
 
 When a chain (run/chain.py) ends for any reason other than the end value (its hours spent, a failed search, no top
 stop, three idle legs), a new chain starts from the furthest stop the last chains reached (the newest leg with a
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import sys
 D = Path(sys.argv[1])
-CHAIN = "/var/tmp/fast-mi/wt-direct/experiments/E027-direct/run/chain.sh"
+CHAIN = str(Path(__file__).resolve().parent / "chain.sh")
 BIN = sys.argv[2]
 log = open(D / "keep.txt", "a")
 
@@ -86,7 +87,8 @@ for n in range(1, 7):
     out = D / f"cont{n}"
     out.mkdir()
     cmd = ["systemd-inhibit", "--what=idle:sleep", "--why=scummrun full run", "nice", "-n", "5", CHAIN, str(out),
-           "--hours", "14", "--stall", "60", "--workers", "7", "--bin", BIN] + sys.argv[3:]
+           "--hours", os.environ.get("KEEP_HOURS", "14"), "--stall", os.environ.get("KEEP_STALL", "60"),
+           "--workers", os.environ.get("KEEP_WORKERS", "7"), "--bin", BIN] + sys.argv[3:]
     if leg is not None:
         line = open(leg / "top.jsonl").read()
         tid = json.loads(line[:line.find(',"events"')] + "}")["id"]

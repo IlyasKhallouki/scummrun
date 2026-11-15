@@ -60,7 +60,9 @@ ALLOFF="$ALLOFF FMI_SELECT_PLACE= FMI_PLAN_TIME= FMI_REACH_ZEROS= FMI_PLANNER_LO
 export ALLON E26 ON ALLOFF ROOT RUN26
 # the games: Monkey Island's DOS CD files are the worktree's game link (never committed), the demo's fixed folders
 MI="FMI_GAME_ID=monkey FMI_GAME_DIR=$ROOT/game/dos-cd FMI_GAME_SCRIPTS=$ROOT/data/scripts-dos-cd"
-DEMO="FMI_GAME_ID=atlantis FMI_GAME_DIR=/var/tmp/fast-mi/games/fate-play-demo FMI_GAME_SCRIPTS=/var/tmp/fast-mi/e014-root/data/scripts-fate-play-demo"
+# the Fate of Atlantis playable demo: game/fate-play-demo (PLAYFATE.000/.001, never committed) and its scripts' dump
+# (scripts/dump-scripts.sh with E014's settings), unless FMI_DEMO_DIR and FMI_DEMO_SCRIPTS name other folders
+DEMO="FMI_GAME_ID=atlantis FMI_GAME_DIR=${FMI_DEMO_DIR:-$ROOT/game/fate-play-demo} FMI_GAME_SCRIPTS=${FMI_DEMO_SCRIPTS:-$ROOT/data/scripts-fate-play-demo}"
 export MI DEMO
 # the engine (patches 0001-0010) and the build
 export FMI_ENGINE_BIN=/var/tmp/fast-mi/svm-e024/build/scummvm/scummvm
@@ -77,14 +79,14 @@ export RUNGS=$ROOT/experiments/E011-speed/rs/fmi-checks/rungs
 export KEY=${KEY:-/home/ilyask/projects/scummrun/experiments/E001-goals-from-scripts/key.json}
 export BENCH=$ROOT/experiments/E011-speed/bench
 export O26=${O26:-$HOME/.cache/fast-mi-e026/build}
-export TMPDIR=/var/tmp/fast-mi/e026-tmp
+export TMPDIR=${E26_TMPDIR:-$ROOT/out/tmp}
 mkdir -p $TMPDIR
 export NICE=${NICE:-5} GUARD=$RUN26/guard.sh FLOOR_GB=${FLOOR_GB:-2}
 # each game's files are there (a missing link voided a check: E016 plan.md:464-468), the binaries are built
 game_ok() {
   local d
-  for d in $ROOT/game/dos-cd $ROOT/data/scripts-dos-cd /var/tmp/fast-mi/games/fate-play-demo \
-    /var/tmp/fast-mi/e014-root/data/scripts-fate-play-demo; do
+  for d in $ROOT/game/dos-cd $ROOT/data/scripts-dos-cd ${FMI_DEMO_DIR:-$ROOT/game/fate-play-demo} \
+    ${FMI_DEMO_SCRIPTS:-$ROOT/data/scripts-fate-play-demo}; do
     [ -d "$d" ] || { echo "env.sh: missing $d" >&2; return 1; }
   done
   [ -e $ROOT/game/dos-cd/MONKEY.000 ] || { echo "env.sh: no MONKEY.000 in $ROOT/game/dos-cd" >&2; return 1; }

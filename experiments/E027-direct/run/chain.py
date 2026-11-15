@@ -66,7 +66,8 @@ def main():
     hours = float(opt(a, "--hours", "12"))
     stall = opt(a, "--stall", "45")
     workers = opt(a, "--workers", "7")
-    binary = opt(a, "--bin", "/var/tmp/fast-mi/direct/bench/bin/chain1")
+    # the search: cargo's build in the repository (experiments/E011-speed/rs, profile fast) unless --bin names another
+    binary = opt(a, "--bin", str(HERE.parents[1] / "E011-speed" / "rs" / "target" / "fast" / "direct"))
     start = opt(a, "--from", None, 2)
     edges = opt(a, "--edges")
     toggles = opt(a, "--toggles")

@@ -19,8 +19,8 @@ code holds no room, object or variable number of the game (the engine patches ke
 earlier work, switched off for these runs). The checkpoint files used to follow a run's progress are read only to
 report it.
 
-- Results, the exact settings, and the whole input movie: [`experiments/E027-direct/results/full5`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments/E027-direct/results/full5) (branch `direct`).
-- The lab notebook of the search: [`notes/log/2026-11-10-e027-direct.md`](https://github.com/IlyasKhallouki/scummrun/blob/direct/notes/log/2026-11-10-e027-direct.md).
+- Results, the exact settings, and the whole input movie: [`experiments/E027-direct/results/full5`](experiments/E027-direct/results/full5).
+- The lab notebook of the search: [`notes/log/2026-11-10-e027-direct.md`](notes/log/2026-11-10-e027-direct.md).
 
 ### Indiana Jones and the Fate of Atlantis, the playable demo (9 November 2026)
 
@@ -29,7 +29,7 @@ report it.
 The earlier version of the system found a route from boot to the end of the demo (experiment E022), then shortened
 its own route (E024) to 92 clicks: 3:46.8 of game time on seed 1, 3:51.5 in real time in the video. The route is
 verified from boot, and no click in it was written by hand. [Watch it on YouTube.](https://youtu.be/npbKSDtlLX8)
-Plan and results: [`experiments/E024-shorten/plan.md`](https://github.com/IlyasKhallouki/scummrun/blob/direct/experiments/E024-shorten/plan.md).
+Plan and results: [`experiments/E024-shorten/plan.md`](experiments/E024-shorten/plan.md).
 
 ### Before that: a hand-routed Any% run of Monkey Island (October 2026)
 
@@ -53,34 +53,80 @@ a baseline, not a result of the search. It is described under "Earlier work" bel
 
 ## Code and notes
 
-- Branch [`direct`](https://github.com/IlyasKhallouki/scummrun/tree/direct): the search ([`experiments/E011-speed/rs/fmi-direct`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments/E011-speed/rs/fmi-direct)),
-  the engine patches ([`patches/`](https://github.com/IlyasKhallouki/scummrun/tree/direct/patches), 0001 to 0013), the run and check scripts
-  ([`experiments/E027-direct/run`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments/E027-direct/run)), the lab notes ([`notes/log`](https://github.com/IlyasKhallouki/scummrun/tree/direct/notes/log)) and every
-  experiment's plan and results ([`experiments/`](https://github.com/IlyasKhallouki/scummrun/tree/direct/experiments)).
-- Branch `main` (this page): the earlier planner and Any% bot, the survey of related work
-  ([`docs/related-work.md`](docs/related-work.md)), and the paper's working files (`paper/`).
+- The search: [`experiments/E011-speed/rs/fmi-direct`](experiments/E011-speed/rs/fmi-direct) (Rust; the host that drives
+  the engine is `fmi-engine`, the shared types `fmi-core`).
+- The engine patches, "the bridge": [`patches/`](patches) (0001 to 0013, applied to ScummVM v2026.3.0).
+- The run and check scripts: [`experiments/E027-direct/run`](experiments/E027-direct/run) (`engine.sh`, `gate.sh`,
+  `chain.sh`, `keep.py`, `bench.sh`, `env.sh`).
+- The lab notes: [`notes/log`](notes/log); every experiment's plan and results: [`experiments/`](experiments).
+- The survey of related work: [`docs/related-work.md`](docs/related-work.md); the paper's working files: `paper/`.
 
-## Checking the Monkey Island result
+## Reproducing the results
 
-You need your own DOS CD files (`MONKEY.000`, `MONKEY.001` and the CD audio as `track2.flac` to `track25.flac`; their
-checksums are in `results/full5/settings.md`), the patched engine, and the search built from branch `direct`:
+Everything runs on Linux. You need git, a C++ compiler with make, CMake, the development files of
+SDL2, libFLAC and zlib (libFLAC plays the CD audio; without it the game's timing differs and the build stops), Python 3,
+and Rust with cargo.
+
+**1. Get the code and the game files.**
 
 ```sh
-# on branch direct, with the game in game/dos-cd and the engine built (see below)
-cd experiments/E011-speed/rs && cargo build --profile fast -p fmi-direct && cd -
-export FMI_ENGINE_E027=/path/to/patched/scummvm
-source experiments/E027-direct/run/env.sh
-mkdir -p out/verify-full5
+git clone --recurse-submodules --shallow-submodules https://github.com/IlyasKhallouki/scummrun.git
+cd scummrun
+```
+
+The game files are never in the repository; bring your own:
+
+- *The Secret of Monkey Island*, DOS CD release: `MONKEY.000`, `MONKEY.001` and the CD audio as `track2.flac` to
+  `track25.flac`, in `game/dos-cd/`. Their checksums are in
+  [`experiments/E027-direct/results/full5/settings.md`](experiments/E027-direct/results/full5/settings.md).
+- For the gate only: the playable DOS demo of *Indiana Jones and the Fate of Atlantis* (free on
+  [ScummVM's demo page](https://www.scummvm.org/demos/); the one whose `PLAYFATE.000` has MD5
+  `035deab53b47bc43abc763560d0f8d4b`), in `game/fate-play-demo/`.
+
+**2. Decompile the scripts** (the search reads which rooms' scripts mention what; nothing of them is committed):
+
+```sh
+GAME_DIR=game/dos-cd scripts/dump-scripts.sh
+GAME_DIR=game/fate-play-demo SCUMMRP_GAME=atlantis INDEX_NAME=PLAYFATE.000 RELEASE=fate-play-demo scripts/dump-scripts.sh
+```
+
+**3. Build the engine and the search.**
+
+```sh
+experiments/E027-direct/run/engine.sh                       # ScummVM v2026.3.0 + patches/ -> build/svm-direct
+(cd experiments/E011-speed/rs && cargo build --profile fast -p fmi-direct)
+```
+
+**4. Run the gate** (5 to 10 minutes). It expands fixed stops of both games one at a time, so its result does not
+depend on the machine, and compares it with the runs' digests. `PASS` means the search, the engine, your game files and
+the decompiled scripts behave exactly as in the runs.
+
+```sh
+experiments/E027-direct/run/gate.sh
+```
+
+**5. Replay the ending from boot** (seconds):
+
+```sh
+source experiments/E027-direct/run/env.sh && mkdir -p out/verify-full5
 env $ON $MI experiments/E011-speed/rs/target/fast/direct verify \
   experiments/E027-direct/results/full5/end-stop.jsonl 7895 out/verify-full5 bit:565=1
 ```
 
-It should print `"frame":114978`, `"clicks":1994` and `"ok":true`.
+It prints `"frame":114978`, `"clicks":1994` and `"ok":true`.
 
-The engine is ScummVM v2026.3.0 with patches 0001 to 0011 applied (0012 and 0013 act only for other games). The build
-the runs used is not yet scripted end to end: its tree holds a small trace hook that is in no patch file and that no
-run uses. To rerun the search itself, see `experiments/E027-direct/run/chain.sh` and the notebook; check a new build
-first with `experiments/E027-direct/run/bench.sh`, whose digests must match `results/full5/gate-vm.txt`.
+**6. Run the search from boot.** The run of 15 November 2026 took 5.5 hours on 8 threads of a cloud machine; a
+four-core laptop needs about 14. `keep.py` starts a new chain from the furthest stop if one ends without the game's end.
+
+```sh
+experiments/E027-direct/run/chain.sh out/full --hours 12 --stall 30 --workers 8 &
+sleep 20; KEEP_STALL=30 KEEP_WORKERS=8 python3 experiments/E027-direct/run/keep.py out/full \
+  experiments/E011-speed/rs/target/fast/direct
+```
+
+Each leg writes its exact command to `out/full/legNN/cmd.txt`, its progress to `err.txt`, and its stops to
+`nodes.jsonl`; `chain.txt` logs the checkpoints as they are first reached. The leg's thread timing decides where a leg
+ends, so a rerun may take another route to the end; `direct verify` checks any end stop it finds the same way as above.
 
 ## Research
 
@@ -89,8 +135,9 @@ lab notebook; `experiments/` holds each experiment's plan (question, prediction,
 
 ## Earlier work: the planner and the Any% bot (October 2026)
 
-Everything below describes the system on this branch (`main`) before the search: the Any% bot of the video above
-and the glitchless Part I planner. It is kept as it was.
+Everything below describes the system before the search: the Any% bot of the video above and the glitchless Part I
+planner. It is kept as it was. Its instructions predate patches 0006 to 0013; to rebuild it as it was, check out commit
+`6617720`, the last before the search was merged.
 
 ### Any%
 
