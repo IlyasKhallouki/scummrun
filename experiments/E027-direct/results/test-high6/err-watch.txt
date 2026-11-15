@@ -1,0 +1,5 @@
+[    5.3s] WATCH var:282=3 first held by node 1
+[    5.3s] WATCH room=61 first held by node 13
+[   15.7s] WATCH room=44 first held by node 134
+[   40.1s] WATCH var:282=4 first held by node 302
+[   40.1s] RUNG P8 first held by node 302 (level 1, 6970 trials so far)

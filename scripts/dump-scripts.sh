@@ -13,17 +13,36 @@
 # regenerated into temporary directories and swapped in.
 #
 # Env overrides: MAKE_JOBS (default 4), GAME_DIR (default game/classic).
+#
+# E014 (experiments/E014-fate-demo): another SCUMM v5 game by explicit settings. Unset, the release is picked by MI's
+# file names as before and every output is byte for byte the same.
+#   SCUMMRP_GAME  scummrp's game id (`scummrp -L` lists its table), e.g. atlantis; picks the v5 path below
+#   RELEASE       the output folders' name: build/blocks-RELEASE, build/verb-blocks-RELEASE, data/scripts-RELEASE
+#   INDEX_NAME    the index file's name in GAME_DIR, when it differs from the name in scummrp's table (a demo's): a
+#                 folder of links, build/scummrp-in-RELEASE, gives scummrp the table's names for the game's files
+#   GAME_TITLE    the title in the index and in each file's header (default with SCUMMRP_GAME: the game named from
+#                 these settings, "atlantis, release fate-play-demo (PLAYFATE.000, SCUMM v5)"; else MI's text, as before)
+#   OUT_ROOT      where build/ and data/ outputs go (default: the repository); GAME_DIR is relative to it
+#   TOOLS_ROOT    where scummrp, descumm and their sources are (default: the repository)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+TOOLS_ROOT="${TOOLS_ROOT:-$ROOT}"
+OUT_ROOT="${OUT_ROOT:-$ROOT}"
+mkdir -p "$OUT_ROOT/build" "$OUT_ROOT/data"
+cd "$OUT_ROOT"
 
 MAKE_JOBS="${MAKE_JOBS:-4}"
 GAME_DIR="${GAME_DIR:-game/classic}"
 # The layout picks the release: MONKEY1.000 is the Mac release (SCUMM v5), MONKEY.000 the
 # DOS CD release (SCUMM v5, same block format), 000.LFL plus
 # DISKnn.LEC is the DOS VGA floppy (SCUMM v4). OUT and the block dirs default per release.
-if [[ -f "$GAME_DIR/000.LFL" || -f "$GAME_DIR/000.lfl" ]]; then
+if [[ -n "${SCUMMRP_GAME:-}" ]]; then
+  : "${RELEASE:?RELEASE names the output folders when SCUMMRP_GAME is set}"
+  GAME_ID="$SCUMMRP_GAME"
+  INDEX_FILE="$GAME_DIR/${INDEX_NAME:?INDEX_NAME is the index file in GAME_DIR}"
+  [[ -f "$INDEX_FILE" ]] || { echo "missing $INDEX_FILE" >&2; exit 1; }
+elif [[ -f "$GAME_DIR/000.LFL" || -f "$GAME_DIR/000.lfl" ]]; then
   RELEASE="dos-vga"
   GAME_ID="monkey"               # scummrp id for 000.LFL / DISKnn.LEC (SCUMM v4)
   INDEX_FILE="$(ls "$GAME_DIR"/000.[Ll][Ff][Ll] | head -1)"
@@ -37,14 +56,20 @@ else
   INDEX_FILE="$GAME_DIR/MONKEY1.000"
 fi
 
+# E014: another game with no GAME_TITLE is named from its settings (scummrp's id, the release, the index file), not
+# by MI's default text
+if [[ -n "${SCUMMRP_GAME:-}" && -z "${GAME_TITLE:-}" ]]; then
+  GAME_TITLE="$SCUMMRP_GAME, release $RELEASE ($INDEX_NAME, SCUMM v5)"
+fi
+
 SCUMMTR_URL="https://github.com/dwatteau/scummtr.git"
 SCUMMTR_REF="a50c6f4bf03566721b3f2c00df257a41a82e22ed"
-SCUMMTR_SRC="build/scummtr"
-SCUMMTR_BUILD="build/scummtr-build"
+SCUMMTR_SRC="$TOOLS_ROOT/build/scummtr"
+SCUMMTR_BUILD="$TOOLS_ROOT/build/scummtr-build"
 SCUMMRP="$SCUMMTR_BUILD/bin/scummrp"
 
-TOOLS_SRC="third_party/scummvm-tools"
-TOOLS_BUILD="build/scummvm-tools"
+TOOLS_SRC="$TOOLS_ROOT/third_party/scummvm-tools"
+TOOLS_BUILD="$TOOLS_ROOT/build/scummvm-tools"
 DESCUMM="$TOOLS_BUILD/descumm"
 
 if [[ "$RELEASE" == "mac" ]]; then
@@ -90,7 +115,7 @@ if [[ ! -x "$DESCUMM" ]]; then
     cd "$TOOLS_BUILD"
     # configure writes config.h/config.mk/Makefile/config.log into the cwd and
     # sets srcdir to its own location, so this is a clean out-of-tree build.
-    "$ROOT/$TOOLS_SRC/configure" --disable-wxwidgets --disable-boost \
+    "$TOOLS_SRC/configure" --disable-wxwidgets --disable-boost \
       --disable-vorbis --disable-tremor --disable-mad --disable-flac \
       --disable-png --disable-freetype2 --disable-iconv --disable-zlib \
       >configure.out 2>&1 || { cat configure.out >&2; exit 1; }
@@ -101,7 +126,21 @@ fi
 # ---- export raw blocks ----------------------------------------------------------
 log "exporting blocks with scummrp -g $GAME_ID"
 rm -rf "$BLOCKS.tmp"
-"$SCUMMRP" -q -g "$GAME_ID" -p "$GAME_DIR" -o -d "$BLOCKS.tmp"
+SCUMMRP_DIR="$GAME_DIR"
+if [[ -n "${SCUMMRP_GAME:-}" ]]; then
+  # scummrp opens the files by its table's names (e.g. ATLANTIS.000, ATLANTIS.001): link the game's files under them
+  want="$("$SCUMMRP" -L | awk -F'|' -v g="$GAME_ID" '{gsub(/ /, "", $1); gsub(/ /, "", $3)} $1 == g {print $3}')"
+  [[ -n "$want" ]] || { echo "scummrp has no game $GAME_ID" >&2; exit 1; }
+  if [[ "$want" != "$INDEX_NAME" ]]; then
+    SCUMMRP_DIR="build/scummrp-in-$RELEASE"
+    rm -rf "$SCUMMRP_DIR" && mkdir -p "$SCUMMRP_DIR"
+    have_stem="${INDEX_NAME%.*}"; want_stem="${want%.*}"
+    for f in "$GAME_DIR/$have_stem".*; do
+      ln -s "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" "$SCUMMRP_DIR/$want_stem.${f##*.}"
+    done
+  fi
+fi
+"$SCUMMRP" -q -g "$GAME_ID" -p "$SCUMMRP_DIR" -o -d "$BLOCKS.tmp"
 rm -rf "$BLOCKS"
 mv "$BLOCKS.tmp" "$BLOCKS"
 
@@ -122,7 +161,7 @@ EOF
 # ---- decompile + index ------------------------------------------------------------
 log "decompiling into $OUT"
 if [[ "$RELEASE" == "dos-vga" ]]; then
-  uv run --quiet --no-project --python 3.12 --script scripts/dump_scripts_v4.py \
+  uv run --quiet --no-project --python 3.12 --script "$ROOT/scripts/dump_scripts_v4.py" \
     --index-file "$INDEX_FILE" \
     --blocks "$BLOCKS" \
     --descumm "$DESCUMM" \
@@ -132,7 +171,8 @@ if [[ "$RELEASE" == "dos-vga" ]]; then
   log "done: $OUT/INDEX.md"
   exit 0
 fi
-uv run --quiet --no-project --python 3.12 --script scripts/dump_scripts.py \
+uv run --quiet --no-project --python 3.12 --script "$ROOT/scripts/dump_scripts.py" \
+  ${GAME_TITLE:+--title "$GAME_TITLE"} \
   --index-file "$INDEX_FILE" \
   --blocks "$BLOCKS" \
   --verb-dir "$VERB_BLOCKS" \

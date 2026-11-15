@@ -301,7 +301,7 @@ fn read_fresh(readings: &Arc<dyn Readings>, b: &mut Box<dyn Engine>, scope: &[i6
         elsewhere: true,
         live_locals: true,
         split_limit: true,
-        switches: step::SWITCHES.into(),
+        switches: step::switches(),
         reach: true,
         frame_costs: true,
         reach_also: vec![],

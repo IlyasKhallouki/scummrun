@@ -1,0 +1,32 @@
+--- a/engines/scumm/speedrun/speedrun_skips.cpp
++++ b/engines/scumm/speedrun/speedrun_skips.cpp
+@@ -30,6 +30,7 @@
+ // logo speed glitch (an Esc at the Lucasfilm logo) can never happen, and only
+ // on a frame where the press has an effect.
+ 
++#include "common/config-manager.h"
+ #include "common/keyboard.h"
+ 
+ #include "scumm/scumm.h"
+@@ -190,9 +191,20 @@
+ 	return !_plan.empty() && !_planDone && _plan[_stepIndex].noSkip;
+ }
+ 
++// speedrun_skip_early, a setting of the game's (its ScummVM settings; unset: false): skips are pressed before the
++// segment start too, still only where a press has an effect. For a game whose boot reaches what its files do not hold
++// unless its intro is skipped: the MI2 non-interactive DOS demo with its playback off loads its intro's room, which
++// the demo does not hold. Never for Monkey Island (the logo speed glitch, above).
++static bool skipEarly() {
++	static int v = -1;
++	if (v < 0)
++		v = ConfMan.hasKey("speedrun_skip_early") && ConfMan.getBool("speedrun_skip_early") ? 1 : 0;
++	return v == 1;
++}
++
+ void SpeedrunBridge::maybeInjectSkip(int delta) {
+ 	trackOverride();
+-	if (_finished || !_segmentStarted || (!_skipText && !_skipCutscenes))
++	if (_finished || (!_segmentStarted && !skipEarly()) || (!_skipText && !_skipCutscenes))
+ 		return;
+ 
+ 	ScummEngine &e = *_vm;

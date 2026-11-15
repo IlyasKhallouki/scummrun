@@ -15,15 +15,137 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 pub const SIG_LIMIT: usize = 1024;
+
+/// E022 amendment (24): `FMI_READ_SIG_LIMIT=N`, a wait point's lists of locals past N folded into 0 (SIG_LIMIT
+/// otherwise). The dark room's ladder (room 48's local 204/205) copies the pending sentence into its locals, so each
+/// sentence is a list of its own: 307,000 of the room's 336,000 actions at 1,024.
+pub fn sig_limit_env() -> usize {
+    std::env::var("FMI_READ_SIG_LIMIT").ok().and_then(|v| v.parse().ok()).filter(|&n: &usize| n > 0).unwrap_or(SIG_LIMIT)
+}
 pub const SPLIT_DEPTH: i64 = 2;
 pub const SPLIT_BUDGET: i64 = 4;
 pub const VAR_CUTSCENEEXIT_KEY: i32 = 24;
 pub const VAR_VERB_SCRIPT: i32 = 32;
 pub const VAR_SENTENCE_SCRIPT: i32 = 33;
 pub const VAR_EGO: i32 = 1;
+
+/// E014's switch `FMI_EGO_VALUES=1`: VAR_EGO may have several values in a scope (`Builder::ego_values`).
+fn ego_values_switch() -> bool {
+    std::env::var("FMI_EGO_VALUES").is_ok_and(|v| v == "1")
+}
+
+/// E014's switch `FMI_READ_CUT`: under split_limit, a run past the path limit with no fact left to split on, or with
+/// paths the step limit ended, is read short in place of stopping the reading, its cut paths dropped and counted.
+/// `1`: such a run gives no record (the machine hands over none of its paths, as for a run split_limit splits);
+/// `paths`: the paths it finished make its records (slower: on the interactive demo's room 49 alone the reading ran
+/// past 10 minutes against 30 s, its finished paths starting events that meet the same loop again). Unset: the reading
+/// stops there, as before.
+pub(crate) fn read_cut_switch() -> bool {
+    read_cut_mode() != 0
+}
+
+/// `FMI_READ_CUT`'s mode: 0 unset, 1 the run gives no record, 2 (`paths`) its finished paths make records.
+pub(crate) fn read_cut_mode() -> u8 {
+    static ON: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| match std::env::var("FMI_READ_CUT").as_deref() {
+        Ok("1") => 1,
+        Ok("paths") => 2,
+        _ => 0,
+    })
+}
+
+/// E014's switch `FMI_READ_WIDEN=1` (plan.md, amendment (6)): under split_limit, a run past the path limit is run
+/// again once with its loops widened (scumm-machine's `widen.rs`); if that run ends under the limit it is the run, and
+/// nothing is split. A run the limit does not cut is never run again. Unset: as before.
+pub(crate) fn read_widen_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_WIDEN").is_ok_and(|v| v == "1"))
+}
+
+/// E014 amendment (8)'s switch `FMI_READ_SOUND=1`: the ops whose only effect is on the sound or the screen
+/// (soundKludge, setRoomShadow, debug) have no tracked effect (scumm-machine's `heads::effect_with`), and
+/// VAR_SOUNDRESULT, which the engine's sound queue writes outside the scripts, is no fact (`domains::engine_why`).
+/// Unset: as before (each such op ends its path "unmodelled", dropped).
+pub fn read_sound_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_SOUND").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (24)'s switch `FMI_READ_MERGE=1`: a run's records that differ in one precondition key alone are one
+/// record, the key's values joined (dropped when they cover its domain), and a record another one's precondition
+/// covers with the same effects goes (`Builder::merge_records`). The machine forks a path on each fact it reads and
+/// keeps the siblings apart at a join while their assumed values differ, so a run that tests independent facts it does
+/// not write by (the dark room's local 208 renames each object by its class 25) made one record per combination:
+/// 3 x 2^8 a run, 285,000 of the room's 312,000 actions. Unset: as before.
+pub fn read_merge_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_MERGE").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (25)'s switch `FMI_READ_B_ARGS=1`: `Builder::b_values` also follows A's Local[0] into the scripts A's
+/// entry starts with it as an argument, and takes the constants compared there with that argument as B. The broken
+/// stairway's Use (room 48's object 584) starts local 204 with [8, Local[0]], and 204 compares its Local[1] with the
+/// ladder (583): "use ladder with stairway" was never built. Unset: as before.
+pub fn read_b_args_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_B_ARGS").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (25)'s switch `FMI_READ_INV_B=1`: a sentence's B is placed in the room and, besides, in the inventory
+/// (each placement whose pins hold is an input); before, B's room placement alone when it has one, so a B the player
+/// holds was never a sentence's (the light wand used with 933). Unset: as before.
+pub fn read_inv_b_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_INV_B").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (27)'s switch `FMI_READ_B_SWAP=1`: an object whose entry for a verb begins with
+/// `doSentence(verb, Local[0], VAR_ME)` (itself as B: the dark room's ladder, the beads 933) takes as its B each object
+/// whose own entry takes it as B, so the sentence the player makes ("use ladder with stairway", (8,583,584)) is built
+/// besides the one it re-issues ((8,584,583)), which the interface cannot make: the realizer found no clicks for it.
+/// Unset: as before.
+pub fn read_b_swap_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_B_SWAP").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (27)'s switch `FMI_READ_QUEUE=1`: a doSentence on a sentence or event run holds its sentence, which
+/// runs where the run's own step ends when the sentence script is idle, as the engine's checkAndRunSentenceScript runs
+/// the queue at the frame's end (`machine::queue_end`). Before, the op was a note and the sentence never ran: the
+/// ladder's "use ladder with stairway" (8,583,584) re-issues (8,584,583), which places the ladder. Unset: as before.
+pub fn read_queue_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_QUEUE").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (28)'s switch `FMI_READ_STRING_SUMMARY=1`: a start of a global script that reads a string's
+/// characters in a loop (`scope::loops_over_strings`) is summarized as the inventory hook's: not run, its writes
+/// guessed. FoA's IQ points (script 145, 154 characters, each an unknown) made the path limit cut every run that gives
+/// points, and with them the light's record the engine takes the first time. Unset: as before.
+pub fn read_string_summary_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_STRING_SUMMARY").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (26)'s switch `FMI_READ_RENAME=1`: a fact read by a test that only picks object names
+/// (`machine::rename_test`) is read as one of its values, with no fork and nothing assumed: both arms leave the same
+/// state. The dark room's local 208 tests the dark class (25) of eight objects only to rename them, so the light's
+/// run (local 203, which starts it through local 200) forked 2^8 ways, past the path limit, and its job split into
+/// some 80 parts of 1,000 paths each, 200-350 s a job. Unset: as before.
+pub fn read_rename_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_RENAME").is_ok_and(|v| v == "1"))
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
+
+/// Whether a path's end is no action: DROP_ENDS, or FMI_READ_WIDEN's "widened" (a loop came round again in a state
+/// its widened iteration holds; scumm-machine's `widen.rs`), which no path ends with when the switch is off.
+pub fn dropped_end(e: &str) -> bool {
+    DROP_ENDS.contains(&e) || e == "widened"
+}
 /// The Reader's counters the Builder reads to decide a split.
 /// The switch grow_limit: the largest path limit a run is read again with before the reading stops.
 pub const GROW_MAX: usize = 16_384;
@@ -114,6 +236,10 @@ pub trait Machine {
     /// The switch grow_limit: the path limit of the runs that follow, 0 for the machine's own. The default does
     /// nothing.
     fn set_path_limit(&mut self, _n: usize) {}
+
+    /// E014's switch FMI_READ_WIDEN: the runs that follow widen their loops (scumm-machine's `widen.rs`). The default
+    /// does nothing.
+    fn set_widen(&mut self, _on: bool) {}
 }
 
 /// What the Builder's counters and sets gained while one job ran (in a worker's Builder, par.rs), merged into the
@@ -330,6 +456,11 @@ pub struct Switches {
     /// A WaitFor op whose test reads engine state no fact holds both blocks and passes in the same run
     /// (experiments/E004-fast-exact/wait-both.md; machine.rs `wait_both`)
     pub wait_both: bool,
+    /// E026 C1 (experiments/E026-part1/plan.md): wait_both's passing path only on a path that holds a sentence (E022
+    /// amendment (27)'s, FMI_READ_QUEUE): a WaitFor op whose test no fact holds also passes there; elsewhere it yields,
+    /// as with both off. WaitForSentence's branches the path decides stay. By Lemma W still an over-approximation
+    /// (machine.rs `wait_both`). With wait_both on as well, wait_both's.
+    pub wait_queued: bool,
     /// With --frame-costs: an event at a WaitFor op that can pass at once costs 0 frames (costs.rs,
     /// experiments/E006-passed-wait/plan.md); the records are the same
     pub wait_pass_cost: bool,
@@ -357,11 +488,12 @@ impl Switches {
                 "havoc_rooms" => s.havoc_rooms = true,
                 "havoc_args" => s.havoc_args = true,
                 "wait_both" => s.wait_both = true,
+                "wait_queued" => s.wait_queued = true,
                 "wait_pass_cost" => s.wait_pass_cost = true,
                 _ if n.starts_with("step_limit=") => {
                     s.step_limit = n["step_limit=".len()..].parse().map_err(|_| format!("reader switch {n}: step_limit=N with N a number"))?
                 }
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, havoc_rooms, havoc_args, wait_both, wait_pass_cost, step_limit=N)")),
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, havoc_rooms, havoc_args, wait_both, wait_queued, wait_pass_cost, step_limit=N)")),
             }
         }
         Ok(s)
@@ -415,6 +547,9 @@ impl Switches {
         }
         if self.wait_both {
             v.push("wait_both");
+        }
+        if self.wait_queued {
+            v.push("wait_queued");
         }
         if self.wait_pass_cost {
             v.push("wait_pass_cost");
@@ -730,7 +865,7 @@ impl<'g> Builder<'g> {
             due: None,
             scope,
             table,
-            sig_limit: SIG_LIMIT,
+            sig_limit: sig_limit_env(),
             records: Vec::new(),
             counts: Counter::default(),
             ends: PyCounter::default(),
@@ -808,6 +943,19 @@ impl<'g> Builder<'g> {
         let dom = self.domain(&key);
         let out = match self.kind(&key) {
             Kind::Const => vec![Label::Int(self.table.start.get0(&key))],
+            // E014 (FMI_EGO_VALUES=1): a game whose scripts give VAR_EGO several values in the scope. The inventory's
+            // condition (owner = the ego) then takes every value of the domain: a superset of the engine's own test,
+            // which the run decides (unset: one value, as MI's scopes always have)
+            Kind::Fact if ego_values_switch() && dom.as_ref().is_some_and(|d| d.values.len() > 1) => {
+                let d = dom.clone().unwrap();
+                d.values
+                    .iter()
+                    .map(|&l| match self.table.value(&key, l) {
+                        Val::Int(n) => Label::Int(n),
+                        _ => l,
+                    })
+                    .collect()
+            }
             Kind::Fact => {
                 let d = dom.clone().unwrap();
                 assert_eq!(d.values.len(), 1, "VAR_EGO forks on read: reader.py's ego_values raises Fork here");
@@ -933,7 +1081,28 @@ impl<'g> Builder<'g> {
             rooms = vec![Label::Int(home as i64)];
         }
         let parent = self.game.object_parent.get(&(a as i32)).copied().unwrap_or(0);
-        let checks = if parent != 0 {
+        // E022 amendment (12) (`FMI_READ_PARENTS=1`): findObject touches a child only while each parent up its chain
+        // is in the state the child names (object.cpp:572-594): a precondition on `state:<parent>` when the index
+        // names the parent object and the reading holds its state; else the assumption as before
+        let mut parent_pre: Vec<(String, Labels)> = Vec::new();
+        let mut known = parent != 0 && read_parents_on();
+        let mut cur = a as i32;
+        while known {
+            match self.game.object_parent_state.get(&cur).copied() {
+                Some((po, ps)) => {
+                    let key = format!("state:{po}");
+                    if self.domain(&key).is_none() {
+                        known = false;
+                        break;
+                    }
+                    parent_pre.push((key, vec![Label::Int(ps as i64)]));
+                    cur = po;
+                }
+                None if cur == a as i32 => known = false,
+                None => break,
+            }
+        }
+        let checks = if parent != 0 && !known {
             vec![Assumption::new(
                 "object.cpp:567-590",
                 format!("object {a}'s parent {parent} in its parent state"),
@@ -943,13 +1112,17 @@ impl<'g> Builder<'g> {
         } else {
             vec![]
         };
+        let mut placed = vec![
+            ("room".to_string(), rooms),
+            (format!("owner:{a}"), vec![Label::Int(OF_OWNER_ROOM)]),
+            (format!("class:{a}:{CLASS_UNTOUCHABLE}"), vec![Label::Int(0)]),
+        ];
+        if known {
+            placed.extend(parent_pre);
+        }
         out.push((
             "room",
-            vec![
-                ("room".to_string(), rooms),
-                (format!("owner:{a}"), vec![Label::Int(OF_OWNER_ROOM)]),
-                (format!("class:{a}:{CLASS_UNTOUCHABLE}"), vec![Label::Int(0)]),
-            ],
+            placed,
             checks,
         ));
         let dom = self.domain(&format!("owner:{a}"));
@@ -996,6 +1169,66 @@ impl<'g> Builder<'g> {
     /// `Builder.b_values`: B for (verb, A).
     pub fn b_values(&mut self, a: i64, verb: i64, ns: &[i64]) -> Vec<i64> {
         let game = self.game;
+        let mut consts = self.b_consts(a, verb);
+        // FMI_READ_B_SWAP: A's entry re-issues the sentence with the objects swapped, so the player's B is each object
+        // whose own entry takes A as its B
+        if read_b_swap_switch() && self.forwards(a, verb) {
+            let others: Vec<i64> = self.scope.objects.iter().chain(&self.scope.held).copied().filter(|&o| o != a).collect();
+            for o in others {
+                if self.b_consts(o, verb).contains(&a) {
+                    consts.insert(o);
+                    self.counts.inc("FMI_READ_B_SWAP: B objects whose own sentence takes A as its B");
+                }
+            }
+        }
+        let mut handlers: BTreeSet<i64> = BTreeSet::new();
+        for &n in ns {
+            for v in self.b_verbs(n, verb) {
+                for &o in self.scope.objects.iter().chain(&self.scope.held) {
+                    if o != a && game.entry(o as i32, v as i32).is_some() && self.has_entry(o, v) {
+                        handlers.insert(o);
+                    }
+                }
+            }
+        }
+        if consts.is_empty() && handlers.is_empty() {
+            return vec![];
+        }
+        let inside: Vec<i64> =
+            consts.iter().copied().filter(|b| self.scope.objects.contains(b) || self.scope.held.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
+        self.counts.add("B constants outside the scope (not built)", (consts.len() - inside.len()) as i64);
+        let inside_set: BTreeSet<i64> = inside.iter().copied().collect();
+        self.counts.add("B objects whose own entry the sentence script starts", handlers.difference(&inside_set).count() as i64);
+        self.counts.add("B actors (reachability a replay check)", inside.iter().filter(|&&b| b < NUM_ACTORS).count() as i64);
+        let all: BTreeSet<i64> = consts.union(&handlers).copied().collect();
+        let other = self.scope.other_b(game, a, &all);
+        if other.is_some() {
+            self.counts.inc("B = other (a stand-in object)");
+        }
+        let mut out: Vec<i64> = inside_set.union(&handlers).copied().collect();
+        out.extend(other);
+        out
+    }
+
+    /// FMI_READ_B_SWAP: whether object `a`'s entry for `verb` begins by re-issuing the sentence with its objects
+    /// swapped, `doSentence(verb, Local[0], VAR_ME)` or with `a` itself as B (the dark room's ladder, the beads 933).
+    fn forwards(&self, a: i64, verb: i64) -> bool {
+        let game = self.game;
+        let ast = &game.ast;
+        let (Some(u), Some(idx)) = (game.id(UnitKey::Obj(a as i32)), game.entry(a as i32, verb as i32)) else { return false };
+        let Some(Stmt::Op { name: known::DO_SENTENCE, args, .. }) = game.ins(u).get(idx as usize).and_then(|x| x.st) else { return false };
+        let k = ast.kids(args);
+        let me = scumm_ir::vars::var_of("VAR_ME");
+        k.len() == 3
+            && ast.constant(k[0]) == Some(verb as i32)
+            && ast.expr(k[1]) == Expr::Local(0)
+            && (ast.constant(k[2]) == Some(a as i32) || matches!(ast.expr(k[2]), Expr::Var(v) if Some(v) == me))
+    }
+
+    /// The constants A's entry for `verb` compares its Local[0] with (and, with FMI_READ_B_ARGS, a started script its
+    /// argument): `b_values`' B constants.
+    fn b_consts(&self, a: i64, verb: i64) -> BTreeSet<i64> {
+        let game = self.game;
         let ast = &game.ast;
         let mut consts: BTreeSet<i64> = BTreeSet::new();
         let u = game.id(UnitKey::Obj(a as i32));
@@ -1003,6 +1236,7 @@ impl<'g> Builder<'g> {
         if let (Some(u), Some(idx)) = (u, idx) {
             let mut caps = 0;
             let ins = game.ins(u);
+            let room = game.object_room.get(&(a as i32)).copied();
             for i in domains::live(game, u, &domains::settings_env(), Some(&[idx]), &mut caps) {
                 if let Some(Stmt::Jump { cond: Some(c), .. }) = ins[i as usize].st {
                     if let Expr::Cmp { a: x, b: y, .. } = ast.expr(c) {
@@ -1015,34 +1249,46 @@ impl<'g> Builder<'g> {
                         }
                     }
                 }
-            }
-        }
-        let mut handlers: BTreeSet<i64> = BTreeSet::new();
-        for &n in ns {
-            for v in self.b_verbs(n, verb) {
-                for &o in &self.scope.objects {
-                    if o != a && game.entry(o as i32, v as i32).is_some() && self.has_entry(o, v) {
-                        handlers.insert(o);
+                // FMI_READ_B_ARGS: Local[0] passed on as a started script's argument j, compared there as its Local[j]
+                if read_b_args_switch() {
+                    if let Some(Stmt::Start { name, script, args, .. }) = ins[i as usize].st {
+                        if name == known::START_SCRIPT || name == known::CHAIN_SCRIPT {
+                            if let Some(n) = ast.constant(script) {
+                                for (j, &e) in ast.kids(args).iter().enumerate() {
+                                    if ast.expr(e) == Expr::Local(0) {
+                                        consts.extend(self.local_consts(n as i64, room, j as i32));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-        if consts.is_empty() && handlers.is_empty() {
-            return vec![];
+        consts
+    }
+
+    /// FMI_READ_B_ARGS: the constants script `n` (started from code of `room`) compares its Local[j] with.
+    fn local_consts(&self, n: i64, room: Option<i32>, j: i32) -> BTreeSet<i64> {
+        let game = self.game;
+        let ast = &game.ast;
+        let mut out = BTreeSet::new();
+        for key in game.started(n as i32, room) {
+            let Some(u) = game.id(key) else { continue };
+            for x in game.ins(u) {
+                if let Some(Stmt::Jump { cond: Some(c), .. }) = x.st {
+                    if let Expr::Cmp { a: l0, b: r0, .. } = ast.expr(c) {
+                        for (l, r) in [(l0, r0), (r0, l0)] {
+                            if ast.expr(l) == Expr::Local(j) {
+                                if let Some(v) = ast.constant(r) {
+                                    out.insert(v as i64);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-        let inside: Vec<i64> =
-            consts.iter().copied().filter(|b| self.scope.objects.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
-        self.counts.add("B constants outside the scope (not built)", (consts.len() - inside.len()) as i64);
-        let inside_set: BTreeSet<i64> = inside.iter().copied().collect();
-        self.counts.add("B objects whose own entry the sentence script starts", handlers.difference(&inside_set).count() as i64);
-        self.counts.add("B actors (reachability a replay check)", inside.iter().filter(|&&b| b < NUM_ACTORS).count() as i64);
-        let all: BTreeSet<i64> = consts.union(&handlers).copied().collect();
-        let other = self.scope.other_b(game, a, &all);
-        if other.is_some() {
-            self.counts.inc("B = other (a stand-in object)");
-        }
-        let mut out: Vec<i64> = inside_set.union(&handlers).copied().collect();
-        out.extend(other);
         out
     }
 
@@ -1174,7 +1420,7 @@ impl<'g> Builder<'g> {
     pub fn inputs(&mut self) -> Vec<Job> {
         let mut out = Vec::new();
         let ns = self.sentence_scripts();
-        let objects = self.scope.objects.clone();
+        let objects: Vec<i64> = self.scope.objects.iter().chain(&self.scope.held).chain(&self.scope.actors).copied().collect();
         let verbs = self.scope.verbs.clone();
         for &n in &ns {
             for (variant, ok, base_pins, base_pre) in self.sentence_base(n) {
@@ -1201,7 +1447,13 @@ impl<'g> Builder<'g> {
                                 continue;
                             }
                             let kind = if walk { "walk_to" } else { "sentence" };
-                            let mut bs: Vec<Option<i64>> = vec![None];
+                            // FMI_READ_B_SWAP: an entry that re-issues the sentence with B as A takes a B; alone it
+                            // re-issues (verb, 0, a), and the interface asks for B before any sentence
+                            let alone = walk || !(read_b_swap_switch() && self.forwards(a, verb));
+                            let mut bs: Vec<Option<i64>> = if alone { vec![None] } else { Vec::new() };
+                            if !alone {
+                                self.counts.inc("FMI_READ_B_SWAP: one-object sentences of an entry that re-issues them (not built)");
+                            }
                             if !walk {
                                 bs.extend(self.b_values(a, verb, &ns).into_iter().map(Some));
                             }
@@ -1223,24 +1475,35 @@ impl<'g> Builder<'g> {
                                 }
                                 match b {
                                     Some(b) => {
-                                        let (mut pb, mut prb) = (pins.clone(), pre.clone());
                                         let all = self.placements(b);
                                         let room: Vec<_> = all.iter().filter(|x| x.0 != "inventory").cloned().collect();
-                                        let pl = if room.is_empty() { all } else { room };
-                                        let okb = pl[0].1.iter().all(|(k, v)| self.pin(&mut pb, &mut prb, k, v));
-                                        if !okb {
-                                            continue;
+                                        // FMI_READ_INV_B: B's room placement and its inventory one, each an input
+                                        let pls = if read_inv_b_switch() {
+                                            let mut v: Vec<_> = room.iter().take(1).cloned().collect();
+                                            v.extend(all.iter().filter(|x| x.0 == "inventory").take(1).cloned());
+                                            if v.is_empty() { all.iter().take(1).cloned().collect() } else { v }
+                                        } else if room.is_empty() {
+                                            all.iter().take(1).cloned().collect::<Vec<_>>()
+                                        } else {
+                                            room.iter().take(1).cloned().collect()
+                                        };
+                                        for pl in pls {
+                                            let (mut pb, mut prb) = (pins.clone(), pre.clone());
+                                            let okb = pl.1.iter().all(|(k, v)| self.pin(&mut pb, &mut prb, k, v));
+                                            if !okb {
+                                                continue;
+                                            }
+                                            let mut ch = checks.clone();
+                                            ch.extend(pl.2.iter().cloned());
+                                            out.push(Job {
+                                                kind: kind.into(),
+                                                label: label.clone(),
+                                                pins: pb,
+                                                pre: prb,
+                                                what: What::Sentence { verb, a, b: Some(b) },
+                                                checks: ch,
+                                            });
                                         }
-                                        let mut ch = checks.clone();
-                                        ch.extend(pl[0].2.iter().cloned());
-                                        out.push(Job {
-                                            kind: kind.into(),
-                                            label,
-                                            pins: pb,
-                                            pre: prb,
-                                            what: What::Sentence { verb, a, b: Some(b) },
-                                            checks: ch,
-                                        });
                                     }
                                     None => out.push(Job {
                                         kind: kind.into(),
@@ -1615,33 +1878,49 @@ impl<'g> Builder<'g> {
         let facts0 = self.rd.counts.get(FORKS_ON_READ);
         let nonfacts0 = self.rd.counts.get(FORKS_ON_NONFACTS);
         let t_run = std::time::Instant::now();
-        let run = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
+        let mut run = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
         crate::par::trace_run(&job.label, t_run.elapsed().as_secs_f64(), &run);
         self.last_pins = pins.clone();
-        self.rd.update(&run.rd);
-        self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
+        self.book_run(&run);
         let facts = self.rd.counts.get(FORKS_ON_READ) - facts0;
         let nonfacts = self.rd.counts.get(FORKS_ON_NONFACTS) - nonfacts0;
-        if let Some(l) = &mut self.memo_log {
-            l.touched.extend(run.touched.iter().cloned());
-            l.queries.extend(run.queries.iter().cloned());
-            for p in &run.paths {
-                l.touched.extend(p.pre.keys().cloned());
-                l.touched.extend(p.writes.keys().cloned());
+        if run.limit != 0 && self.table.split_limit && read_widen_switch() {
+            // E014 (FMI_READ_WIDEN): the run again with its loops widened; ended under the limit, it is the run
+            let t_w = std::time::Instant::now();
+            m.set_widen(true);
+            let w = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
+            m.set_widen(false);
+            crate::par::trace_widen(&job.label, t_w.elapsed().as_secs_f64(), run.limit, &w);
+            self.book_run(&w);
+            if w.limit == 0 {
+                self.counts.inc("FMI_READ_WIDEN: runs past the path limit read whole with their loops widened");
+                run = w;
+            } else {
+                self.counts.inc("FMI_READ_WIDEN: runs past the path limit still past it with their loops widened (split as before)");
             }
         }
         if run.limit == 0 {
             self.reach_out.extend(run.held);
         }
         if self.table.split_limit {
-            if run.limit != 0 {
+            if run.limit != 0 && !(read_cut_switch() && !self.splits(&run.first_fork, pre)) {
                 return self.run_split(m, job, pins, pre, budget, run.first_fork.clone(), run.limit);
+            }
+            if run.limit != 0 {
+                // E014 (FMI_READ_CUT): no fact left to split on and no larger limit to read it with: the run is read
+                // short (mode 1: no record; mode `paths`: its finished paths make its records, and the paths the limit
+                // ended are dropped, DROP_ENDS), counted; the reading goes on
+                self.counts.inc("FMI_READ_CUT: runs past the path limit with no fact left to split on, read short");
             }
             // scumm-machine's step limit ends a path "limit" too; in a run the path limit cut nothing (limit 0)
             // every such end is the step limit's, and no split lifts it
             let n = run.paths.iter().filter(|p| p.end.as_deref() == Some("limit")).count();
-            if n != 0 && !self.table.havoc_cut {
+            if n != 0 && !self.table.havoc_cut && !read_cut_switch() {
                 panic!("split_limit: {} has {n} paths the step limit ended; the reading stops", job.label);
+            }
+            if n != 0 && !self.table.havoc_cut {
+                // E014 (FMI_READ_CUT=1): the paths the step limit ended are dropped, counted
+                self.counts.add("FMI_READ_CUT: paths the step limit ended, dropped", n as i64);
             }
         } else if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
             self.counts.inc("runs past the path limit not split (more forks on non-facts than on facts)");
@@ -1671,7 +1950,7 @@ impl<'g> Builder<'g> {
                     out.extend(self.run(m, job, p2, pre2, budget));
                 }
                 budget.1 -= 1;
-                return out;
+                return self.merge_records(out);
             }
             self.counts.inc("runs past the path limit not split (depth or budget used up, or no fork on a read)");
         }
@@ -1681,7 +1960,7 @@ impl<'g> Builder<'g> {
             self.ends.add(Py::Tuple(vec![Py::str(&job.kind), end_py(&p.end)]), 1);
             // the switch havoc_cut: a path the step limit ended (machine.rs hands it over with where it stood)
             let havoc = self.table.havoc_cut && p.cut.is_some();
-            if !havoc && (p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym) {
+            if !havoc && (p.end.as_deref().is_some_and(dropped_end) || !p.sym) {
                 let base = job.label.split('#').next().unwrap().split('@').next().unwrap();
                 let lab = format!("{base}{}", if job.label.contains('@') { ")" } else { "" });
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
@@ -1718,7 +1997,133 @@ impl<'g> Builder<'g> {
             }
             out.push(rec);
         }
+        self.merge_records(out)
+    }
+
+    /// `read_merge_switch`: a run's records less those that differ from another in one precondition key alone (joined
+    /// into one, the key's values united, the key dropped when they cover its domain) or whose precondition another
+    /// record with the same effects covers. Both are exact: the merged record applies in just the states the records
+    /// did. Records are compared on all else (the label, the effects, the checks, the end, the next events).
+    fn merge_records(&mut self, recs: Vec<Record>) -> Vec<Record> {
+        if !read_merge_switch() || recs.len() < 2 {
+            return recs;
+        }
+        let n0 = recs.len();
+        let rest = |r: &Record| {
+            let mut c = r.clone();
+            c.pre = Pre::new();
+            c.engine_pre = Vec::new();
+            format!("{c:?}")
+        };
+        let mut order: Vec<String> = Vec::new();
+        let mut groups: FxHashMap<String, Vec<Record>> = FxHashMap::default();
+        for r in recs {
+            let k = rest(&r);
+            if !groups.contains_key(&k) {
+                order.push(k.clone());
+            }
+            groups.entry(k).or_default().push(r);
+        }
+        let mut out = Vec::new();
+        for k in order {
+            let g = groups.remove(&k).unwrap();
+            out.extend(if g.len() < 2 { g } else { self.merge_group(g) });
+        }
+        if out.len() < n0 {
+            self.counts.add("FMI_READ_MERGE: records merged into others", (n0 - out.len()) as i64);
+        }
         out
+    }
+
+    /// `merge_records` on records equal but for their preconditions, to a fixed point.
+    fn merge_group(&mut self, mut rs: Vec<Record>) -> Vec<Record> {
+        loop {
+            let mut changed = false;
+            let keys: BTreeSet<String> = rs.iter().flat_map(|r| r.pre.keys().cloned()).collect();
+            for k in keys {
+                // the records holding k, by their precondition without it: each bucket is one record
+                let mut buckets: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+                for (i, r) in rs.iter().enumerate() {
+                    if r.pre.contains_key(&k) {
+                        let mut p = r.pre.clone();
+                        p.remove(&k);
+                        buckets.entry(format!("{p:?}")).or_default().push(i);
+                    }
+                }
+                let mut gone: FxHashSet<usize> = FxHashSet::default();
+                for idx in buckets.values().filter(|v| v.len() > 1) {
+                    let mut vals: Labels = idx.iter().flat_map(|&i| rs[i].pre[&k].iter().copied()).collect();
+                    vals.sort();
+                    vals.dedup();
+                    let all = self.domain(&k).is_some_and(|d| d.values.iter().all(|v| vals.contains(v)));
+                    let r0 = &mut rs[idx[0]];
+                    if all {
+                        r0.pre.remove(&k);
+                    } else {
+                        r0.pre.insert(k.clone(), vals);
+                    }
+                    gone.extend(idx[1..].iter().copied());
+                }
+                if !gone.is_empty() {
+                    changed = true;
+                    rs = rs.into_iter().enumerate().filter(|(i, _)| !gone.contains(i)).map(|(_, r)| r).collect();
+                }
+            }
+            // a record whose precondition a more general one's covers (that one's keys a subset, its values a superset)
+            let covers = |s: &Pre, r: &Pre| s.iter().all(|(k, sv)| r.get(k).is_some_and(|rv| rv.iter().all(|v| sv.contains(v))));
+            let mut gone: FxHashSet<usize> = FxHashSet::default();
+            for i in 0..rs.len() {
+                if gone.contains(&i) {
+                    continue;
+                }
+                for j in 0..rs.len() {
+                    if i != j && !gone.contains(&j) && covers(&rs[j].pre, &rs[i].pre) && (rs[j].pre != rs[i].pre || j < i) {
+                        gone.insert(i);
+                        break;
+                    }
+                }
+            }
+            if !gone.is_empty() {
+                changed = true;
+                rs = rs.into_iter().enumerate().filter(|(i, _)| !gone.contains(i)).map(|(_, r)| r).collect();
+            }
+            if !changed {
+                break;
+            }
+        }
+        for r in rs.iter_mut() {
+            let keep: Vec<String> = r.engine_pre.iter().filter(|k| r.pre.contains_key(*k)).cloned().collect();
+            r.engine_pre = keep;
+        }
+        rs
+    }
+
+    /// A run's counters and, for the job memo, what it touched and asked (`run`; FMI_READ_WIDEN books both runs).
+    fn book_run(&mut self, run: &RunOut) {
+        self.rd.update(&run.rd);
+        self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
+        if let Some(l) = &mut self.memo_log {
+            l.touched.extend(run.touched.iter().cloned());
+            l.queries.extend(run.queries.iter().cloned());
+            for p in &run.paths {
+                l.touched.extend(p.pre.keys().cloned());
+                l.touched.extend(p.writes.keys().cloned());
+            }
+        }
+    }
+
+    /// E014 (FMI_READ_CUT): whether `run_split` can lift a run past the path limit: its first fork on a read has two
+    /// or more values left, or grow_limit can read it whole with a larger limit.
+    fn splits(&self, first_fork: &Option<String>, pre: &Pre) -> bool {
+        let n = match first_fork {
+            Some(key) => match (self.domain(key), pre.get(key)) {
+                (Some(dom), Some(s)) => dom.values.iter().filter(|v| s.contains(v)).count(),
+                (Some(dom), None) => dom.values.len(),
+                (None, _) => 0,
+            },
+            None => 0,
+        };
+        n >= 2 || (self.table.grow_limit && self.path_limit_now.max(crate::machine::PATH_LIMIT) < GROW_MAX)
     }
 
     /// The switch split_limit: a run past the path limit is run again once per value of its first fork on a read
@@ -1795,7 +2200,7 @@ impl<'g> Builder<'g> {
             out.extend(self.run(m, job, p2, pre2, budget));
         }
         budget.1 -= 1;
-        out
+        self.merge_records(out)
     }
 
     /// `Builder.record`: the record of one path, or None when it changes nothing.
@@ -2279,6 +2684,7 @@ impl<'g> Builder<'g> {
         self.havoc_args_analysis();
         assert!(!self.switches.reach_pairs || self.switches.reach, "reach_pairs needs --reach");
         self.table.wait_both = self.switches.wait_both;
+        self.table.wait_queued = self.switches.wait_queued;
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");
@@ -2815,3 +3221,10 @@ enum EffOut {
     None,
 }
 
+
+/// E022 amendment (12): `FMI_READ_PARENTS=1`, a room object with a parent is placed only with each parent up its chain
+/// in the state findObject needs (`Builder` placements).
+pub fn read_parents_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_PARENTS").is_ok_and(|v| v == "1"))
+}

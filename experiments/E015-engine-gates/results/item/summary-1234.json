@@ -1,0 +1,205 @@
+{
+  "step1": {
+    "room": 63,
+    "load_frame": 1392,
+    "idle_frame": 1405,
+    "idle": "sentence",
+    "reason": "idle",
+    "rng": 1523492811,
+    "xstart": 88,
+    "seconds": 0.291127859
+  },
+  "step2": {
+    "trials": 95,
+    "nodes": 1,
+    "stopped": "goal",
+    "goals": 6,
+    "goal": {
+      "trial": 2,
+      "depth": 1,
+      "frame": 1533,
+      "room": 69,
+      "idle": "sentence",
+      "inputs": [
+        "v1t854"
+      ],
+      "path": [
+        [
+          1406,
+          2,
+          154
+        ],
+        [
+          1408,
+          91,
+          55
+        ]
+      ]
+    },
+    "rooms": [
+      [
+        49,
+        6
+      ],
+      [
+        63,
+        83
+      ],
+      [
+        69,
+        6
+      ]
+    ],
+    "by_depth": [
+      [
+        1,
+        95
+      ]
+    ],
+    "refused": 0,
+    "ended": 5,
+    "seconds": 0.802709067,
+    "ms_per_trial": 8.44956912631579,
+    "verify": {
+      "frame": 1533,
+      "got_frame": 1533,
+      "facts": 3848,
+      "facts_differ": 0,
+      "first": [],
+      "room": 69,
+      "room_same": true,
+      "digest_same": true,
+      "digest": "900dea283303f99a",
+      "differences": 0,
+      "seconds": 0.178087964
+    }
+  },
+  "step3_start": {
+    "frame": 1533,
+    "idle": "sentence",
+    "rng": 323603000,
+    "room": 69
+  },
+  "step3": {
+    "trials": 135,
+    "nodes": 1,
+    "stopped": "goal",
+    "goals": 1,
+    "goal": {
+      "trial": 33,
+      "depth": 1,
+      "frame": 1548,
+      "room": 69,
+      "idle": "sentence",
+      "inputs": [
+        "v11t946"
+      ],
+      "path": [
+        [
+          1534,
+          56,
+          161
+        ],
+        [
+          1536,
+          91,
+          59
+        ]
+      ]
+    },
+    "rooms": [
+      [
+        63,
+        6
+      ],
+      [
+        69,
+        129
+      ]
+    ],
+    "by_depth": [
+      [
+        1,
+        135
+      ]
+    ],
+    "refused": 0,
+    "ended": 8,
+    "seconds": 0.82769952,
+    "ms_per_trial": 6.131107555555555,
+    "owner_values": [
+      [
+        -1,
+        8
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        15,
+        126
+      ]
+    ]
+  },
+  "step4": {
+    "frame": 1548,
+    "got_frame": 1548,
+    "facts": 3850,
+    "facts_differ": 0,
+    "first": [],
+    "room": 69,
+    "room_same": true,
+    "digest_same": true,
+    "digest": "0babbc2cb2c1a1de",
+    "differences": 0,
+    "seconds": 0.204865027,
+    "movie": [
+      [
+        993,
+        4,
+        184
+      ],
+      [
+        1040,
+        5,
+        135
+      ],
+      [
+        1101,
+        5,
+        110
+      ],
+      [
+        1201,
+        30,
+        25
+      ],
+      [
+        1320,
+        4,
+        154
+      ],
+      [
+        1406,
+        2,
+        154
+      ],
+      [
+        1408,
+        91,
+        55
+      ],
+      [
+        1534,
+        56,
+        161
+      ],
+      [
+        1536,
+        91,
+        59
+      ]
+    ]
+  }
+}

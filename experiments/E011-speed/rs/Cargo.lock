@@ -104,6 +104,7 @@ dependencies = [
  "fmi-plan",
  "fmi-play",
  "fmi-reading",
+ "fmi-shorten",
  "scumm-ir",
  "serde_json",
 ]
@@ -116,12 +117,24 @@ dependencies = [
  "fmi-engine",
  "fmi-explore",
  "fmi-play",
+ "scumm-ir",
+ "scumm-machine",
  "serde_json",
 ]
 
 [[package]]
 name = "fmi-core"
 version = "0.1.0"
+
+[[package]]
+name = "fmi-direct"
+version = "0.1.0"
+dependencies = [
+ "fmi-core",
+ "fmi-engine",
+ "fmi-explore",
+ "serde_json",
+]
 
 [[package]]
 name = "fmi-engine"
@@ -156,6 +169,7 @@ name = "fmi-play"
 version = "0.1.0"
 dependencies = [
  "fmi-core",
+ "fmi-explore",
  "indexmap",
  "libc",
  "rustc-hash",
@@ -176,6 +190,17 @@ dependencies = [
  "serde_json",
  "sha1_smol",
  "sha2",
+]
+
+[[package]]
+name = "fmi-shorten"
+version = "0.1.0"
+dependencies = [
+ "fmi-core",
+ "fmi-explore",
+ "fmi-play",
+ "fmi-reading",
+ "serde_json",
 ]
 
 [[package]]

@@ -114,6 +114,8 @@ pub struct WaitOut {
     pub view_misses: Vec<(u64, String, Val, Val)>,
     /// wall seconds by part: the fork, the entry's dump, the frames, the stops' dumps, the quit
     pub parts: Vec<(&'static str, f64)>,
+    /// E014: the end's frame and tick when the run ended in the wait (the engine's end status)
+    pub end_at: Option<(u64, u64)>,
 }
 
 impl WaitOut {
@@ -340,6 +342,23 @@ impl Truths {
     }
 }
 
+thread_local! {
+    /// E019: inside an affordance step (`afford::try_all`), the trials' waits' floor in frames
+    static TRIAL_FLOOR: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// E019 (`FMI_TRIAL_WAIT_FLOOR=N`): the floor of a trial's wait (its idle frames), N frames where the entry's wait keeps
+/// E009's; the dues and the stops extend a wait as before. Kept states came within 164 frames of their offer in play8
+/// and play9 (play8's room-42 crossing ~390 frames after its click), against a floor of 1,600.
+pub fn trial_floor() -> Option<u64> {
+    std::env::var("FMI_TRIAL_WAIT_FLOOR").ok().and_then(|v| v.parse().ok()).filter(|&v: &u64| v > 0)
+}
+
+/// Sets (or clears) the floor of the waits run in this thread, for an affordance step's trials.
+pub fn set_trial_floor(f: Option<u64>) {
+    TRIAL_FLOOR.with(|c| c.set(f));
+}
+
 /// The observed keys of the atoms (unobserved prefixes left out: args:, saved:, actorroom:), sorted, once each.
 pub fn observed_keys(atoms: &[(Key, Vec<Val>)]) -> Vec<Key> {
     let unob = start::unobserved(true);
@@ -362,7 +381,7 @@ fn eng(e: EngineError) -> String {
 /// The wait from the engine `root` stands at (a fork of it, quit at the end), on T's atoms over the reading `rd`.
 pub fn wait(root: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], rd: &dyn ReadingSource, cfg: &WaitCfg) -> Result<WaitOut, String> {
     let t = Instant::now();
-    let mut b = machine::port(|| root.fork()).map_err(eng)?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("wait.rs:384"))).map_err(eng)?;
     let t_fork = t.elapsed().as_secs_f64();
     let r = wait_on(&mut b, atoms, rd.domains(), points_of(rd), cfg, t);
     let cpu = b.cpu_s();
@@ -390,7 +409,8 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
     let dues0 = dues_of(&o0);
     let mut horizon = dues0.iter().map(|d| d.1).max().unwrap_or(f0);
     let mut last_stop = f0;
-    let end_of = |horizon: u64, last_stop: u64| (f0 + cfg.idle_frames).max(horizon.max(last_stop) + cfg.w);
+    let floor = TRIAL_FLOOR.with(|c| c.get()).map(|f| f.min(cfg.idle_frames)).unwrap_or(cfg.idle_frames);
+    let end_of = |horizon: u64, last_stop: u64| (f0 + floor).max(horizon.max(last_stop) + cfg.w);
     let mut end_frame = end_of(horizon, last_stop);
     let cap = f0 + cfg.max_frames;
     let mut rule = IdleRule::new();
@@ -401,6 +421,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
     // (tick, var 19, frame) at the frame before: the next frame's tick advance is var 19 there, at least 1
     let mut prev = (o0.tick, o0.vars.get(VAR_TIMER_NEXT).copied().unwrap_or(0), f0);
     let mut end = None;
+    let mut end_at: Option<(u64, u64)> = None;
     let mut bad_frame: Option<String> = None;
     let mut view_points = if cfg.view_check { Some(tv.points.clone()) } else { None };
     let s_entry = t0.elapsed().as_secs_f64();
@@ -448,7 +469,10 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
                 !newly.is_empty()
             };
             let tw = Instant::now();
+            // E019: the wait stops only after a frame that changed an observed key (newly needs one)
+            b.set_watch(Some(keys.as_slice()));
             let r = machine::port(|| b.wait(target - cur, &mut each));
+            b.set_watch(None);
             s_frames += tw.elapsed().as_secs_f64();
             r
         };
@@ -484,6 +508,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
             }
             Err(EngineError::Ended(s)) => {
                 end = Some(WaitEnd::Ended(s.reason.clone()));
+                end_at = Some((s.frame, s.tick));
                 break;
             }
             Err(e) => return Err(eng(e)),
@@ -523,6 +548,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
         view_checked,
         view_misses,
         parts: vec![("entry", s_entry), ("frames", s_frames), ("stops", s_stops)],
+        end_at,
     })
 }
 

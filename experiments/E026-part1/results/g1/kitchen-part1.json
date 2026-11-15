@@ -1,0 +1,137 @@
+{
+ "archive": "/var/tmp/fast-mi/e012-archives/kitchen",
+ "entries": 151,
+ "files_read": 151,
+ "t0": 1793716921.7925365,
+ "t0_from": "the root's file",
+ "t0_time": "2026-11-03T14:42:01Z",
+ "furthest": "P1",
+ "furthest_in_order": "P1",
+ "rungs": [
+  {
+   "rung": "P0",
+   "what": "the root (first control)",
+   "reached": true,
+   "entry": 0,
+   "job": null,
+   "how": "boot",
+   "step": "boot",
+   "frame": 2728,
+   "room": 33,
+   "wall_s": 0.0,
+   "time": "2026-11-03T14:42:01Z",
+   "chain": [
+    0
+   ]
+  },
+  {
+   "rung": "P1",
+   "what": "owner:566=1 (kitchen)",
+   "reached": true,
+   "entry": 150,
+   "job": "j00052",
+   "how": "end",
+   "step": "planned",
+   "frame": 18416,
+   "room": 41,
+   "wall_s": 1294.0,
+   "time": "2026-11-03T15:03:35Z",
+   "chain": [
+    0,
+    44,
+    55,
+    85,
+    123,
+    135,
+    142,
+    146,
+    150
+   ]
+  },
+  {
+   "rung": "P2",
+   "what": "bit:72=1 (money)",
+   "reached": false
+  },
+  {
+   "rung": "P3",
+   "what": "bit:65=1 (map)",
+   "reached": false
+  },
+  {
+   "rung": "P4",
+   "what": "owner:396=owner:388=1, bit:98=1 (store)",
+   "reached": false
+  },
+  {
+   "rung": "P5",
+   "what": "bit:19=1 (sword training)",
+   "reached": false
+  },
+  {
+   "rung": "P6",
+   "what": "var:196>=1 (a trial)",
+   "reached": false
+  },
+  {
+   "rung": "P7",
+   "what": "var:196>=2 (two trials)",
+   "reached": false
+  },
+  {
+   "rung": "P8",
+   "what": "var:196>=3 (the trials)",
+   "reached": false
+  },
+  {
+   "rung": "P9",
+   "what": "bit:304=1 (crew phase)",
+   "reached": false
+  },
+  {
+   "rung": "P10",
+   "what": "bit:51=1 (ship)",
+   "reached": false
+  },
+  {
+   "rung": "P11",
+   "what": "at least 1 of bit:89, bit:88, bit:76 =1 (the crew)",
+   "reached": false
+  },
+  {
+   "rung": "P12",
+   "what": "at least 2 of bit:89, bit:88, bit:76 =1 (the crew)",
+   "reached": false
+  },
+  {
+   "rung": "P13",
+   "what": "at least 3 of bit:89, bit:88, bit:76 =1 (the crew)",
+   "reached": false
+  },
+  {
+   "rung": "P14",
+   "what": "owner:901=owner:902=owner:903=1 (end)",
+   "reached": false
+  }
+ ],
+ "score": {
+  "rungs": 2,
+  "of": 15,
+  "entry": 150,
+  "held": [
+   "P0",
+   "P1"
+  ],
+  "chain": [
+   0,
+   44,
+   55,
+   85,
+   123,
+   135,
+   142,
+   146,
+   150
+  ]
+ }
+}

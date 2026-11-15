@@ -55,6 +55,17 @@ pub const NUM_LOCALS: i32 = 25;
 pub const SETTINGS: [(i32, i64); 1] = [(39, 0)];
 
 pub fn engine_why(n: i32) -> Option<&'static str> {
+    engine_why_with(n, crate::builder::read_sound_switch())
+}
+
+/// VAR_SOUNDRESULT (vars.cpp, SCUMM v5): the sound engine's answer to a sound command
+pub const VAR_SOUNDRESULT: i32 = 56;
+
+/// `engine_why` with E014 amendment (8)'s FMI_READ_SOUND given: on, VAR_SOUNDRESULT is written by the engine too.
+pub fn engine_why_with(n: i32, sound: bool) -> Option<&'static str> {
+    if sound && n == VAR_SOUNDRESULT {
+        return Some("VAR_SOUNDRESULT: sound.cpp processSoundQueues, the sound engine's answer to a soundKludge command");
+    }
     ENGINE.iter().find(|e| e.0 == n).map(|e| e.1)
 }
 
@@ -496,7 +507,7 @@ fn bump(c: &mut Vec<(String, i64)>, k: String) {
 
 /// The room numbers of the game data (index.json's "rooms"), for domains.py's widened `room`.
 pub fn meta_rooms(root: &std::path::Path) -> Vec<i32> {
-    let p = root.join("data").join("scripts-dos-cd").join("index.json");
+    let p = scumm_ir::game_index(root); // E014: FMI_GAME_SCRIPTS's index when set
     let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&p).expect("index.json")).expect("index.json");
     let mut out: Vec<i32> = v["rooms"].as_object().expect("rooms").keys().map(|k| k.parse().expect("room")).collect();
     out.sort_unstable();

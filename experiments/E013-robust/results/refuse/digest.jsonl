@@ -1,0 +1,6 @@
+{"entry":0,"frame":2728,"same_as_replay":true,"same_as_quiet_fork":true,"idle_frames":200,"distinct":200,"equal_consecutive":0,"ms_per_digest":0.20943204999999998,"s_per_frame_with_digest":0.000249741715,"bytes":67111,"ok":true}
+{"entry":30,"frame":2850,"same_as_replay":true,"same_as_quiet_fork":true,"idle_frames":200,"distinct":200,"equal_consecutive":0,"ms_per_digest":0.21193264,"s_per_frame_with_digest":0.00034991719999999995,"bytes":67106,"ok":true}
+{"entry":60,"frame":10199,"same_as_replay":true,"same_as_quiet_fork":true,"idle_frames":200,"distinct":200,"equal_consecutive":0,"ms_per_digest":0.23281943,"s_per_frame_with_digest":0.00039829054500000003,"bytes":67229,"ok":true}
+{"entry":90,"frame":17490,"same_as_replay":true,"same_as_quiet_fork":true,"idle_frames":200,"distinct":200,"equal_consecutive":0,"ms_per_digest":0.18042033,"s_per_frame_with_digest":0.00022310467000000002,"bytes":67185,"ok":true}
+{"entry":120,"frame":11292,"same_as_replay":true,"same_as_quiet_fork":true,"idle_frames":200,"distinct":200,"equal_consecutive":0,"ms_per_digest":0.19785392,"s_per_frame_with_digest":0.00028710533499999997,"bytes":67174,"ok":true}
+{"entry":150,"frame":18416,"same_as_replay":true,"same_as_quiet_fork":true,"idle_frames":200,"distinct":200,"equal_consecutive":0,"ms_per_digest":0.27413664,"s_per_frame_with_digest":0.00037931114,"bytes":67430,"ok":true}

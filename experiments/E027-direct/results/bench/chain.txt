@@ -1,0 +1,19 @@
+E027 bench, 2026-11-13: --stall M and --until K=V in the search, and run/chain.py (chain.sh) driving legs of it.
+--stall M ends a run when its highest level was not raised for M minutes; --until ends it when a watched value is
+first held. The driver begins each leg at the top stop of the leg before (top.jsonl), with its ways (edges.jsonl)
+and the flags seen unset (toggles.txt, merged), until the end value is held, H hours pass, or three legs in a row
+win no object. Old: tree 2e08e67 (binary walk1).
+
+From part3f's stop 955 (owner:788), 4 threads, --stall 6: leg 00 held owner:823 at 85.6 s, room 83 at 165.6 s,
+owner:733 at 265.3 s and bit:565 = 1 at 265.3 s; UNTIL ended the leg and the chain (0.07 h, 65 stops, 44,606
+trials).
+From the boot, 3 threads, --stall 1.5 (a test of the legs' seams): leg 00 ended at 92.2 s (STALL), leg 01 began at
+its top stop 210 (room 57) and ended at 90.4 s, leg 02 at leg 01's stop 251; the chain ended there (then: two legs
+in a row that won nothing; three since).
+
+Neither option given (binary chain1), five stops from each reference (default flags): as the old tree
+p7top       4843   104  9cba4c7715
+cake        8306   124  a91ca2c9eb
+crew        3212   271  cb39ef7d95
+meathook    7919    51  a4cee03988
+boot        1549    40  6213300783

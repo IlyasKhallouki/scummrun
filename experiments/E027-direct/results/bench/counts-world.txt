@@ -1,0 +1,25 @@
+E027 bench, 2026-11-13: --counts-world and --runs-on, behind flags (off: as before). Old: tree 3cdf92a (binary
+ends1).
+  --counts-world (with --go)  the counts of Mentions::vars (added to or taken from in the scripts of 3 rooms at
+                              most, read by a room's own scripts: 24 in Monkey Island, 6 of them not in the
+                              guide) are of the world beside the guide's variables
+  --runs-on                   a trial's stop where a script runs that the twin does not run at that frame (and
+                              not the scripts that take the clicks) is read again PROBE frames on
+
+From part3e's stop 3737 (room 73), one stop expanded:
+old tree, both off   2,169 trials, 35 kept; var:237 at no stop (in no guide; written 20 frames after the
+                     sentence's stop)
+--runs-on alone      2,185 trials, 36 kept; var:237 at no stop (not of the world)
+both                 2,188 trials, 38 kept; the counting takes the sentence as its input for var:237:
+                     var:237 = 1 and 2, state:802 = 1 in the same expansion
+part3f (both, with the flags of part3e, from that stop): state:802 = 1 at 21.6 s, owner:802 at 31.0 s,
+owner:815 at 482.6 s; part3e had none of them in 3,800 s after its last gain.
+
+Both off (binary runs2), five stops from each reference (default flags): as the old tree
+p7top       4843   104  9cba4c7715
+cake        8306   124  a91ca2c9eb
+crew        3212   271  cb39ef7d95
+meathook    7919    51  a4cee03988
+boot        1549    40  6213300783
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).
+Not run with the flags on: the references, the demo.

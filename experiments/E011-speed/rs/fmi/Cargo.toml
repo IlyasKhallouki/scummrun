@@ -16,5 +16,6 @@ fmi-engine = { path = "../fmi-engine" }
 fmi-reading = { path = "../fmi-reading" }
 fmi-plan = { path = "../fmi-plan" }
 fmi-play = { path = "../fmi-play" }
+fmi-shorten = { path = "../fmi-shorten" }
 scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }

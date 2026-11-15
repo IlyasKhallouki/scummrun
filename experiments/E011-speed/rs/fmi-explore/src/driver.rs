@@ -71,6 +71,25 @@ pub trait Verifier {
     fn verify(&self, a: &Archive, entry: usize) -> Res<Value>;
 }
 
+/// E024 item 3 (experiments/E024-shorten/plan.md, Part 2), `FMI_SHORTEN=1`: once a goal entry exists the run's last
+/// stage shortens its route, the goal entry's movie from boot with the archive (fmi-shorten, `fmi shorten run`). The
+/// stage depends on this crate, so the binary that links it sets it here (`set_shortener`). Unset: as before.
+pub trait Shortener: Send + Sync {
+    /// The stage on the archive at `root` and the movie `movie` (its events as the archive holds them): its summary.
+    fn shorten(&self, root: &Path, movie: &[Value]) -> Res<Value>;
+}
+
+static SHORTENER: std::sync::OnceLock<Box<dyn Shortener>> = std::sync::OnceLock::new();
+
+pub fn shorten_on() -> bool {
+    std::env::var("FMI_SHORTEN").is_ok_and(|v| v == "1")
+}
+
+/// The shorten stage this binary links (the first set is kept).
+pub fn set_shortener(s: Box<dyn Shortener>) {
+    let _ = SHORTENER.set(s);
+}
+
 struct Thread {
     handle: Option<JoinHandle<(i32, f64)>>,
     cancel: Arc<AtomicBool>,
@@ -487,23 +506,47 @@ fn count_kills(a: &Archive) -> HashMap<String, i64> {
 #[derive(Clone, Debug, Default)]
 pub struct DriverStats {
     pub jobs: usize,
+    /// E019: the jobs committed as the same as an earlier one, not run
+    pub same: usize,
     /// wall seconds spent in the driver's own work (selection, job.json, ingest, the files), polls not counted
     pub own_s: f64,
     pub own_by_job: Vec<f64>,
 }
 
+/// E014 amendment (8): `FMI_STOP_WALL=S`, the run's wall limit in seconds of this driver's wall. Once it is reached no
+/// try starts; the running tries finish and are committed; the stop is "wall limit". Unset (or not a number): no limit.
+pub fn stop_wall_s() -> Option<f64> {
+    std::env::var("FMI_STOP_WALL").ok().and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| *v >= 0.0)
+}
+
+/// E016 (plan.md "Stop rule"): `FMI_STOP_FILE=PATH`, a stop asked from outside the run (the ladder's watcher, after 40
+/// minutes of wall with no new rung). Once the file exists no try starts; the running tries finish and are committed;
+/// the stop is "stop file", its detail the file's first line. Unset: no such stop.
+pub fn stop_file() -> Option<PathBuf> {
+    std::env::var("FMI_STOP_FILE").ok().filter(|v| !v.trim().is_empty()).map(PathBuf::from)
+}
+
 /// The job loop (explore.py `run`): until a stop rule fires. Returns summary.json's contents.
 pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn Verifier>, stats: &mut DriverStats) -> Res<Value> {
     let mut a = Archive::open(root)?;
+    // E022 amendment (15) (`FMI_FRONTIER_FRESH=1`): the atom frontier counts this driver's tries only
+    if std::env::var("FMI_FRONTIER_FRESH").is_ok_and(|v| v == "1") {
+        a.fresh_from = Some(a.next_job());
+    }
     if a.root.join("summary.json").exists() {
         let s = read_json(&a.root.join("summary.json"))?;
         say(&format!("{}: stopped already ({}); summary.json", a.root.display(), files::py_str(s.get("stop"))));
         return Ok(s);
     }
+    // E013 (component free): FMI_FREE's share, the progress order and stall's port, checked before any job
+    crate::free::check_env(&a)?;
     let m = Machine::from_env();
     a.stage["workers"] = json!(workers);
     a.stage["env"] = plan_env();
     write_json(&a.root.join("stage.json"), &a.stage, Some(1))?;
+    // E013 (FMI_STALLS=1): the stall table from the archive's files, then one try more after each commit, stalls.json
+    // and its line each time (stall.rs; free's port keeps its own, stall::ArchivePort)
+    let mut stalls = if crate::stall::on() { Some(crate::stall::Live::open(&a)?) } else { None };
     let free = || machine::disk_free(&m.disk_path);
     for name in a.job_names() {
         // a dir the driver made but did not finish writing: its selection is made again
@@ -530,6 +573,10 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
     let (mut stop, mut detail, mut stopping): (Option<String>, Value, bool) = (None, Value::Null, false);
     let stop_jobs = files::as_i64(a.e009.get("stop_jobs")).unwrap_or(0);
     let mut bound = false;
+    let (wall0, stop_wall) = (Instant::now(), stop_wall_s());
+    let mut walled = false;
+    let stop_f = stop_file();
+    let mut asked = false;
     let commit_finished = files::truthy(a.e010.get("commit_finished"));
     let in_process = matches!(mode, StepMode::InProcess(_));
     let mut woken = 0u64;
@@ -608,7 +655,13 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 line["new_entries"].as_array().map(|x| x.len()).unwrap_or(0), line["new_cells"],
                 line["new_r"].as_array().map(|x| x.len()).unwrap_or(0), a.rows.len(), a.cells.len()
             ));
-            if line["outcome"] == "return differs" {
+            if let Some(s) = stalls.as_mut() {
+                s.commit(&a, &line)?;
+                say(&s.stalls.line());
+            }
+            if line["outcome"] == "return differs" && crate::archive::differs_dead_on() {
+                say(&format!("{}: entry {} is dead (its return differs); the run goes on", j.name, j.entry));
+            } else if line["outcome"] == "return differs" {
                 stop = Some("return differs".into());
                 detail = json!({"job": j.name, "entry": j.entry, "return": line["return"]});
                 for k in running.iter_mut() {
@@ -665,6 +718,14 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                     bound = true;
                     break;
                 }
+                if stop_wall.is_some_and(|w| wall0.elapsed().as_secs_f64() >= w) {
+                    walled = true;
+                    break;
+                }
+                if stop_f.as_ref().is_some_and(|p| p.exists()) {
+                    asked = true;
+                    break;
+                }
                 if free() < m.floor_gb * GIB {
                     floor = true;
                     break;
@@ -672,18 +733,31 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 if !can_start(&running, &restart) {
                     break;
                 }
-                let ids = a.select(1);
-                if ids.is_empty() {
-                    break;
-                }
-                let d = a.prepare_job(ids[0])?;
+                // E013 (FMI_FREE, component free): the job's kind and its entry; unset, E012's selection
+                let Some((id, kind)) = crate::free::pick(&a)? else { break };
+                let d = a.prepare_job_as(id, kind.as_ref())?;
                 let name = d.file_name().unwrap().to_string_lossy().into_owned();
+                if crate::archive::skip_same_on() {
+                    // E019: a try whose job.json repeats a committed one's would repeat its result exactly: committed
+                    // as that result with no new entries and no time, not run
+                    if let Some(prev) = a.same_job(&d)? {
+                        a.write_same_result(&d, &prev)?;
+                        let line = a.ingest(&d, None)?;
+                        say(&format!("{name}: entry {id} same as {prev}; not run ({})", line["outcome"].as_str().unwrap_or("")));
+                        if let Some(s) = stalls.as_mut() {
+                            s.commit(&a, &line)?;
+                        }
+                        stats.same += 1;
+                        continue;
+                    }
+                }
                 let mut j = Job::new(&a, &name)?;
                 a.busy.insert(name.clone(), (j.entry, j.cell.clone()));
                 j.start(&a, mode, &m)?;
-                say(&format!("{}: entry {} (room {}), scope {:?}, key {}", j.name, j.entry,
+                say(&format!("{}: entry {} (room {}), scope {:?}, key {}{}", j.name, j.entry,
                              a.rows[j.entry].room.map(|r| r.to_string()).unwrap_or("None".into()), j.scope,
-                             pyjson::compact(&read_json(&d.join("select.json"))?["key"])));
+                             pyjson::compact(&read_json(&d.join("select.json"))?["key"]),
+                             kind.map(|k| format!(", {} ({})", k.text(), k.why)).unwrap_or_default()));
                 running.push(j);
                 stats.jobs += 1;
             }
@@ -692,6 +766,18 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
             if stop.is_none() && bound && a.goal_entries().is_empty() {
                 stop = Some("prediction bound".into());
                 detail = json!({"jobs": a.job_names().len(), "stop_jobs": stop_jobs});
+            }
+            if stop.is_none() && walled && a.goal_entries().is_empty() {
+                stop = Some("wall limit".into());
+                detail = json!({"wall_s": pyjson::round(wall0.elapsed().as_secs_f64(), 1), "stop_wall_s": stop_wall,
+                                "jobs": a.job_names().len()});
+            }
+            if stop.is_none() && asked && a.goal_entries().is_empty() {
+                let p = stop_f.as_ref().unwrap();
+                let why = fs::read_to_string(p).ok().and_then(|t| t.lines().next().map(|l| l.to_string())).unwrap_or_default();
+                stop = Some("stop file".into());
+                detail = json!({"wall_s": pyjson::round(wall0.elapsed().as_secs_f64(), 1), "file": p.to_string_lossy(),
+                                "why": why, "jobs": a.job_names().len()});
             }
             if stop.is_none() {
                 if a.select(1).is_empty() {
@@ -734,6 +820,17 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 summary["verify"] = Value::Object(s);
             }
             None => summary["verify"] = Value::Null,
+        }
+        // E024 item 3 (FMI_SHORTEN=1): the shorten stage on the goal entry's movie, its summary in summary.json
+        if shorten_on() {
+            let e = detail["entry"].as_u64().unwrap_or(0) as usize;
+            summary["shorten"] = match SHORTENER.get() {
+                Some(s) => {
+                    say(&format!("goal entry {e}: the shorten stage (E024)"));
+                    a.movie(e).and_then(|m| s.shorten(&a.root, &m)).unwrap_or_else(|x| json!({"error": x}))
+                }
+                None => json!({"error": "no shorten stage in this binary"}),
+            };
         }
     }
     write_json(&a.root.join("summary.json"), &summary, Some(1))?;

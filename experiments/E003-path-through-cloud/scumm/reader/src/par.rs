@@ -116,6 +116,8 @@ struct Shared {
     max_waiting: AtomicU64,
     /// the job the reading waits for (the first not handed on)
     frontier: AtomicU64,
+    /// E026 C2: the reading's stop flag (`Pool::set_abort`), which each worker's machine looks at as it runs a job
+    stop: std::sync::OnceLock<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// What the pool did: for the measurements.
@@ -178,15 +180,17 @@ impl<'a, 'g> Pool<'a, 'g> {
     }
 
     /// The flag that stops the reading: the reading's thread looks at it while it waits for the workers (at least
-    /// every 100 ms) and stops by a panic when it is set. It changes nothing a reading that is not stopped writes.
+    /// every 100 ms) and stops by a panic when it is set; E026 C2: each machine, the workers' and this thread's, looks
+    /// at it every `STOP_LOOK` steps and ends its job by an unwind, so the workers end with the reading. It changes
+    /// nothing a reading that is not stopped writes.
     pub fn set_abort(&mut self, abort: Arc<std::sync::atomic::AtomicBool>) {
+        self.main.m.stop = Some(abort.clone());
+        let _ = self.sh.stop.set(abort.clone());
         self.abort = Some(abort);
     }
 
-    fn check_abort(&self) {
-        if self.abort.as_ref().is_some_and(|a| a.load(Ordering::Relaxed)) {
-            panic!("the reading was stopped");
-        }
+    fn stopped(&self) -> bool {
+        self.abort.as_ref().is_some_and(|a| a.load(Ordering::Relaxed))
     }
 
     fn estimate(&self, job: &Job) -> f64 {
@@ -242,6 +246,10 @@ impl Machine for Pool<'_, '_> {
         self.main.set_path_limit(n)
     }
 
+    fn set_widen(&mut self, on: bool) {
+        self.main.set_widen(on)
+    }
+
     fn run_batch(&mut self, b: &mut Builder<'_>, jobs: &Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
         if self.threads == 0 {
             return false;
@@ -293,7 +301,15 @@ impl Machine for Pool<'_, '_> {
             let ready: Vec<JobOut> = {
                 let mut q = self.sh.q.lock().unwrap();
                 loop {
-                    if let Some(f) = &q.failed {
+                    // E026 C2: a stop first (a worker the stop ended has failed with it)
+                    if self.stopped() {
+                        drop(q);
+                        panic!("the reading was stopped");
+                    }
+                    // a stop lets go of the queue's lock first, so that the pool's shutdown (`with_pool`) takes it
+                    // and the idle workers end (E014 amendment (5)); held, the lock was poisoned and they waited on
+                    if let Some(f) = q.failed.clone() {
+                        drop(q);
                         panic!("a worker failed: {f}");
                     }
                     let mut ready = Vec::new();
@@ -307,7 +323,6 @@ impl Machine for Pool<'_, '_> {
                         break ready;
                     }
                     if self.abort.is_some() {
-                        self.check_abort();
                         q = self.sh.done.wait_timeout(q, std::time::Duration::from_millis(100)).unwrap().0;
                     } else {
                         q = self.sh.done.wait(q).unwrap();
@@ -402,6 +417,10 @@ impl Machine for WorkerMachine<'_, '_> {
 
     fn set_path_limit(&mut self, n: usize) {
         Machine::set_path_limit(self.rd, n)
+    }
+
+    fn set_widen(&mut self, on: bool) {
+        Machine::set_widen(self.rd, on)
     }
 
     fn prefetch(&mut self, cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
@@ -505,6 +524,14 @@ pub(crate) fn trace_shared(label: &str, why: &str) {
     }
 }
 
+/// E014 (FMI_READ_WIDEN): a run past the path limit run again with its loops widened.
+pub(crate) fn trace_widen(label: &str, secs: f64, cut: i64, run: &crate::builder::RunOut) {
+    if trace_on() {
+        let widened = run.paths.iter().filter(|p| p.end.as_deref() == Some("widened")).count();
+        eprintln!("widen {label}: {cut} paths cut before; widened: {secs:.2} s, {} paths, {} cut, {widened} ends widened", run.paths.len(), run.limit);
+    }
+}
+
 pub(crate) fn trace_grow(label: &str, depth: usize, limit: usize, cut: i64) {
     if trace_on() {
         eprintln!("grow {label} depth {depth}: read again with the path limit at {limit} ({cut} paths cut)");
@@ -552,6 +579,10 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                 q = sh.work.wait(q).unwrap();
             }
         };
+        // E026 C2: the machine looks at the reading's stop flag as it runs (set once the reading's thread has it)
+        if rd.m.stop.is_none() {
+            rd.m.stop = sh.stop.get().cloned();
+        }
         let r = panic::catch_unwind(AssertUnwindSafe(|| match task {
             Task::Part(p) => {
                 if p.claim() {
@@ -584,7 +615,15 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                     eprintln!("start {} {:.1}", jobs[i].label, TRACE_T0.get_or_init(Instant::now).elapsed().as_secs_f64());
                 }
                 let mut m = WorkerMachine { rd: &mut rd, sh, snap: &snap, parts: Vec::new() };
+                let t_job = std::time::Instant::now();
                 let records = b.run_job(&mut m, &jobs[i]);
+                // FMI_READ_SLOW_DEBUG=S: a job that took more than S seconds, its label and records
+                if let Some(s) = std::env::var("FMI_READ_SLOW_DEBUG").ok().and_then(|v| v.parse::<f64>().ok()) {
+                    let dt = t_job.elapsed().as_secs_f64();
+                    if dt > s {
+                        eprintln!("[slow] {dt:.1} s {} {} ({} records)", jobs[i].kind, jobs[i].label, records.len());
+                    }
+                }
                 trace_job(&jobs[i].label, t.elapsed().as_secs_f64(), records.len());
                 // the switch --prep: what the reading's thread and the sink work out of the records, worked out here
                 let mut records = records;
@@ -641,6 +680,7 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
         buffered: AtomicU64::new(0),
         max_waiting: AtomicU64::new(DEFAULT_MAX_WAITING),
         frontier: AtomicU64::new(0),
+        stop: std::sync::OnceLock::new(),
     };
     std::thread::scope(|s| {
         for w in 0..threads {
@@ -664,7 +704,7 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
         };
         let r = panic::catch_unwind(AssertUnwindSafe(|| f(&mut pool)));
         {
-            let mut q = sh.q.lock().unwrap();
+            let mut q = sh.q.lock().unwrap_or_else(|e| e.into_inner());
             q.shutdown = true;
         }
         sh.work.notify_all();

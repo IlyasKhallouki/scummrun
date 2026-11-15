@@ -1,0 +1,70 @@
+{
+ "archive": "/var/tmp/fast-mi/e014-archives/play8",
+ "entries": 628,
+ "files_read": 628,
+ "t0": 1793787948.8520901,
+ "t0_from": "the root's file",
+ "t0_time": "2026-11-04T10:25:48Z",
+ "furthest": "C0",
+ "furthest_in_order": "C0",
+ "rungs": [
+  {
+   "rung": "C0",
+   "what": "room=49 and var:32=4",
+   "reached": true,
+   "entry": 3,
+   "job": "j00000",
+   "how": "end",
+   "step": "planned",
+   "frame": 1043,
+   "room": 49,
+   "wall_s": 127.6,
+   "time": "2026-11-04T10:27:56Z"
+  },
+  {
+   "rung": "C1",
+   "what": "room=63",
+   "reached": false
+  },
+  {
+   "rung": "C2",
+   "what": "room=69",
+   "reached": false
+  },
+  {
+   "rung": "C3",
+   "what": "owner:946=ego",
+   "reached": false
+  },
+  {
+   "rung": "C4",
+   "what": "room=49 and owner:946=ego",
+   "reached": false
+  },
+  {
+   "rung": "C5",
+   "what": "room=42 and owner:946=ego",
+   "reached": false
+  },
+  {
+   "rung": "C6",
+   "what": "class:491:12=0 (a full state)",
+   "reached": false
+  },
+  {
+   "rung": "C7",
+   "what": "room=82",
+   "reached": false
+  },
+  {
+   "rung": "C8",
+   "what": "room=48",
+   "reached": false
+  },
+  {
+   "rung": "C9",
+   "what": "end=1, end:kind=1, end:number=582, end:offset=0x67, end:where in {0,1,4}",
+   "reached": false
+  }
+ ]
+}

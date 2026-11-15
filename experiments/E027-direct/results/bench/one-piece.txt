@@ -1,0 +1,5 @@
+meathook  stops   5 trials    7939 kept   181 digest ad605c5c0a | wall   53.1 s explore   39.0 commit  11.3 engines  0.1 | trial s: fork   10.8 run   17.0 read   2.0 inputs   0.7 quit  0.1
+crew      stops   5 trials    3745 kept   320 digest 6ac1558525 | wall   42.6 s explore   25.4 commit  14.8 engines  0.3 | trial s: fork    4.7 run   12.7 read   0.7 inputs   0.2 quit  0.0
+p7top     stops   5 trials    6319 kept   295 digest 22cb96de58 | wall   44.3 s explore   29.4 commit  13.2 engines  0.2 | trial s: fork    7.1 run   14.9 read   1.4 inputs   0.4 quit  0.1
+cake      stops   5 trials   11001 kept   392 digest 2ce5761faa | wall   78.0 s explore   55.5 commit  20.6 engines  0.2 | trial s: fork   14.8 run   29.2 read   2.7 inputs   0.9 quit  0.1
+boot      stops   5 trials    1461 kept    46 digest e94400041b | wall    7.5 s explore    7.0 commit   0.1 engines  0.2 | trial s: fork    1.6 run    3.6 read   0.3 inputs   0.1 quit  0.0

@@ -1,0 +1,107 @@
+{
+  "local": 212,
+  "literal_starts": [
+    {
+      "at": "room-048/obj-0587",
+      "offset": "0053",
+      "op": "chainScript"
+    },
+    {
+      "at": "room-049/local-200",
+      "offset": "00EC",
+      "op": "startScript"
+    },
+    {
+      "at": "room-069/obj-0946",
+      "offset": "0091",
+      "op": "startScript"
+    }
+  ],
+  "indirect_starts": [
+    {
+      "at": "global/script-002",
+      "offset": "0107",
+      "op": "startScript",
+      "arg": "Var[163]"
+    },
+    {
+      "at": "global/script-004",
+      "offset": "0222",
+      "op": "startScript",
+      "arg": "Var[164]"
+    },
+    {
+      "at": "global/script-004",
+      "offset": "0288",
+      "op": "startScript",
+      "arg": "Var[180]"
+    },
+    {
+      "at": "global/script-004",
+      "offset": "03B6",
+      "op": "startScript",
+      "arg": "Var[125]"
+    },
+    {
+      "at": "global/script-072",
+      "offset": "021C",
+      "op": "chainScript",
+      "arg": "Local[4]"
+    },
+    {
+      "at": "global/script-094",
+      "offset": "0052",
+      "op": "startScript",
+      "arg": "Local[2]"
+    }
+  ],
+  "indirect_var_assigns": {
+    "Var[163]": [
+      {
+        "at": "global/script-001",
+        "offset": "04A5",
+        "value": "11"
+      },
+      {
+        "at": "room-049/local-200",
+        "offset": "013E",
+        "value": "217"
+      }
+    ],
+    "Var[164]": [
+      {
+        "at": "global/script-023",
+        "offset": "0005",
+        "value": "0"
+      },
+      {
+        "at": "room-042/entry",
+        "offset": "0009",
+        "value": "203"
+      },
+      {
+        "at": "room-049/entry",
+        "offset": "0075",
+        "value": "204"
+      }
+    ],
+    "Var[180]": [
+      {
+        "at": "global/script-023",
+        "offset": "000A",
+        "value": "161"
+      }
+    ]
+  },
+  "class_obj": 491,
+  "class": 12,
+  "class_clears": [
+    {
+      "at": "room-042/local-212",
+      "offset": "0000",
+      "classes": [
+        12
+      ]
+    }
+  ]
+}

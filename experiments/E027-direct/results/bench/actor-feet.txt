@@ -1,0 +1,29 @@
+E027 bench, 2026-11-13: an actor's point is tried at its feet too. The offer takes an actor's point where the hit
+test answers that actor, at 20, 30, 10 and 40 pixels over its feet (M4's order); now after those at 5, 2, 1 and 0
+pixels. An actor drawn a few pixels tall had no point and was no target. Old: tree 94997da (binary aim3).
+
+From part3b's stop 291 (room 2), the offer:
+old tree    3 actors on the screen, 5 targets (the 5 objects that can be touched)
+this tree   7 targets: actor 1 at 2 pixels over its feet and actor 2 at 0 with them; the click on actor 2 comes to
+            a stop in room 21 at +56 frames
+In part3b (old tree, 3 h, 1,852 stops) 145 stops of room 2 were expanded, none with an actor among its targets,
+and room 21 was never entered. part3c (this tree, from part3b's stop 787): room 21 at the 8th stop, 38.8 s.
+
+Five stops from each reference (default flags):  trials  kept  digest       (old: trials, digest)
+p7top       4843   104  9cba4c7715   (4791, 5a020cf174)
+cake        8306   124  a91ca2c9eb   (8213, the same)
+crew        3212   271  cb39ef7d95   (3210, the same)
+meathook    7919    51  a4cee03988   (7631, the same)
+boot        1549    40  6213300783   (1549, the same)
+More trials where an actor is a target now that was none: room 215's first stop of p7top has 6 targets (5), room
+85's stops of crew 11 (10), three of meathook's stops in room 48 have 6 (5). p7top's digest: one kept stop of its
+first stop (new by a walk box) is reached by the click on actor 3 at frame 51,862, before the floor click that
+came to it at 51,865; the 104 kept stops are otherwise the same.
+
+The checks (--shares):                      old                          this tree
+p7top: owner:420=1                          stop 31                      stop 31
+       40 stops                             79661 trials, kept 762       80474 trials, kept 762
+cake:  var:196=3                            stop 15                      stop 15
+       30 stops                             31366 trials, kept 348       31371 trials, kept 369
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).

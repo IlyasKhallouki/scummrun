@@ -1,0 +1,15 @@
+boot: frame 75260 room 73 idle Some("sentence") in 8.1 s
+toggles: 66 flags an earlier run saw unset again
+counts: 24 variables the scripts of a few rooms count, 6 of them not in the guide
+[   21.6s] WATCH state:802=1 first held by node 42
+[   31.0s] WATCH owner:802=1 first held by node 50
+[  482.6s] WATCH owner:815=1 first held by node 666
+[  762.2s] WATCH room=71 first held by node 916
+[  783.0s] WATCH owner:788=1 first held by node 955
+[ 2721.8s] WATCH owner:823=1 first held by node 2698
+[ 2774.2s] WATCH room=83 first held by node 2805
+[   21.6s] kept 43 [7, 1, 25, 4, 5], expanded 1, level 0 (37 queued there), queued [0, 1, 22, 4, 5], trials 2188 (166/s), rooms 4, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"], boots 0
+[  801.2s] kept 980 [143, 8, 216, 46, 566], expanded 60, level 3 (9 queued there), queued [0, 7, 134, 42, 440], trials 177469 (243/s), rooms 8, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"], boots 0
+[ 1612.7s] kept 1621 [266, 24, 421, 69, 840], expanded 120, level 3 (393 queued there), queued [0, 23, 298, 61, 635], trials 316822 (80/s), rooms 17, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"], boots 0
+[ 2414.7s] kept 2385 [341, 71, 686, 108, 1178], expanded 216, level 3 (915 queued there), queued [0, 69, 545, 83, 889], trials 436438 (166/s), rooms 27, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"], boots 6
+[ 2909.5s] kept 3190 [574, 100, 836, 129, 1550], expanded 327, level 5 (59 queued there), queued [0, 82, 657, 103, 1182], trials 565110 (189/s), rooms 36, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"], boots 17

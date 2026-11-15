@@ -1,0 +1,15 @@
+{
+  "windows_matched": 22,
+  "same_choice_and_end": 22,
+  "windows_with_refused_tries": 6,
+  "ended_by_b": 0,
+  "ended_by_b_where_recorded_chose_an_end_point": 0,
+  "recorded_tries_in_skips": 12,
+  "refused_with_the_same_message": 12,
+  "other": 0,
+  "bound_windows": 0,
+  "bound_ended_within_10_frames": 0,
+  "recorded_bound_windows": 0,
+  "recorded_bound_with_a_rerun_window": 0,
+  "recorded_bound_whose_rerun_windows_ended_within_10_frames": 0
+}

@@ -391,6 +391,102 @@ fn stagnation_over_t_and_rooms() {
     assert!(!a.stagnant());
 }
 
+/// E014 amendment (7)'s switch, set for one test and unset when it ends (the ENV lock is held by the caller).
+struct StagCells;
+
+impl StagCells {
+    fn on() -> StagCells {
+        std::env::set_var("FMI_STAG_CELLS", "1");
+        StagCells
+    }
+}
+
+impl Drop for StagCells {
+    fn drop(&mut self) {
+        std::env::remove_var("FMI_STAG_CELLS");
+    }
+}
+
+/// A committed log line of a try from `entry`: its kind, its outcome, and whether it gave a new atom of T.
+fn tried(job: &str, entry: usize, kind: &str, outcome: &str, gave: bool) -> Value {
+    json!({"job": job, "entry": entry, "kind": kind, "outcome": outcome, "new_t": if gave { json!(["var:103=1"]) } else { json!([]) },
+           "new_rooms": [], "new_r": if gave { json!([["var:103", 1]]) } else { json!([]) }, "selectable": 3})
+}
+
+/// Three cells: the root's, p's (var:103 = 1) and q's (state:316 = 1), each selectable.
+fn three_cells(a: &mut Archive) -> (usize, usize, Vec<String>) {
+    let l = ingest(a, 0, &[nw(5, &[("var:103", json!(1))]), nw(6, &[("state:316", json!(1))])],
+                   &[v("var:103", 1), v("state:316", 1)]);
+    let (p, q) = (ids(&l)[0], ids(&l)[1]);
+    let cells: Vec<String> = [0, p, q].iter().map(|&i| a.rows[i].cell.clone()).collect();
+    assert_eq!(cells.iter().collect::<BTreeSet<_>>().len(), 3);
+    assert_eq!(a.n_selectable(), 3);
+    (p, q, cells)
+}
+
+#[test]
+fn stagnation_waits_for_a_try_from_every_selectable_cell() {
+    let _g = switch(true);
+    let t = tmp("stagcells");
+    let mut a = make(&t);
+    let (p, q, cells) = three_cells(&mut a);
+    // the try that gave progress, then three that gave none, from the root's cell and p's: the count (3 >= 3) is
+    // reached, q's cell has no try since
+    a.logs = vec![tried("j0", 0, "model", "ok", true), tried("j1", 0, "model", "ok", false), tried("j2", p, "free", "ok", false),
+                  tried("j3", p, "model", "ok", false)];
+    assert!(a.stagnant(), "the count alone");
+    let sw = StagCells::on();
+    assert!(!a.stagnant());
+    let since: Vec<&Value> = a.logs[1..].iter().collect();
+    assert_eq!(a.untried_selectable(&since), vec![cells[2].clone()]);
+    // a "return differs" from q's cell is no try of it; a free try is
+    a.logs.push(tried("j4", q, "free", "return differs", false));
+    assert!(!a.stagnant());
+    a.logs.push(tried("j5", q, "free", "ok", false));
+    assert!(a.stagnant());
+    // a new atom starts a new sweep: the count and every cell again; an error counts as a try
+    a.logs.push(tried("j6", q, "model", "ok", true));
+    a.logs.extend([tried("j7", 0, "model", "ok", false), tried("j8", p, "model", "error", false), tried("j9", p, "free", "ok", false)]);
+    assert!(!a.stagnant());
+    a.logs.push(tried("j10", q, "model", "ok", false));
+    assert!(a.stagnant());
+    // before any try gave progress, the sweep is from the start
+    a.logs = vec![tried("j0", 0, "model", "ok", false), tried("j1", p, "model", "ok", false), tried("j2", p, "free", "ok", false)];
+    assert!(!a.stagnant());
+    // an exhausted cell (no candidate under the current T) is not waited for
+    let n = a.progress.as_ref().unwrap().t.len();
+    a.progress.as_mut().unwrap().exhausted.insert(q, n);
+    assert_eq!(a.n_selectable(), 2);
+    assert!(a.stagnant());
+    drop(sw);
+    // unset: the count alone again
+    a.progress.as_mut().unwrap().exhausted.clear();
+    a.logs = vec![tried("j0", 0, "model", "ok", true), tried("j1", 0, "model", "ok", false), tried("j2", 0, "free", "ok", false),
+                  tried("j3", 0, "model", "ok", false)];
+    assert!(a.stagnant());
+}
+
+#[test]
+fn stagnation_waits_for_every_selectable_cell_without_the_progress_order() {
+    let _g = switch(false);
+    let t = tmp("stagcells-off");
+    let mut a = make(&t);
+    assert!(a.progress.is_none());
+    let d = job(&a, 0, &[nw(5, &[("var:103", json!(1))]), nw(6, &[("state:316", json!(1))])], &[], false, json!([]));
+    let l = a.ingest(&d, None).unwrap();
+    let (p, q) = (ids(&l)[0], ids(&l)[1]);
+    let n = [0, p, q].iter().map(|&i| a.rows[i].cell.clone()).collect::<BTreeSet<_>>().len();
+    assert_eq!(n, 3);
+    assert_eq!(a.n_selectable(), 3);
+    a.logs = vec![tried("j0", 0, "model", "ok", true), tried("j1", 0, "model", "ok", false), tried("j2", p, "model", "ok", false),
+                  tried("j3", p, "model", "ok", false)];
+    assert!(a.stagnant(), "the count alone");
+    let _sw = StagCells::on();
+    assert!(!a.stagnant());
+    a.logs.push(tried("j4", q, "model", "ok", false));
+    assert!(a.stagnant());
+}
+
 #[test]
 fn off_nothing_of_e012_is_in_the_files() {
     let _g = switch(false);
@@ -611,4 +707,128 @@ fn backfill_gives_what_the_ingest_logged() {
     let got: Vec<(Value, Value)> = a.logs.iter().map(|x| (x["new_t"].clone(), x["new_rooms"].clone())).collect();
     assert_eq!(got, want);
     assert_eq!(a.cells_json(), n0);
+}
+
+/// E016 F's switch, set for one test under the lock and unset when the guard goes (a failing test too).
+struct Frontier;
+
+impl Frontier {
+    fn on() -> Frontier {
+        std::env::set_var("FMI_FRONTIER", "1");
+        Frontier
+    }
+}
+
+impl Drop for Frontier {
+    fn drop(&mut self) {
+        std::env::remove_var("FMI_FRONTIER");
+    }
+}
+
+#[test]
+fn e016_f_the_frontier_entry_gets_the_next_worker_once() {
+    // E016 section F (FMI_FRONTIER=1): entries 1 (room 28) and 2 (room 35) from the root; then entry 3 in room 35 again,
+    // from entry 1 and holding an object, so in a cell of its own with three rooms on its chain. The order puts entry 3
+    // first (rooms on the chain); the frontier puts entry 2 first, the first entry of room 35, which no job had yet
+    let _g = switch(true);
+    let t = tmp("frontier");
+    let mut a = make(&t);
+    let l = ingest(&mut a, 0, &[nw(5, &[("room", json!(28))]), nw(6, &[("room", json!(35))])], &[]);
+    let (e1, e2) = (ids(&l)[0], ids(&l)[1]);
+    let l = ingest(&mut a, e1, &[nw(4, &[("room", json!(35)), ("owner:600", json!(1))])], &[]);
+    let e3 = ids(&l)[0];
+    assert_ne!(a.rows[e2].cell, a.rows[e3].cell);
+    assert_eq!(a.select(1), vec![e3]);
+    assert_eq!(a.select_free(1), vec![e3]);
+    let d = a.prepare_job(e2).unwrap();
+    assert!(files::read_json(&d.join("select.json")).unwrap().get("frontier").is_none());
+    std::fs::remove_dir_all(&d).unwrap();
+    {
+        let _f = Frontier::on();
+        // the root and entry 1 had jobs; entry 2 is the first of room 35; entry 3 is not the first of its room
+        assert_eq!(a.frontier(false), [e2].into_iter().collect());
+        assert_eq!(a.select(1), vec![e2]);
+        assert_eq!(a.select_free(1), vec![e2]);
+        assert_eq!(a.select(2), vec![e2, e3]);
+        let d = a.prepare_job(e2).unwrap();
+        assert_eq!(files::read_json(&d.join("select.json")).unwrap()["frontier"], json!(true));
+        std::fs::remove_dir_all(&d).unwrap();
+        // a running job on entry 2: not the frontier's any more, and its cell is busy
+        a.busy.insert("j9".into(), (e2, a.rows[e2].cell.clone()));
+        assert!(a.frontier(false).is_empty());
+        assert_eq!(a.select(1), vec![e3]);
+        a.busy.clear();
+        // once its job is committed, the order is as before
+        ingest(&mut a, e2, &[], &[]);
+        assert!(a.frontier(false).is_empty());
+        assert_eq!(a.select(1), vec![e3]);
+    }
+    assert!(std::env::var("FMI_FRONTIER").is_err());
+}
+
+/// E016 C's switch, set for one test under the lock and unset when the guard goes.
+struct NoGood;
+
+impl NoGood {
+    fn on() -> NoGood {
+        std::env::set_var("FMI_NOGOOD", "1");
+        NoGood
+    }
+}
+
+impl Drop for NoGood {
+    fn drop(&mut self) {
+        std::env::remove_var("FMI_NOGOOD");
+    }
+}
+
+#[test]
+fn e016_c_the_archive_keeps_the_failure_memory_with_its_entry_and_reading() {
+    // E016 section C (FMI_NOGOOD=1): a try's result.json "nogood" goes into its log line; job.json gives a later try the
+    // refutations of its own entry only, and the no-plan records of its scope's newest registered reading only
+    let _g = switch(true);
+    let t = tmp("nogood");
+    let mut a = make(&t);
+    let l = ingest(&mut a, 0, &[nw(5, &[("var:5", json!(8))])], &[]);
+    let e1 = ids(&l)[0];
+    let rdir = t.join("arch").join("readings").join("r0");
+    std::fs::create_dir_all(&rdir).unwrap();
+    std::fs::write(rdir.join("reading.json"), "{}").unwrap();
+    let rp = rdir.join("reading.json").to_string_lossy().into_owned();
+    let scope = a.scope_of_room(Some(33));
+    a.register_reading(&scope, &rp, 0, None, "fresh", Some(0)).unwrap();
+    let _n = NoGood::on();
+    let d = job(&a, 0, &[], &[], false, json!([]));
+    let mut res = files::read_json(&d.join("result.json")).unwrap();
+    let r = |entry: usize| json!({"entry": entry, "prefix": "p", "target": "t", "label": "sentence(1,2)", "point": [["room", 33]],
+                                  "step": "sentence(1,2)#0", "frame": 100, "plan": 0, "why": "200 frames"});
+    let np = json!({"reading": rp, "scope": scope, "start": "s", "target": "t", "status": "unsolvable"});
+    res["nogood"] = json!({"refuted": [r(0)], "no_plan": [np], "given": {}, "used": {}});
+    std::fs::write(d.join("result.json"), res.to_string()).unwrap();
+    let line = a.ingest(&d, None).unwrap();
+    assert_eq!(line["nogood"]["refuted"][0]["label"], "sentence(1,2)");
+    let job_of = |a: &Archive, i: usize| {
+        let d = a.prepare_job(i).unwrap();
+        let j = files::read_json(&d.join("job.json")).unwrap();
+        std::fs::remove_dir_all(&d).unwrap();
+        j
+    };
+    let j0 = job_of(&a, 0);
+    assert_eq!(j0["nogood"]["refuted"].as_array().unwrap().len(), 1);
+    assert_eq!(j0["nogood"]["no_plan"].as_array().unwrap().len(), 1);
+    // another entry: no refutation, the reading's no-plan record (entry 1 is in room 33's scope too)
+    let j1 = job_of(&a, e1);
+    assert!(j1["nogood"]["refuted"].as_array().unwrap().is_empty());
+    assert_eq!(j1["nogood"]["no_plan"].as_array().unwrap().len(), 1);
+    // a newer reading of the scope replaces it: the no-plan record goes, the refutation stays
+    let rdir2 = t.join("arch").join("readings").join("r1");
+    std::fs::create_dir_all(&rdir2).unwrap();
+    std::fs::write(rdir2.join("reading.json"), "{}").unwrap();
+    a.register_reading(&scope, &rdir2.join("reading.json").to_string_lossy(), e1 as i64, None, "fresh", Some(1)).unwrap();
+    let j0 = job_of(&a, 0);
+    assert_eq!(j0["nogood"]["refuted"].as_array().unwrap().len(), 1);
+    assert!(j0["nogood"]["no_plan"].as_array().unwrap().is_empty());
+    drop(_n);
+    // the switch off: job.json has no "nogood"
+    assert!(job_of(&a, 0).get("nogood").is_none());
 }

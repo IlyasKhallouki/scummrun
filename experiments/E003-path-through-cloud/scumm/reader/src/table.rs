@@ -92,6 +92,8 @@ pub struct FactTable {
     pub havoc_args: Option<std::sync::Arc<crate::args::HavocArgs>>,
     /// the switch wait_both (the Builder's): a WaitFor op whose test no fact holds also passes (machine.rs `wait_both`)
     pub wait_both: bool,
+    /// E026 C1, the switch wait_queued (the Builder's): wait_both's passing path only on a path that holds a sentence
+    pub wait_queued: bool,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
@@ -209,6 +211,9 @@ impl FactTable {
             actor_room_domains(scope, game, &start, &doms, &mut extra, &mut counts);
         }
         let mut engine: BTreeSet<i32> = domains::ENGINE.iter().map(|e| e.0).collect();
+        if crate::builder::read_sound_switch() {
+            engine.insert(domains::VAR_SOUNDRESULT);
+        }
         engine.extend(TIME_VARS);
         engine.extend(MOUSE_VARS);
         let mut points: BTreeMap<&'static str, BTreeMap<String, BTreeSet<i64>>> = BTreeMap::new();
@@ -248,6 +253,7 @@ impl FactTable {
             havoc_rooms: false,
             havoc_args: None,
             wait_both: false,
+            wait_queued: false,
             reach: None,
             memo: None,
             cross: None,
@@ -452,7 +458,7 @@ fn actor_room_domains(
         if let Some(&(_, v)) = SETTINGS.iter().find(|s| s.0 == n) {
             return Some([v].into_iter().collect());
         }
-        if domains::ENGINE.iter().any(|e| e.0 == n) || TIME_VARS.contains(&n) || MOUSE_VARS.contains(&n) {
+        if domains::engine_why(n).is_some() || TIME_VARS.contains(&n) || MOUSE_VARS.contains(&n) {
             return None;
         }
         if !scope.writes.has(&k) {

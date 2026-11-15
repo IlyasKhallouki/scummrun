@@ -1,0 +1,2 @@
+The run began at the game's own start for boot number 1212 (FMI_BOOT_PARAM=1212: room 83, frame 2), not at a
+player's boot. verify.json's "from_boot" is a boot with that number.

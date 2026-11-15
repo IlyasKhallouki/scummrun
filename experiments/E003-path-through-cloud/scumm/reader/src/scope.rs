@@ -355,6 +355,48 @@ pub fn hook_writes(game: &Game, n: i32) -> Vec<String> {
     keys.into_iter().collect()
 }
 
+/// E022 amendment (14): whether global script `n` enumerates the inventory (an assignment reads findInventory): the
+/// reader cannot enumerate it, so running the script forks on every slot; `FMI_READ_INVENTORY_SUMMARY=1` summarizes a
+/// start of it as the inventory hook's (machine.rs `eng_script`).
+pub fn enumerates_inventory(game: &Game, n: i32) -> bool {
+    fn has(game: &Game, e: scumm_ir::ExprId) -> bool {
+        use scumm_ir::Expr;
+        match game.ast.expr(e) {
+            Expr::Getter { name, args } => name == known::FIND_INVENTORY || game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::BinOp { a, b, .. } | Expr::Cmp { a, b, .. } => has(game, a) || has(game, b),
+            Expr::Neg(x) | Expr::Not(x) | Expr::Truth(x) => has(game, x),
+            Expr::Concat(args) | Expr::List(args) => game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::Embed(a) => has(game, a.rhs),
+            _ => false,
+        }
+    }
+    let Some(u) = game.id(UnitKey::Global(n)) else { return false };
+    game.ins(u).iter().any(|x| matches!(x.st, Some(Stmt::Assign(a)) if has(game, a.rhs)))
+}
+
+/// E022 amendment (28): whether global script `n` reads a string's characters (an assignment reads GetStringChar) in a
+/// loop (a jump back): each character is an unknown, so running the script forks at every turn of the loop, past the
+/// path limit (FoA's IQ points, script 145, over 154 characters); `FMI_READ_STRING_SUMMARY=1` summarizes a start of
+/// it as the inventory hook's (machine.rs `eng_script`).
+pub fn loops_over_strings(game: &Game, n: i32) -> bool {
+    fn has(game: &Game, e: scumm_ir::ExprId) -> bool {
+        use scumm_ir::Expr;
+        match game.ast.expr(e) {
+            Expr::Getter { name, args } => name == known::GET_STRING_CHAR || game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::BinOp { a, b, .. } | Expr::Cmp { a, b, .. } => has(game, a) || has(game, b),
+            Expr::Neg(x) | Expr::Not(x) | Expr::Truth(x) => has(game, x),
+            Expr::Concat(args) | Expr::List(args) => game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::Embed(a) => has(game, a.rhs),
+            _ => false,
+        }
+    }
+    let Some(u) = game.id(UnitKey::Global(n)) else { return false };
+    let ins = game.ins(u);
+    let reads = ins.iter().any(|x| matches!(x.st, Some(Stmt::Assign(a)) if has(game, a.rhs)));
+    let back = ins.iter().enumerate().any(|(i, x)| x.target.is_some_and(|t| (t as usize) <= i));
+    reads && back
+}
+
 /// reader.py `made_verbs`: {verb: the VerbOps sub-op names any script gives it} for every verb some script creates
 /// with New (a constant number).
 pub fn made_verbs(game: &Game) -> BTreeMap<i32, BTreeSet<String>> {
@@ -368,7 +410,29 @@ pub fn made_verbs(game: &Game) -> BTreeMap<i32, BTreeSet<String>> {
         }
     }
     made.retain(|_, n| n.contains("New"));
+    if verbs_var_on() {
+        // E014 (FMI_VERBS_VAR_ON=1): a VerbOps whose verb operand is not a constant and that turns a verb On (a loop
+        // over verb numbers, `VerbOps(Local[1],[On()])`) may turn any made verb On: each one counts as turned On
+        let var_on = game.ins.iter().any(|x| match x.st {
+            Some(Stmt::Op { name: known::VERB_OPS, args, subops, .. }) => {
+                ast.constant(ast.kids(args)[0]).is_none() && ast.subs(subops).iter().any(|s| s.name == known::ON)
+            }
+            _ => false,
+        });
+        if var_on {
+            for n in made.values_mut() {
+                n.insert("On".to_string());
+            }
+        }
+    }
     made
+}
+
+/// E014's switch `FMI_VERBS_VAR_ON=1`: `made_verbs` counts a verb as turned On when some script turns verbs On by a
+/// variable operand (a game that shows its verbs in a loop over their numbers, not one by one by constant as MI does).
+/// Unset: On only by a constant operand, as before.
+pub fn verbs_var_on() -> bool {
+    std::env::var("FMI_VERBS_VAR_ON").is_ok_and(|v| v == "1")
 }
 
 /// The verbs some object's event table names.
@@ -421,6 +485,12 @@ pub struct Scope {
     pub units: Vec<UnitId>,
     pub unit_keys: rustc_hash::FxHashSet<UnitKey>,
     pub objects: Vec<i64>,
+    /// E019 (`FMI_READ_HELD=1`): the objects of other rooms an actor holds at the start, whose code the scope reads;
+    /// the sentences' objects besides `objects` (empty with the switch off)
+    pub held: Vec<i64>,
+    /// E021 (`FMI_READ_ACTORS=1`): the actors other than ego that the start reports with a class, sentence objects
+    /// besides the objects (empty with the switch off)
+    pub actors: Vec<i64>,
     pub verbs: Vec<i64>,
     pub dialog_verbs: Vec<i64>,
     pub walk_verb: Option<i64>,
@@ -431,6 +501,16 @@ pub struct Scope {
     /// fix round 1's switches the reading runs with (machine.rs `Switches`; reader.py has none): the Reader's machine
     /// takes them, and `of_with` adds the writes they make
     pub switches: Switches,
+}
+
+/// E021: `FMI_READ_ACTORS=1`, a scope's sentences take actors as their first object (`Scope.actors`).
+pub fn actors_on() -> bool {
+    std::env::var("FMI_READ_ACTORS").is_ok_and(|v| v == "1")
+}
+
+/// E019: `FMI_READ_HELD=1`, a scope reads the code of the objects actors hold (`Scope::of_with`).
+pub fn held_on() -> bool {
+    std::env::var("FMI_READ_HELD").is_ok_and(|v| v == "1")
 }
 
 impl Scope {
@@ -445,6 +525,12 @@ impl Scope {
         let mut rooms: Vec<i32> = rooms.to_vec();
         rooms.sort_unstable();
         let in_rooms = |r: i32| rooms.contains(&r);
+        // E019 (FMI_READ_HELD=1): an object of another room an actor holds carries its code into every room (its verb
+        // scripts run wherever it is used), so the scope reads it and its sentences take it
+        let held_out = |o: i32| {
+            let w = start.get0(&format!("owner:{o}"));
+            held_on() && w != 0 && w != OF_OWNER_ROOM && !game.object_room.get(&o).is_some_and(|&r| in_rooms(r))
+        };
         let walks = walk_verbs(game);
         let walk_verb = (walks.len() == 1).then(|| walks[0] as i64);
         let mut units: Vec<UnitId> = Vec::new();
@@ -452,7 +538,7 @@ impl Scope {
             let k = game.unit(u).key;
             let inside = match k {
                 UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) => in_rooms(r),
-                UnitKey::Obj(o) => game.object_room.get(&o).is_some_and(|&r| in_rooms(r)),
+                UnitKey::Obj(o) => game.object_room.get(&o).is_some_and(|&r| in_rooms(r)) || held_out(o),
                 UnitKey::Global(_) => false,
             };
             if inside {
@@ -515,6 +601,17 @@ impl Scope {
         let mut objects: Vec<i64> =
             game.object_room.iter().filter(|(_, &r)| in_rooms(r)).map(|(&o, _)| o as i64).collect();
         objects.sort_unstable();
+        let mut held: Vec<i64> = game.object_room.keys().filter(|&&o| held_out(o) && game.id(UnitKey::Obj(o)).is_some()).map(|&o| o as i64).collect();
+        held.sort_unstable();
+        // E021: an actor the engine reports with a class at the start (ego aside) is clicked as a sentence's object
+        let ego = start.get0("var:1");
+        let actors: Vec<i64> = if actors_on() {
+            (1..NUM_ACTORS as i64)
+                .filter(|&a| a != ego && start.iter().any(|(k, v)| v != 0 && k.strip_prefix("class:").is_some_and(|r| r.split(':').next() == Some(&a.to_string()))))
+                .collect()
+        } else {
+            vec![]
+        };
         let evs = event_verbs(game);
         let made = made_verbs(game);
         let verbs: Vec<i64> = made
@@ -573,6 +670,8 @@ impl Scope {
             units,
             unit_keys,
             objects,
+            held,
+            actors,
             verbs,
             dialog_verbs,
             walk_verb,

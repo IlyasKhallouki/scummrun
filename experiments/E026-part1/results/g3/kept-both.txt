@@ -1,0 +1,5 @@
+{"file":"new/0.json.gz","frame":19206,"tick":112786,"how":"checkpoint"} [{"frame":19204,"click":[56,161]},{"frame":19206,"click":[155,131]}]
+{"file":"new/1.json.gz","frame":19207,"tick":112792,"how":"checkpoint"} [{"frame":19204,"click":[56,161]},{"frame":19206,"click":[155,131]}]
+{"file":"new/2.json.gz","frame":19270,"tick":113170,"how":"checkpoint"} [{"frame":19204,"click":[56,161]},{"frame":19206,"click":[155,131]}]
+{"file":"new/3.json.gz","frame":19271,"tick":113176,"how":"checkpoint"} [{"frame":19204,"click":[56,161]},{"frame":19206,"click":[155,131]}]
+{"file":"new/4.json.gz","frame":22871,"tick":134776,"how":"end"} [{"frame":19204,"click":[56,161]},{"frame":19206,"click":[155,131]}]

@@ -396,6 +396,12 @@ pub struct Executor {
     pub stone_at: u64,
     /// the stone trials kept as the branch (`stone_keep`)
     pub stats_kept: u32,
+    /// E013 (component refuse): set when a check after an input this executor issued failed (the verb key check:
+    /// the profile's selected-verb variable it read); None when a route error is one of forming the input
+    pub check_var: Option<usize>,
+    /// E022 amendment (27) (`realize::queued_on`): the frame the sentence script began a planned sentence the game had
+    /// queued itself, played with no input
+    pub queued_at: Option<u64>,
 }
 
 impl Executor {
@@ -411,6 +417,8 @@ impl Executor {
             stone_frames: 0,
             stone_at: 0,
             stats_kept: 0,
+            check_var: None,
+            queued_at: None,
         }
     }
 
@@ -776,6 +784,7 @@ impl Executor {
             self.run_to(b, kf)?;
             let state = b.state()?;
             if state.vars.get(self.p.verb_var).copied().unwrap_or(0) as i64 != verb {
+                self.check_var = Some(self.p.verb_var);
                 return route(format!("{}: verb key did not select verb {verb}", mv.name));
             }
             if let Some(o) = mv.obj {
@@ -970,7 +979,7 @@ impl Executor {
             for o in &stones {
                 let t_trial = std::time::Instant::now();
                 let c0 = thread_ns();
-                let mut child = b.e.fork()?;
+                let mut child = b.e.fork().inspect(|_| fmi_core::count_fork("executor.rs:978"))?;
                 b.cpu[3] += thread_ns() - c0;
                 self.stone_trials += 1;
                 let mut frames = None;
@@ -1085,8 +1094,13 @@ impl Executor {
 // --- replay.Harness's input code on a child (window._Ctx) ------------------------------------------------------------
 
 /// The harness's input code for one input (window.Search._play: Harness._wait_camera and _check_ego for a click,
-/// _click_verb for a dialog line, else the Executor's play).
+/// _click_verb for a dialog line, else the Executor's play). E016 A (plan.md, "A. Realization on the run path";
+/// amendment (1)): with FMI_REALIZE=1 a click or a dialog line is realized by the engine (`realize::play`), and no
+/// profile is read for it; its events go to the executor's movie.
 pub fn play_input(ex: &mut Executor, b: &mut Br, inp: &InputStep, name: &str) -> PResult<()> {
+    if (inp.kind == "click" || inp.kind == "line") && crate::realize::on() {
+        return crate::realize::play(b, inp, name, &mut ex.movie, &mut ex.queued_at);
+    }
     if inp.kind == "click" {
         wait_camera(ex, b, inp, INPUT_LIMIT)?;
         check_ego(ex, b, inp)?;

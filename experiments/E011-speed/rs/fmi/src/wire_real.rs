@@ -59,6 +59,8 @@ static GLOBAL: fmi_reading::inproc::ReaderAlloc = fmi_reading::inproc::ReaderAll
 pub struct RealReadings {
     pub reader: PathBuf,
     pub opened: Mutex<HashMap<PathBuf, Arc<fmi_reading::Reading>>>,
+    /// E022 amendment (24) (FMI_READ_TRIM=1): the readings opened, in order (`opened` keeps the first and the newest)
+    pub order: Mutex<Vec<PathBuf>>,
     pub reuse: Mutex<Option<Arc<fmi_reading::reuse::ReuseGame>>>,
     pub root: PathBuf,
     pub cache: Option<fmi_reading::cache::ReadingCache>,
@@ -83,6 +85,7 @@ impl RealReadings {
         Ok(RealReadings {
             reader,
             opened: Mutex::new(Default::default()),
+            order: Mutex::new(Vec::new()),
             reuse: Mutex::new(None),
             root,
             cache,
@@ -106,7 +109,9 @@ impl RealReadings {
         }
         if let Some(ip) = &self.inproc {
             args.extend(ip.extra_args(self.memo.is_some()));
-            ip.read(&args, dir, cancel)?;
+            let res = ip.read(&args, dir, cancel);
+            fmi_explore::machine::trim_heap();
+            res?;
             return Ok(args);
         }
         if self.prep {
@@ -144,7 +149,19 @@ impl Readings for RealReadings {
             return Ok(r.clone());
         }
         let r = Arc::new(fmi_reading::Reading::open_head(p).map_err(|e| format!("{}: {e}", p.display()))?);
-        self.opened.lock().unwrap().insert(p.to_path_buf(), r.clone());
+        let mut opened = self.opened.lock().unwrap();
+        // E022 amendment (24): a try's later readings replace the one before; the first (the try's own, whose reuse
+        // keys the job asks for) stays
+        if fmi_explore::machine::read_trim_on() {
+            let mut order = self.order.lock().unwrap();
+            if order.len() >= 2 {
+                for gone in order.drain(1..) {
+                    opened.remove(&gone);
+                }
+            }
+            order.push(p.to_path_buf());
+        }
+        opened.insert(p.to_path_buf(), r.clone());
         Ok(r)
     }
     fn reuse_keys(&self, rd: &dyn ReadingSource) -> Result<HashSet<String>, String> {
@@ -206,7 +223,11 @@ impl Readings for RealReadings {
             cache.dir_of(&key)
         } else {
             let tmp = cache.scratch().map_err(|e| e.to_string())?;
-            self.run_reader(&spec, &tmp, q, cancel)?;
+            // a reading that failed or was stopped leaves no scratch folder behind
+            if let Err(e) = self.run_reader(&spec, &tmp, q, cancel) {
+                let _ = std::fs::remove_dir_all(&tmp);
+                return Err(e);
+            }
             let d = cache.put(&key, &tmp).map_err(|e| e.to_string())?;
             cache.evict(std::slice::from_ref(&d)).map_err(|e| format!("the reading cache's eviction: {e}"))?;
             d

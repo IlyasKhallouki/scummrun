@@ -1,0 +1,10 @@
+[20:41:20] off: start (e12, ''), load 5.11 4.74 4.57
+[20:43:53] off: run 153.039 s; GUARD: rc 0 wall 153.0 s low 0 min MemAvailable 8689060 kB
+[20:44:02] off: verify: 14 entries from boot, 0 with differences or errors
+[20:44:02] off: stall-report rc 0: 4 PASS, 0 FAIL; stalls.json none
+[20:44:02] on: start (e12, 'FMI_STALLS=1 FMI_FREE_SHIFT=1'), load 4.75 4.87 4.65
+[20:46:20] on: run 137.856 s; GUARD: rc 0 wall 137.8 s low 0 min MemAvailable 8936452 kB
+[20:46:31] on: verify: 14 entries from boot, 0 with differences or errors
+[20:46:31] on: stall-report rc 0: 5 PASS, 0 FAIL; stalls.json written
+[20:46:31] fmi check tries off on: rc 0; G0 /var/tmp/fast-mi/e013-stall/r2-e12/on/kitchen: 4 tries, stop class = A's in 4, everything = A's in 4
+[20:46:31] files: 4 jobs, 15 entries, 4 log lines; 0 differ

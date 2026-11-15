@@ -1,0 +1,26 @@
+E027 bench, 2026-11-12: a stop made inside a window that is new by a guide variable's value has its turn before
+any line's (--shares). Old: tree 93784e8. Laptop, 6 threads (the first run 4); trials and stops do not depend on
+the machine.
+
+From cont2's stop 1021 (room 41 as entered after P7), --shares --go:
+                        old (80 stops)            every atom new in a window   a variable's value only (60 stops)
+var:272=2               stop 2, 3982 trials       stop 2, 3982                 stop 2, 3982
+var:272=3               not held                  stop 12, 37094               stop 3, 7604
+object 568 owned        not held                  stop 12, 37094               stop 3, 7604
+room 57                 stop 3, 6296              stop 13, 38587               stop 5, 11360
+room 43                 not entered               (not watched)                stop 15, 29118
+bit:19=1 (P5)           not held                  75440 trials                 stop 35, 35433
+Old: 14 stops new by a key of the world were kept from inside windows, and 3 new by var:272=2; none was expanded.
+
+The two checks (--shares, 30 stops):
+                        old                       every atom                   a variable's value only
+cake:  var:196=3        stop 15, 16472 trials     stop 15, 16472               stop 15, 16472
+p7top: owner:420=1      stop 23, 36054            not held (77369 trials,      stop 26, 46049
+                                                  15 of the 30 stops from
+                                                  inside windows)
+Five stops from each reference without --shares: the digests of 93784e8.
+
+Replayed from boot (results/fish): object 568 owned, 484 clicks; bit:19=1 with var:196=2, 510 clicks.
+
+cont3 (from cont1's stop 8946, tree 93784e8, 6 threads): stopped at 1,318 s, 346 stops, 196,073 trials, 42 rooms,
+no rung after P7; 16 of the stops expanded were kept for the interface alone (3.5% of the trials; cont2 39.6%).

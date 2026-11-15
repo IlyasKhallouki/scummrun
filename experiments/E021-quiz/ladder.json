@@ -1,0 +1,118 @@
+{
+ "archive": "/var/tmp/fast-mi/e017-archives/play10",
+ "entries": 22003,
+ "files_read": 226,
+ "t0": 1793821844.4906201,
+ "t0_from": "the root's file",
+ "t0_time": "2026-11-04T19:50:44Z",
+ "furthest": "C6",
+ "furthest_in_order": "C6",
+ "rungs": [
+  {
+   "rung": "C0",
+   "what": "room=49 and var:32=4",
+   "reached": true,
+   "entry": 3,
+   "job": "j00000",
+   "how": "end",
+   "step": "planned",
+   "frame": 1043,
+   "room": 49,
+   "wall_s": 127.5,
+   "time": "2026-11-04T19:52:51Z"
+  },
+  {
+   "rung": "C1",
+   "what": "room=63",
+   "reached": true,
+   "entry": 128,
+   "job": "j00045",
+   "how": "wait",
+   "step": "model-free",
+   "frame": 1322,
+   "room": 63,
+   "wall_s": 274.5,
+   "time": "2026-11-04T19:55:18Z"
+  },
+  {
+   "rung": "C2",
+   "what": "room=69",
+   "reached": true,
+   "entry": 136,
+   "job": "j00048",
+   "how": "afford",
+   "step": "model-free",
+   "frame": 1484,
+   "room": 69,
+   "wall_s": 283.1,
+   "time": "2026-11-04T19:55:27Z"
+  },
+  {
+   "rung": "C3",
+   "what": "owner:946=ego",
+   "reached": true,
+   "entry": 144,
+   "job": "j00051",
+   "how": "free",
+   "step": "model-free",
+   "frame": 1499,
+   "room": 69,
+   "wall_s": 322.6,
+   "time": "2026-11-04T19:56:07Z"
+  },
+  {
+   "rung": "C4",
+   "what": "room=49 and owner:946=ego",
+   "reached": true,
+   "entry": 3412,
+   "job": "j01004",
+   "how": "afford",
+   "step": "model-free",
+   "frame": 1646,
+   "room": 49,
+   "wall_s": 7286.7,
+   "time": "2026-11-04T21:52:11Z"
+  },
+  {
+   "rung": "C5",
+   "what": "room=42 and owner:946=ego",
+   "reached": true,
+   "entry": 7987,
+   "job": "j05927",
+   "how": "free",
+   "step": "model-free",
+   "frame": 2751,
+   "room": 42,
+   "wall_s": 53814.1,
+   "time": "2026-11-05T10:47:38Z"
+  },
+  {
+   "rung": "C6",
+   "what": "class:491:12=0 (a full state)",
+   "reached": true,
+   "entry": 10534,
+   "job": "j06574",
+   "how": "checkpoint",
+   "step": "planned",
+   "frame": 13899,
+   "room": 42,
+   "wall_s": 70987.6,
+   "time": "2026-11-05T15:33:52Z"
+  },
+  {
+   "rung": "C7",
+   "what": "room=82",
+   "reached": false
+  },
+  {
+   "rung": "C8",
+   "what": "room=48",
+   "reached": false
+  },
+  {
+   "rung": "C9",
+   "what": "end=1, end:kind=1, end:number=582, end:offset=0x67, end:where in {0,1,4}",
+   "reached": false
+  }
+ ]
+}

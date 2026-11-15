@@ -1,0 +1,29 @@
+boot: frame 2 room 45 idle Some("sentence") in 0.2 s
+mentions: 0 objects, 0 flags named in rooms' scripts; 0 ways from room to room seen, 0 more the scripts advise
+[   23.6s] kept 90 [19, 2, 1, 0, 67], expanded 16, level 0 (74 queued there), queued [0, 2, 1, 0, 67], trials 4197 (179/s), rooms 3, rungs [], boots 0
+[   33.6s] kept 102 [19, 3, 4, 0, 75], expanded 17, level 0 (85 queued there), queued [0, 3, 4, 0, 75], trials 6105 (190/s), rooms 3, rungs [], boots 0
+[   46.3s] kept 117 [22, 3, 4, 0, 87], expanded 20, level 0 (97 queued there), queued [0, 3, 4, 0, 87], trials 9354 (257/s), rooms 3, rungs [], boots 0
+[   65.0s] kept 117 [22, 3, 4, 0, 87], expanded 21, level 0 (96 queued there), queued [0, 3, 4, 0, 87], trials 14092 (253/s), rooms 3, rungs [], boots 0
+[   87.5s] kept 132 [22, 4, 4, 0, 101], expanded 25, level 0 (107 queued there), queued [0, 2, 4, 0, 101], trials 18911 (213/s), rooms 3, rungs [], boots 0
+[   99.9s] kept 138 [22, 5, 7, 0, 103], expanded 27, level 0 (111 queued there), queued [0, 1, 7, 0, 103], trials 21457 (207/s), rooms 3, rungs [], boots 0
+[  145.3s] kept 147 [24, 6, 11, 0, 105], expanded 28, level 0 (119 queued there), queued [0, 1, 11, 0, 105], trials 30299 (195/s), rooms 3, rungs [], boots 0
+[  192.4s] kept 160 [31, 6, 12, 0, 110], expanded 29, level 1 (8 queued there), queued [0, 1, 12, 0, 110], trials 39804 (202/s), rooms 3, rungs [], boots 0
+[  279.2s] kept 176 [36, 9, 16, 0, 114], expanded 30, level 1 (23 queued there), queued [0, 4, 16, 0, 114], trials 59656 (229/s), rooms 3, rungs [], boots 0
+[  317.0s] kept 193 [40, 13, 22, 0, 117], expanded 31, level 1 (39 queued there), queued [0, 8, 22, 0, 117], trials 69478 (260/s), rooms 3, rungs [], boots 0
+[  361.2s] kept 207 [42, 13, 22, 0, 129], expanded 32, level 1 (52 queued there), queued [0, 8, 22, 0, 129], trials 79342 (224/s), rooms 4, rungs [], boots 0
+[  394.6s] kept 218 [43, 14, 23, 0, 137], expanded 33, level 1 (62 queued there), queued [0, 9, 23, 0, 137], trials 86985 (228/s), rooms 4, rungs [], boots 0
+[  436.4s] kept 219 [43, 14, 23, 0, 138], expanded 34, level 1 (62 queued there), queued [0, 9, 23, 0, 138], trials 96848 (236/s), rooms 4, rungs [], boots 0
+[  496.8s] kept 224 [43, 14, 23, 0, 143], expanded 35, level 1 (66 queued there), queued [0, 9, 23, 0, 143], trials 111720 (246/s), rooms 4, rungs [], boots 0
+[  544.2s] kept 229 [43, 15, 24, 0, 146], expanded 36, level 1 (66 queued there), queued [0, 10, 24, 0, 146], trials 122304 (223/s), rooms 4, rungs [], boots 0
+[  570.6s] kept 230 [43, 15, 24, 0, 147], expanded 37, level 1 (66 queued there), queued [0, 9, 24, 0, 147], trials 127839 (209/s), rooms 4, rungs [], boots 0
+[  588.5s] kept 240 [43, 16, 25, 0, 155], expanded 38, level 1 (75 queued there), queued [0, 10, 25, 0, 155], trials 131632 (211/s), rooms 4, rungs [], boots 0
+[  635.2s] kept 240 [43, 16, 25, 0, 155], expanded 39, level 1 (74 queued there), queued [0, 9, 25, 0, 155], trials 144283 (271/s), rooms 4, rungs [], boots 0
+[  678.6s] kept 240 [43, 16, 25, 0, 155], expanded 40, level 1 (73 queued there), queued [0, 8, 25, 0, 155], trials 156920 (291/s), rooms 4, rungs [], boots 0
+[  710.9s] kept 242 [43, 16, 26, 0, 156], expanded 41, level 1 (74 queued there), queued [0, 7, 26, 0, 156], trials 168545 (360/s), rooms 4, rungs [], boots 0
+[  793.0s] kept 248 [43, 16, 26, 0, 162], expanded 42, level 1 (79 queued there), queued [0, 7, 26, 0, 162], trials 188401 (242/s), rooms 4, rungs [], boots 0
+[  843.3s] kept 248 [43, 16, 26, 0, 162], expanded 43, level 1 (78 queued there), queued [0, 7, 25, 0, 162], trials 201622 (263/s), rooms 4, rungs [], boots 0
+[  867.4s] kept 249 [43, 16, 27, 0, 162], expanded 44, level 1 (78 queued there), queued [0, 6, 26, 0, 162], trials 208083 (268/s), rooms 4, rungs [], boots 0
+[  885.4s] kept 249 [43, 16, 27, 0, 162], expanded 45, level 1 (77 queued there), queued [0, 6, 25, 0, 162], trials 212168 (227/s), rooms 4, rungs [], boots 0
+[  897.5s] kept 253 [43, 19, 27, 0, 163], expanded 46, level 1 (80 queued there), queued [0, 9, 25, 0, 163], trials 215013 (235/s), rooms 4, rungs [], boots 0
+[  930.7s] kept 254 [43, 19, 27, 0, 164], expanded 47, level 1 (80 queued there), queued [0, 9, 24, 0, 164], trials 222548 (227/s), rooms 4, rungs [], boots 0
+[  930.7s] kept 254 [43, 19, 27, 0, 164], expanded 47, level 1 (80 queued there), queued [0, 9, 24, 0, 164], trials 222548 (0/s), rooms 4, rungs [], boots 0

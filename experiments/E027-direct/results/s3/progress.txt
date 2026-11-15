@@ -1,0 +1,18 @@
+[  106.6s] kept 580 [58, 41, 46, 5, 75, 354], expanded 73, queued [27, 31, 21, 3, 75, 350], trials 31341 (236/s), rooms 13, rungs ["P0"], boots 15
+[   14.2s] kept 69 [10, 10, 25, 2, 2, 19], expanded 31, queued [6, 3, 11, 1, 2, 15], trials 7476 (533/s), rooms 8, rungs ["P0"], boots 5
+[  195.5s] WATCH room=41 first held by node 590
+[  222.5s] kept 849 [68, 56, 58, 6, 124, 536], expanded 94, queued [16, 46, 33, 4, 124, 532], trials 55917 (212/s), rooms 15, rungs ["P0"], boots 34
+[   27.7s] kept 206 [40, 22, 38, 4, 19, 82], expanded 52, queued [30, 12, 13, 2, 19, 78], trials 12758 (393/s), rooms 13, rungs ["P0"], boots 6
+[  322.3s] RUNG P1 first held by node 961
+[  331.5s] kept 1091 [83, 77, 71, 6, 159, 694], expanded 115, queued [15, 62, 46, 4, 159, 690], trials 75874 (183/s), rooms 17, rungs ["P0", "P1"], boots 48
+[  425.6s] kept 1281 [94, 108, 79, 13, 172, 814], expanded 136, queued [11, 87, 54, 11, 172, 810], trials 97681 (232/s), rooms 19, rungs ["P0", "P1"], boots 63
+[  497.7s] kept 1400 [99, 114, 83, 13, 185, 905], expanded 157, queued [5, 83, 58, 11, 185, 901], trials 119433 (302/s), rooms 19, rungs ["P0", "P1"], boots 78
+[  552.1s] kept 1458 [100, 114, 83, 13, 194, 953], expanded 178, queued [1, 67, 58, 11, 194, 949], trials 138974 (359/s), rooms 20, rungs ["P0", "P1"], boots 97
+[  589.1s] kept 1729 [110, 128, 87, 13, 217, 1173], expanded 220, queued [3, 47, 62, 11, 217, 1169], trials 156278 (469/s), rooms 20, rungs ["P0", "P1"], boots 131
+[  616.1s] kept 1821 [114, 130, 94, 14, 220, 1248], expanded 241, queued [4, 31, 69, 12, 220, 1244], trials 166153 (366/s), rooms 21, rungs ["P0", "P1"], boots 152
+[  666.6s] kept 1926 [114, 136, 95, 14, 227, 1339], expanded 262, queued [0, 20, 70, 12, 227, 1335], trials 186634 (405/s), rooms 21, rungs ["P0", "P1"], boots 168
+[  699.6s] kept 2014 [115, 138, 95, 14, 233, 1418], expanded 283, queued [1, 2, 69, 12, 233, 1414], trials 196529 (300/s), rooms 21, rungs ["P0", "P1"], boots 179
+[  723.0s] kept 2062 [115, 138, 95, 14, 239, 1460], expanded 304, queued [0, 0, 51, 12, 239, 1456], trials 206196 (0/s), rooms 21, rungs ["P0", "P1"], boots 181
+[  723.0s] kept 2062 [115, 138, 95, 14, 239, 1460], expanded 304, queued [0, 0, 51, 12, 239, 1456], trials 206196 (414/s), rooms 21, rungs ["P0", "P1"], boots 181
+boot: frame 2728 room 33 idle Some("sentence") in 0.2 s
+guide: 115 variables

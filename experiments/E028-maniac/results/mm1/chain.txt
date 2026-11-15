@@ -1,0 +1,5 @@
+2026-11-14 21:15:09 UTC  chain: /var/tmp/fast-mi/direct/bench/bin/high6, 7 threads, stall 60 min, 14.0 h at most, from the boot
+2026-11-14 21:15:09 UTC  leg 00: begins at the boot
+2026-11-14 23:13:24 UTC  leg 00: [ 7095.7s] STALL: the highest level (4) not raised for 60 minutes: the run ends
+2026-11-14 23:13:24 UTC  leg 00: top stop 914, room 22, frame 1623, 4 objects ever owned
+2026-11-14 23:13:24 UTC  leg 01: begins at /var/tmp/fast-mi/direct/mm1/leg00/top.jsonl stop 914

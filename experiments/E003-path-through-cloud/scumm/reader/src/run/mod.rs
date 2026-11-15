@@ -703,7 +703,12 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
         None => arg(&args, "--packed").map_or_else(|| out.join(format!("{name}.tc")), PathBuf::from),
     };
     let cap_s = arg(&args, "--cap-min").map_or(60.0, |m| m.parse::<f64>().unwrap()) * 60.0;
-    let max_rss_kb = (arg(&args, "--max-rss-gb").map_or(8.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
+    // E020: FMI_READ_MAX_RSS_GB, the bound when no --max-rss-gb is given (8 GB): in process the RSS is the driver's, so a
+    // reading's growth there counts the other tries' too
+    let max_rss_gb = arg(&args, "--max-rss-gb")
+        .or_else(|| std::env::var("FMI_READ_MAX_RSS_GB").ok().filter(|v| !v.is_empty()))
+        .map_or(8.0, |g| g.parse::<f64>().unwrap());
+    let max_rss_kb = (max_rss_gb * 1024.0 * 1024.0) as u64;
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let max_files_b = arg(&args, "--max-files-gb").map(|g| (g.parse::<f64>().unwrap() * 1073741824.0) as u64);
     let max_cpu_s: Option<f64> = arg(&args, "--max-cpu-s").map(|c| c.parse().unwrap());
@@ -1057,6 +1062,18 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let stream = tee.stream.take().unwrap();
     let keys = stream.fact_keys();
     let goal_labels: Vec<(String, Vec<Label>)> = goal.iter().map(|(k, v)| (k.clone(), v.iter().map(|&x| Label::Int(x)).collect())).collect();
+    // E014 (FMI_GOAL_END=1): a goal key that is no fact of the game (the game's own end, `end`) has no domain; it gets
+    // {its start value, the goal's values}. Nothing writes it, so the task never reaches it. Off: as before (every
+    // goal key of a fact goal has its domain).
+    if std::env::var("FMI_GOAL_END").is_ok_and(|v| v == "1") {
+        for (k, vs) in &goal {
+            if b.table.domain(k).is_none() {
+                let mut v: Vec<i64> = vs.clone();
+                v.push(start.get0(k));
+                b.table.extra.insert(k.clone(), crate::domain::Domain::of(v, None, None));
+            }
+        }
+    }
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
     let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
     let (info, folded, kept_actions, written) = if prep {
@@ -1133,6 +1150,14 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let pass_counts: BTreeMap<String, i64> =
         b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
+    // E026 C1: under the switch wait_queued, the machine's counts of its waits and of the sentences paths held
+    if b.switches.wait_queued {
+        let q: BTreeMap<String, i64> = b.rd.counts.0.iter()
+            .filter(|(k, _)| k.starts_with("wait_queued: ") || k.starts_with("FMI_READ_QUEUE: "))
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        r["wait_queued"] = json!(q);
+    }
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
     // the lists of locals the last pass folded (their `args:` numbers rewritten to 0 at its end): golden lines
     // streamed as made (--golden without --keep) still carry their numbers (replay_part1.py read_rust's stream)

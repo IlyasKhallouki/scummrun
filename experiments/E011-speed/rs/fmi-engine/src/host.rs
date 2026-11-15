@@ -21,10 +21,26 @@ pub const GAMEID: &str = "monkey";
 pub const PLATFORM: &str = "pc";
 pub const TALKSPEED: u32 = 255;
 pub const BOOT_PARAM: i32 = 0;
+
+/// The number given to the game's boot script: 0 (a boot as a player's), or FMI_BOOT_PARAM. A game's boot script may
+/// hold starts of its own for other numbers (its makers' shortcuts into later parts): a run from such a start is a
+/// test of that part, and its stops replay from that start, not from the boot.
+pub fn boot_param() -> i32 {
+    std::env::var("FMI_BOOT_PARAM").ok().and_then(|v| v.parse().ok()).unwrap_or(BOOT_PARAM)
+}
 pub const MAX_TICKS: u64 = 10_000_000;
 pub const MAX_FRAME: u64 = 200_000;
 /// replay_part1.ANY_SEED: never used
 pub const ANY_SEED: u32 = 836_557_856;
+
+/// E014's switch `FMI_GAME_ID` (experiments/E014-fate-demo): another game's ScummVM game id; its files are in
+/// `FMI_GAME_DIR`. Unset: MI's DOS CD release (`TARGET`, `GAMEID`, the root's game/dos-cd), as before. Set, every
+/// engine also gets a save folder of its own, made empty at its boot (`HostCfg::own_saves`): a game's scripts may
+/// write and read files there (SCUMM v5's roomOps 9, 13, 14), and a shared folder would carry one run's files into
+/// another's boot.
+pub fn game_id_env() -> Option<String> {
+    std::env::var("FMI_GAME_ID").ok().filter(|v| !v.is_empty())
+}
 
 /// Where the engine and the game are, and the per-command timeout.
 #[derive(Clone, Debug)]
@@ -35,6 +51,11 @@ pub struct HostCfg {
     pub root: PathBuf,
     /// the game's files (releases.game_dir of dos-cd)
     pub game_dir: PathBuf,
+    /// the ScummVM target (the ini's section) and game id (E014: FMI_GAME_ID's; else MI's)
+    pub target: String,
+    pub gameid: String,
+    /// E014: every engine's save folder is its own (OUT/saves, made empty at the boot), not the root's shared one
+    pub own_saves: bool,
     pub timeout: Duration,
     /// more bridge settings for every engine (the checks: SPEEDRUN_DUMP_EXACT, one lean switch alone)
     pub extra_env: Vec<(String, String)>,
@@ -54,6 +75,12 @@ pub fn boxes_on() -> bool {
     std::env::var("FMI_BOXES").is_ok_and(|v| v == "1")
 }
 
+/// E013's switches `SPEEDRUN_INPUT=1` (the input log, patch 0007) and `FMI_REFUSE=1` (component refuse, which reads
+/// it): either passes SPEEDRUN_INPUT=1 to every engine. Off by default.
+pub fn input_log_on() -> bool {
+    std::env::var("SPEEDRUN_INPUT").is_ok_and(|v| v == "1") || std::env::var("FMI_REFUSE").is_ok_and(|v| v == "1")
+}
+
 impl HostCfg {
     /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd;
     /// FMI_ENGINE_CUTS=1: every engine also gets SPEEDRUN_CUTS=1, round 2's count-only mixer and no pixel output
@@ -71,7 +98,13 @@ impl HostCfg {
                 .canonicalize()
                 .unwrap_or_default()
         });
-        let game = root.join("game").join("dos-cd");
+        let (target, gameid, game, own_saves) = match game_id_env() {
+            Some(id) => {
+                let dir = std::env::var_os("FMI_GAME_DIR").map(PathBuf::from).expect("FMI_GAME_DIR: the files of FMI_GAME_ID's game");
+                (id.clone(), id, dir, true)
+            }
+            None => (TARGET.to_string(), GAMEID.to_string(), root.join("game").join("dos-cd"), false),
+        };
         let game_dir = game.canonicalize().unwrap_or(game);
         let mut extra_env = Vec::new();
         if std::env::var("FMI_ENGINE_CUTS").is_ok_and(|v| v == "1") {
@@ -80,19 +113,46 @@ impl HostCfg {
         if report_restart() {
             extra_env.push(("SPEEDRUN_REPORT_RESTART".to_string(), "1".to_string()));
         }
+        // E014: the decision point without verb ids (SPEEDRUN_IDLE=handler) and the end's site (SPEEDRUN_END_SITE=1),
+        // passed to every engine when set in this process's environment (an engine with the E014 patch).
+        // E024 (plan.md Part 2, item 8): the segment's start frame (SPEEDRUN_START_FRAME, patch 0001) and var 19's
+        // required value (SPEEDRUN_TIMER_NEXT), so skips run from boot; extra_env goes on after TIMER_NEXT=any (spawn)
+        // E027: an image verb's name is its image's hash (SPEEDRUN_VERB_IMAGES=1, engine svm-e027)
+        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE", "SPEEDRUN_START_FRAME", "SPEEDRUN_TIMER_NEXT", "SPEEDRUN_VERB_IMAGES"] {
+            if let Some(v) = std::env::var(k).ok().filter(|v| !v.is_empty()) {
+                extra_env.push((k.to_string(), v));
+            }
+        }
+        // E013 (patch 0007): the input log, passed to every engine with SPEEDRUN_INPUT=1, and with FMI_REFUSE=1 (the
+        // component refuse reads it); an engine with patch 0007
+        if input_log_on() {
+            extra_env.push(("SPEEDRUN_INPUT".to_string(), "1".to_string()));
+        }
         HostCfg {
             bin,
             root,
             game_dir,
+            target,
+            gameid,
+            own_saves,
             timeout: Duration::from_secs(600),
             extra_env,
         }
     }
 
+    /// The save folder of an engine whose out folder is `out`: its own (E014), else the root's shared one.
+    pub fn saves(&self, out: &Path) -> PathBuf {
+        if self.own_saves {
+            out.join("saves")
+        } else {
+            self.root.join("out/scummvm/saves")
+        }
+    }
+
     /// engine.py `_ini_text` (the run's scummvm.ini), plus `joystick_num=-1` when lean (no joystick scan at start).
-    pub fn ini_text(&self, lean: bool) -> String {
+    /// `saves`: the save folder (`HostCfg::saves`).
+    pub fn ini_text(&self, lean: bool, saves: &Path) -> String {
         let mut s = String::from("[scummvm]\n");
-        let saves = self.root.join("out/scummvm/saves");
         for (k, v) in [
             ("savepath", saves.display().to_string()),
             ("autosave_period", "0".into()),
@@ -117,9 +177,9 @@ impl HostCfg {
         if lean {
             s.push_str("joystick_num=-1\n");
         }
-        s.push_str(&format!("\n[{TARGET}]\n"));
+        s.push_str(&format!("\n[{}]\n", self.target));
         for (k, v) in [
-            ("gameid", GAMEID.to_string()),
+            ("gameid", self.gameid.clone()),
             ("engineid", "scumm".into()),
             ("path", self.game_dir.display().to_string()),
             ("platform", PLATFORM.into()),
@@ -132,6 +192,14 @@ impl HostCfg {
             ("talkspeed", TALKSPEED.to_string()),
         ] {
             s.push_str(&format!("{k}={v}\n"));
+        }
+        // FMI_GAME_INI: more of the game's ScummVM settings, K=V,K=V (unset: none). The MI2 demo's
+        // `disable_mi2_ni_demo=true` turns off its recorded playback, so it takes clicks.
+        if let Ok(extra) = std::env::var("FMI_GAME_INI") {
+            for kv in extra.split(',').filter(|kv| kv.contains('=')) {
+                s.push_str(kv.trim());
+                s.push('\n');
+            }
         }
         s
     }
@@ -297,6 +365,7 @@ static SEQ: AtomicU64 = AtomicU64::new(0);
 
 impl Host {
     pub fn new(cfg: HostCfg) -> std::io::Result<Host> {
+        sys::raise_nofile();
         Ok(Host { cfg: Arc::new(cfg) })
     }
 
@@ -308,27 +377,31 @@ impl Host {
         &self.cfg
     }
 
-    /// A fresh engine (replay_part1.config's settings, the binary channel, the lean switches when `cfg.lean`), its
-    /// movie from boot as SPEEDRUN_INPUTS (events up to `cfg.frame` when set), stopped at its first decision point.
-    pub fn spawn(&self, cfg: &BootCfg) -> EResult<BinEngine> {
+    /// The engine's command for a boot: its out folder, ini and save folder made, its settings, its movie from boot
+    /// as SPEEDRUN_INPUTS (events up to `cfg.frame` when set); with no control channel (`spawn` adds it).
+    fn command(&self, cfg: &BootCfg) -> EResult<Command> {
         if cfg.seed == ANY_SEED {
             return Err(EngineError::Bridge(
                 "the Any% seed is never used by the system's runs".into(),
             ));
         }
         let h = &*self.cfg;
-        let family = Arc::new(Family::new(h.timeout).map_err(io_err)?);
         let out = &cfg.out_dir;
+        let saves = h.saves(out);
+        if h.own_saves {
+            // E014: an empty save folder at every boot
+            let _ = std::fs::remove_dir_all(&saves);
+        }
         for d in [
             out.clone(),
-            h.root.join("out/scummvm/saves"),
+            saves.clone(),
             out.join("xdg/data"),
             out.join("xdg/cache"),
         ] {
             std::fs::create_dir_all(&d).map_err(io_err)?;
         }
         let ini = out.join("scummvm.ini");
-        std::fs::write(&ini, h.ini_text(cfg.lean)).map_err(io_err)?;
+        std::fs::write(&ini, h.ini_text(cfg.lean, &saves)).map_err(io_err)?;
         let events: Vec<&Event> = cfg
             .events
             .iter()
@@ -338,11 +411,11 @@ impl Host {
         sorted.sort_by_key(|e| e.frame); // stable, as write_events
         let mut cmd = Command::new(&h.bin);
         cmd.arg(format!("--config={}", ini.display()))
-            .arg(format!("--savepath={}", h.root.join("out/scummvm/saves").display()))
-            .arg(format!("--boot-param={BOOT_PARAM}"))
+            .arg(format!("--savepath={}", saves.display()))
+            .arg(format!("--boot-param={}", boot_param()))
             .arg("--disable-sdl-audio")
             .arg(format!("--random-seed={}", cfg.seed))
-            .arg(TARGET);
+            .arg(&h.target);
         for (k, _) in std::env::vars_os() {
             if k.to_string_lossy().starts_with("SPEEDRUN_") {
                 cmd.env_remove(k);
@@ -357,9 +430,20 @@ impl Host {
             .env("XDG_DATA_HOME", out.join("xdg/data"))
             .env("XDG_CACHE_HOME", out.join("xdg/cache"))
             .env("SDL_VIDEODRIVER", "dummy")
-            .env("SDL_AUDIODRIVER", "dummy")
-            .env("SPEEDRUN_CONTROL", &family.sock)
-            .env("SPEEDRUN_WIRE", "bin");
+            .env("SDL_AUDIODRIVER", "dummy");
+        // E020 (FMI_IMUSE_TICKS=1): iMUSE's sequencer advances by game time, not on the mixer's wall-time timer
+        if std::env::var("FMI_IMUSE_TICKS").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_IMUSE_TICKS", "1");
+        }
+        // E021 (FMI_TEMP_SAVES=1): the scripts' temporary saves and loads are the game's, kept in the engine's memory
+        if std::env::var("FMI_TEMP_SAVES").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_TEMP_SAVES", "1");
+        }
+        // E024 (FMI_MEM_FILES=1, patch 0010): the files the scripts write (roomOps 13, 14) kept in the engine's memory,
+        // so the forks of one boot (a scan's candidates) never share the save folder's file
+        if std::env::var("FMI_MEM_FILES").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_MEM_FILES", "1");
+        }
         if !sorted.is_empty() {
             let movie = out.join("prefix.jsonl");
             let text: String = sorted.iter().map(|e| event_line(e) + "\n").collect();
@@ -375,6 +459,40 @@ impl Host {
         for (k, v) in &h.extra_env {
             cmd.env(k, v);
         }
+        Ok(cmd)
+    }
+
+    /// E024 (plan.md Part 2, item 9): the engine run standalone, its movie from boot as `spawn` gives it but no
+    /// control channel: it runs the movie by itself until its end or `max_ticks` (SPEEDRUN_MAX_TICKS), and the end is
+    /// in its trace (OUT/trace.jsonl). Waits for it at most `wall`.
+    pub fn standalone(&self, cfg: &BootCfg, max_ticks: u64, wall: Duration) -> EResult<std::process::ExitStatus> {
+        let mut cmd = self.command(cfg)?;
+        cmd.env("SPEEDRUN_MAX_TICKS", max_ticks.to_string());
+        let log = std::fs::File::create(cfg.out_dir.join("stdout.log")).map_err(io_err)?;
+        let log2 = log.try_clone().map_err(io_err)?;
+        cmd.stdin(Stdio::null()).stdout(log).stderr(log2);
+        let mut child = cmd.spawn().map_err(io_err)?;
+        let t = Instant::now();
+        loop {
+            match child.try_wait().map_err(io_err)? {
+                Some(st) => return Ok(st),
+                None if t.elapsed() < wall => std::thread::sleep(Duration::from_millis(20)),
+                None => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(EngineError::Bridge(format!("standalone: no end within {} s", wall.as_secs())));
+                }
+            }
+        }
+    }
+
+    /// A fresh engine (replay_part1.config's settings, the binary channel, the lean switches when `cfg.lean`), its
+    /// movie from boot as SPEEDRUN_INPUTS (events up to `cfg.frame` when set), stopped at its first decision point.
+    pub fn spawn(&self, cfg: &BootCfg) -> EResult<BinEngine> {
+        let mut cmd = self.command(cfg)?;
+        let family = Arc::new(Family::new(self.cfg.timeout).map_err(io_err)?);
+        cmd.env("SPEEDRUN_CONTROL", &family.sock).env("SPEEDRUN_WIRE", "bin");
+        let out = &cfg.out_dir;
         let log = std::fs::File::create(out.join("stdout.log")).map_err(io_err)?;
         let log2 = log.try_clone().map_err(io_err)?;
         cmd.stdin(Stdio::null()).stdout(log).stderr(log2);
@@ -427,6 +545,9 @@ impl EngineHost for Host {
     }
 }
 
+/// Spike (E027): nanoseconds of `fork_bin` so far: to the parent's reply, then to the child's connection.
+pub static FORK_NS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
 /// What a Step returns besides the new state (kept in the engine: `facts`, `block`).
 #[derive(Clone, Debug, Default)]
 pub struct StepOut {
@@ -455,6 +576,8 @@ pub struct BinEngine {
     last_delta: bool,
     /// the block before the last Step (step_changes's scratch)
     prev: Vec<u8>,
+    /// E019: the keys the next waits stop on (`Engine::set_watch`), for StepTrace (FMI_STEP_TRACE=1)
+    watch: Option<Vec<Key>>,
     /// how the facts were had: (followed a delta, built whole)
     pub facts_counts: (u64, u64),
     proc_: Option<Child>,
@@ -481,6 +604,7 @@ impl BinEngine {
             ranges: Vec::new(),
             last_delta: false,
             prev: Vec::new(),
+            watch: None,
             facts_counts: (0, 0),
             proc_: None,
             done: false,
@@ -639,6 +763,26 @@ impl BinEngine {
     /// The JSON "boxes" reply's text at the current stop (patch 0005's BoxesJson; the Boxes gate's other side).
     pub fn boxes_json(&mut self) -> EResult<String> {
         self.send(W::msg(wire::C_BOXES_JSON).finish())?;
+        let p = self.expect(wire::R_JSON)?;
+        let mut r = R::new(&p);
+        let s = r.str().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(s)
+    }
+
+    /// The JSON "input_log" reply's text at the current stop (patch 0007's InputLogJson; takes the records, as InputLog).
+    pub fn input_log_json(&mut self) -> EResult<String> {
+        self.send(W::msg(wire::C_INPUT_LOG_JSON).finish())?;
+        let p = self.expect(wire::R_JSON)?;
+        let mut r = R::new(&p);
+        let s = r.str().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(s)
+    }
+
+    /// The JSON "digest" reply's text at the current stop (patch 0007's DigestJson).
+    pub fn digest_json(&mut self) -> EResult<String> {
+        self.send(W::msg(wire::C_DIGEST_JSON).finish())?;
         let p = self.expect(wire::R_JSON)?;
         let mut r = R::new(&p);
         let s = r.str().map_err(bad)?;
@@ -892,6 +1036,100 @@ impl Engine for BinEngine {
         Ok(b)
     }
 
+    /// One InputLog message (patch 0007, E013's component refuse): the records since the last one, taken.
+    fn input_log(&mut self) -> EResult<InputLog> {
+        self.send(W::msg(wire::C_INPUT_LOG).finish())?;
+        let p = self.expect(wire::R_INPUT_LOG)?;
+        let mut r = R::new(&p);
+        let l = r.input_log().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(l)
+    }
+
+    /// One Digest message (patch 0007).
+    fn digest(&mut self) -> EResult<Digest> {
+        self.send(W::msg(wire::C_DIGEST).finish())?;
+        let p = self.expect(wire::R_DIGEST)?;
+        let mut r = R::new(&p);
+        let d = r.digest().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(d)
+    }
+
+    fn set_watch(&mut self, keys: Option<&[Key]>) {
+        self.watch = keys.map(|k| k.to_vec());
+    }
+
+    /// E019 (FMI_STEP_TRACE=1 with a watch): the frames run by StepTrace, a batch at a time: the engine runs frame by
+    /// frame and replies after the first frame that changed a watched key's bytes (or at the batch's end), with every
+    /// frame's status and delta; `each` sees them frame by frame as `step_changes(1)` would give them. Otherwise one
+    /// `step_changes(1)` per frame (the trait's default).
+    fn wait(&mut self, frames: u64, each: &mut dyn FnMut(&Status, &[(Key, Val, Val)]) -> bool) -> EResult<(Status, u64)> {
+        let trace = std::env::var("FMI_STEP_TRACE").is_ok_and(|v| v == "1");
+        let mut st = self.status().clone();
+        let mut n = 0u64;
+        let Some(keys) = self.watch.clone().filter(|_| trace) else {
+            while n < frames {
+                let (s, ch) = self.step_changes(1)?;
+                n += 1;
+                st = s;
+                if each(&st, &ch) {
+                    break;
+                }
+            }
+            return Ok((st, n));
+        };
+        while n < frames {
+            self.block()?;
+            let ranges = block::watch_ranges(&self.last, &keys);
+            let batch = (frames - n).min(4096) as u32;
+            let mut w = W::msg(wire::C_STEP_TRACE);
+            w.u32(batch);
+            w.u32(ranges.len() as u32);
+            for (o, l) in &ranges {
+                w.u32(*o);
+                w.u32(*l);
+            }
+            self.send(w.finish())?;
+            self.moved();
+            let p = self.expect(wire::R_STEP_TRACE_REPLY)?;
+            let mut r = R::new(&p);
+            let count = r.u32().map_err(bad)?;
+            let mut prev = std::mem::take(&mut self.prev);
+            for i in 0..count {
+                let status = r.status().map_err(bad)?;
+                prev.clear();
+                prev.extend_from_slice(&self.last);
+                let mut rg = std::mem::take(&mut self.ranges);
+                let delta = block::apply(&mut self.last, &mut r, &mut rg).map_err(bad)?;
+                let ch = block::changes(&prev, &self.last, &rg, delta).map_err(bad)?;
+                self.ranges = rg;
+                self.last_delta = delta;
+                self.last_facts = None;
+                self.status = status.clone();
+                st = status;
+                n += 1;
+                if each(&st, &ch) {
+                    if i + 1 != count {
+                        self.prev = prev;
+                        return Err(bad(format!("step_trace: the wait stopped at frame {} of a batch of {count}", i + 1)));
+                    }
+                    r.done().map_err(bad)?;
+                    self.prev = prev;
+                    self.last_now = true;
+                    return Ok((st, n));
+                }
+            }
+            r.done().map_err(bad)?;
+            self.prev = prev;
+            self.last_now = true;
+            if count == 0 {
+                break;
+            }
+        }
+        Ok((st, n))
+    }
+
     /// One Step, its delta read into the facts' changes (block::changes) with no whole facts built (IFACE e011-r2-own).
     fn step_changes(&mut self, frames: u32) -> EResult<(Status, Vec<(Key, Val, Val)>)> {
         // the base: this stop's block (a State round trip unless a Step brought it)
@@ -928,12 +1166,16 @@ impl BinEngine {
 
     /// `fork` as a `BinEngine`: the child stops where this one is, with this stop's facts already known.
     pub fn fork_bin(&mut self) -> EResult<BinEngine> {
+        let t0 = Instant::now();
         self.send(W::msg(wire::C_FORK).finish())?;
         let p = self.expect(wire::R_FORKED)?;
+        FORK_NS[0].fetch_add(t0.elapsed().as_nanos() as u64, Ordering::Relaxed);
+        let t0 = Instant::now();
         let mut r = R::new(&p);
         let pid = r.u32().map_err(bad)?;
         r.done().map_err(bad)?;
         let mut c = self.child_of(pid)?;
+        FORK_NS[1].fetch_add(t0.elapsed().as_nanos() as u64, Ordering::Relaxed);
         if self.last_now {
             // the child stands where this one stands: the same block and facts. Its connection has sent no block,
             // so its first block comes whole and `last` is only a cache there, never a delta's base.

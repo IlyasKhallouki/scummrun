@@ -1,0 +1,20 @@
+{
+  "ladder": "Monkey Island Part I's P0-P14 (E026 plan.md I2). Evaluation only: the system never reads it. run_b: run B's frame (E003 results/groundtruth-part1.jsonl, which skips the intro; P0's is the root's here, without skips)",
+  "rungs": [
+    {"rung": "P0", "what": "the root (first control)", "full": true, "all": [], "run_b": 2728},
+    {"rung": "P1", "what": "owner:566=1 (kitchen)", "all": [["owner:566", "=", 1]], "run_b": 574},
+    {"rung": "P2", "what": "bit:72=1 (money)", "all": [["bit:72", "=", 1]], "run_b": 1056},
+    {"rung": "P3", "what": "bit:65=1 (map)", "all": [["bit:65", "=", 1]], "run_b": 1778},
+    {"rung": "P4", "what": "owner:396=owner:388=1, bit:98=1 (store)", "all": [["owner:396", "=", 1], ["owner:388", "=", 1], ["bit:98", "=", 1]], "run_b": 2421},
+    {"rung": "P5", "what": "bit:19=1 (sword training)", "all": [["bit:19", "=", 1]], "run_b": 4224},
+    {"rung": "P6", "what": "var:196>=1 (a trial)", "all": [["var:196", ">=", 1]], "run_b": 3635},
+    {"rung": "P7", "what": "var:196>=2 (two trials)", "all": [["var:196", ">=", 2]], "run_b": 5201},
+    {"rung": "P8", "what": "var:196>=3 (the trials)", "all": [["var:196", ">=", 3]], "run_b": 6277},
+    {"rung": "P9", "what": "bit:304=1 (crew phase)", "all": [["bit:304", "=", 1]], "run_b": 6517},
+    {"rung": "P10", "what": "bit:51=1 (ship)", "all": [["bit:51", "=", 1]], "run_b": 7048},
+    {"rung": "P11", "what": "at least 1 of bit:89, bit:88, bit:76 =1 (the crew)", "least": 1, "of": [["bit:89", "=", 1], ["bit:88", "=", 1], ["bit:76", "=", 1]], "run_b": 7435},
+    {"rung": "P12", "what": "at least 2 of bit:89, bit:88, bit:76 =1 (the crew)", "least": 2, "of": [["bit:89", "=", 1], ["bit:88", "=", 1], ["bit:76", "=", 1]], "run_b": 8051},
+    {"rung": "P13", "what": "at least 3 of bit:89, bit:88, bit:76 =1 (the crew)", "least": 3, "of": [["bit:89", "=", 1], ["bit:88", "=", 1], ["bit:76", "=", 1]], "run_b": 9278},
+    {"rung": "P14", "what": "owner:901=owner:902=owner:903=1 (end)", "all": [["owner:901", "=", 1], ["owner:902", "=", 1], ["owner:903", "=", 1]], "run_b": 9539}
+  ]
+}

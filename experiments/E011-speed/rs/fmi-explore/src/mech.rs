@@ -100,6 +100,8 @@ pub struct Waited {
     pub end: String,
     /// the engine's end reason and frame when the run ended in the wait
     pub ended: Option<(String, u64)>,
+    /// E014: the end's frame and tick (the engine's end status) when the run ended in the wait
+    pub ended_at: Option<(u64, u64)>,
     pub is_static: bool,
     /// the last due frame read (absolute; frame0 when no slot was paused)
     pub due: u64,
@@ -228,6 +230,34 @@ pub fn trigger_of_stop(stop: Option<&str>) -> Option<Trigger> {
     }
 }
 
+/// E024 Part 1: `FMI_AFFORD_P0=1`, the affordance step of an attempt that stopped on its trailing empty windows runs at
+/// P0, where they began, not at the attempt's end (experiments/E024-shorten/plan.md, "The affordance step runs at P0").
+pub fn afford_p0() -> bool {
+    env_is("FMI_AFFORD_P0", "1")
+}
+
+/// E024 Part 1: an empty window whose search gave up with the parent unchanged: no try chosen, and the end its frame
+/// bound, its tries' stop (FMI_READY_END) or E013's refused input. A window that ended on a change in the parent (an
+/// input's precondition closed, a record refuted, the goal) is a state the game reached by itself.
+fn gave_up(w: &Value) -> bool {
+    let e = w["end_reason"].as_str().unwrap_or("");
+    let bound = e.strip_suffix(" frames").is_some_and(|n| !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit()));
+    w["best"].is_null() && (bound || e == "ready: forking stopped, no try left" || e.starts_with("refused input"))
+}
+
+/// E024 Part 1: P0 of an attempt's window records, the start of its trailing run of empty windows that gave up
+/// (`gave_up`); the attempt's start `frame0` when every window is one. None: no window, or the last one is not.
+pub fn p0_of(windows: &[Value], frame0: i64) -> Option<i64> {
+    let n = windows.iter().rev().take_while(|w| gave_up(w)).count();
+    if n == 0 {
+        None
+    } else if n == windows.len() {
+        Some(frame0)
+    } else {
+        windows[windows.len() - n]["start"].as_i64()
+    }
+}
+
 /// The game's end a harness stop names ("engine: engine ended: R" with R one of fmi-core's GAME_ENDS).
 pub fn game_end_of_stop(stop: Option<&str>) -> Option<String> {
     let r = stop?.strip_prefix("engine: engine ended: ")?;
@@ -238,6 +268,47 @@ pub fn game_end_of_stop(stop: Option<&str>) -> Option<String> {
 /// A dead move (plan.md 5): its run ended in the game's own end; it has no entry. result.json "dead".
 pub fn dead_json(reason: &str, frame: u64, events: &[Value], how: &str) -> Value {
     json!({"reason": reason, "frame": frame, "events": events, "how": how})
+}
+
+/// E014's switch `FMI_GOAL_END` (experiments/E014-fate-demo plan.md (d)): the stage goal `end=1` is the game's own
+/// end reached through a script (a restart or quit that a script's systemOps made, named by the engine with
+/// SPEEDRUN_END_SITE=1). On, a move whose run ends there is also an entry (`end_extra`), whose one checkpoint holds
+/// `fmi_core::end_facts` (`end` = 1 and the site): the goal entry. Off (the default), as E012: a dead move only.
+pub fn goal_end() -> bool {
+    std::env::var("FMI_GOAL_END").is_ok_and(|v| v == "1")
+}
+
+/// E016 section E's switch `FMI_GOAL_SITE=verb` (experiments/E016-realize-run/plan.md, "E. The end must come from a
+/// verb handler"): with `goal_end` on, an end is the goal's entry only when the slot that ran systemOps runs an
+/// object's verb handler (`end_from_verb`). Unset (the default): every end with a script site is, as in E014.
+pub fn goal_site_verb() -> bool {
+    std::env::var("FMI_GOAL_SITE").is_ok_and(|v| v == "verb")
+}
+
+/// E016 E: the end's facts (`fmi_core::end_facts`) name an object's verb handler. `end:where` is the restarting slot's
+/// `where` (patch 0006-e014's `scriptSite`, ScummVM's WhereIsObject). An object's verb handler runs in a slot whose
+/// `where` is the object's place: 0 (inventory), 1 (room) or 4 (floating object). A global script's slot is 2 and a
+/// room's local script's 3, so a global reached through an override jump (a death screen that restarts on its
+/// override key) is not one. These are the engine's slot kinds, not a game's numbers.
+pub fn end_from_verb(facts: &Facts) -> bool {
+    facts.get(Key::parse("end")) == Some(1) && matches!(facts.get(Key::parse("end:where")), Some(0) | Some(1) | Some(4))
+}
+
+/// E014: the end entry of a move whose run ended at a script's restart or quit (`goal_end`): its events after the
+/// try's entry and one checkpoint at the end's frame and tick, with the end's facts. None when the switch is off or
+/// the end has no script site. With E016's `goal_site_verb`, also None when the site is not an object's verb handler:
+/// the move is a dead move only.
+pub fn end_extra(reason: &str, frame: u64, tick: u64, events: Vec<Value>, prefix_cps: &[Checkpoint]) -> Option<Extra> {
+    if !goal_end() {
+        return None;
+    }
+    let facts = fmi_core::end_facts(reason)?;
+    if goal_site_verb() && !end_from_verb(&facts) {
+        return None;
+    }
+    let mut cps: Vec<Checkpoint> = prefix_cps.iter().filter(|c| c.frame < frame).cloned().collect();
+    cps.push(Checkpoint { frame, facts, tick, rng: 0, actors: vec![] });
+    Some(Extra { how: "end", events, cps, novel: vec!["end".into()] })
 }
 
 /// An entry the try commits besides its attempt's: its events after the try's entry (absolute frames) and its
@@ -413,6 +484,10 @@ pub fn afford_step(e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nov: &Try
         let mut evs = prefix_events.to_vec();
         evs.extend(tr.events.iter().map(events::event_json));
         out.dead.push(dead_json(&tr.reason, tr.frame, &evs, "afford"));
+        // E014 (FMI_GOAL_END): a trial that ends the game through a script is also the goal's entry
+        if let Some(x) = end_extra(&tr.reason, tr.frame, tr.tick, evs, prefix_cps) {
+            out.kept.push(x);
+        }
     }
     out.cpu_s += r.engine_cpu_s;
     let mut rec = r.json();
@@ -428,10 +503,93 @@ pub fn afford_step(e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nov: &Try
     Ok(out)
 }
 
+
+/// E014's switches `FMI_NOVEL_VERBS=1` and `FMI_NOVEL_GUIDE=1`: more atoms for T, the atoms the wait stops on and the
+/// try's novelty is over, from the game's own mechanics, where the reading tests few (a reading that models few inputs,
+/// e.g. a dialog's lines at the start, or one read short):
+///
+/// - verbs: `verb:V = 1` for every verb of the reading's scope (its sentence and dialog verbs, read from the scripts'
+///   VerbOps) and every verb the entry shows: a state that shows an input slot no entry showed offers inputs no entry
+///   offered (plan.md 4 enumerates inputs from the visible verb slots);
+/// - guide: the guide's atoms of one value (the regression from the goal's sites: values tested on the way to it), and
+///   `= 1` for each bit the guide names with any value.
+///
+/// Each is added once, after the reading's own atoms. Returns the number added. Unset: T is the reading's, as before.
+pub fn novelty_extra(flat: &mut Vec<(Key, Vec<Val>)>, job: &Value, scope: &Value, entry: &Facts) -> usize {
+    let on = |k: &str| std::env::var(k).is_ok_and(|v| v == "1");
+    let mut have: HashSet<(Key, Vec<Val>)> = flat.iter().cloned().collect();
+    let n0 = flat.len();
+    let mut push = |flat: &mut Vec<(Key, Vec<Val>)>, k: Key, v: Val| {
+        let a = (k, vec![v]);
+        if have.insert(a.clone()) {
+            flat.push(a);
+        }
+    };
+    if on("FMI_NOVEL_VERBS") {
+        let mut vs: BTreeSet<i64> = BTreeSet::new();
+        for f in ["verbs", "dialog_verbs"] {
+            if let Some(a) = scope.get(f).and_then(|x| x.as_array()) {
+                vs.extend(a.iter().filter_map(|x| x.as_i64()));
+            }
+        }
+        for &(k, v) in entry.iter() {
+            if v != 0 {
+                if let Some(n) = k.text().strip_prefix("verb:").and_then(|n| n.parse::<i64>().ok()) {
+                    vs.insert(n);
+                }
+            }
+        }
+        for v in vs {
+            push(flat, Key::parse(&format!("verb:{v}")), 1);
+        }
+    }
+    if on("FMI_NOVEL_GUIDE") {
+        if let Some(g) = job.get("guide").and_then(|g| g.as_str()).and_then(|p| std::fs::read_to_string(p).ok()) {
+            if let Ok(g) = serde_json::from_str::<Value>(&g) {
+                for a in g.get("atoms").and_then(|x| x.as_array()).into_iter().flatten() {
+                    let Some(k) = a.get(0).and_then(|x| x.as_str()) else { continue };
+                    if k == "room" {
+                        continue; // rooms are novel by themselves
+                    }
+                    match a.get(1).and_then(|x| x.as_i64()) {
+                        Some(v) => push(flat, Key::parse(k), v),
+                        None if k.starts_with("bit:") => push(flat, Key::parse(k), 1),
+                        None => {}
+                    }
+                }
+            }
+        }
+    }
+    flat.len() - n0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use fmi_core::K_ROOM;
+
+    #[test]
+    fn p0_is_where_the_trailing_empty_windows_began() {
+        let w = |start: i64, best: bool, end: &str| json!({"start": start, "best": if best { json!({"g": start}) } else { Value::Null }, "end_reason": end});
+        let chose = w(10656, true, "ready: the first end point in the order of tries");
+        let empty = |s: i64| w(s, false, "3600 frames");
+        assert_eq!(p0_of(&[chose.clone(), empty(10764), empty(14364)], 10656), Some(10764));
+        assert_eq!(p0_of(&[empty(2521), empty(6121)], 2521), Some(2521));
+        assert_eq!(p0_of(&[empty(2521), chose.clone()], 2521), None);
+        assert_eq!(p0_of(&[], 2521), None);
+        // a window the plan matched in the parent is no empty window; a delay fork's fallback chose a try
+        let matched = w(10700, false, "matched in the parent");
+        assert_eq!(p0_of(&[chose.clone(), matched, empty(10764), empty(14364)], 10656), Some(10764));
+        assert_eq!(p0_of(&[empty(10600), w(10656, true, "3600 frames"), empty(10764)], 10600), Some(10764));
+        let ready_end = |s: i64| w(s, false, "ready: forking stopped, no try left");
+        assert_eq!(p0_of(&[chose.clone(), ready_end(10764), empty(11059)], 10656), Some(10764));
+        assert_eq!(p0_of(&[ready_end(2521), w(2815, false, "refused input: dropped: gate")], 2521), Some(2521));
+        // a precondition closed in the parent: the game changed by itself there (j08932, 18802), so the run ends
+        let closed = |s: i64| w(s, false, "the input's precondition closed in the parent after its window opened");
+        assert_eq!(p0_of(&[chose.clone(), closed(18322), ready_end(18324), closed(18618)], 17965), None);
+        assert_eq!(p0_of(&[chose, closed(18322), ready_end(18324)], 17965), Some(18324));
+        assert_eq!(p0_of(&[closed(2521), ready_end(2523)], 2521), Some(2523));
+    }
 
     fn facts(pairs: &[(&str, i64)]) -> Facts {
         Facts::from_pairs(pairs.iter().map(|(k, v)| (Key::parse(k), *v)).collect())
@@ -555,6 +713,7 @@ impl WaitPort for RealWait {
             v
         });
         Ok(Waited {
+            ended_at: w.end_at,
             frame0: w.frame0,
             stops: w.stops.iter().map(|s| Stop { frame: s.frame, checkpoint: s.checkpoint.clone(), room: s.room }).collect(),
             end: w.end.text(),

@@ -1,0 +1,70 @@
+{
+ "entry": 184,
+ "inputs": 2,
+ "rows": [
+  {
+   "input": 0,
+   "click_frame": 1201,
+   "stop": 1302,
+   "reason": "idle",
+   "room": 49,
+   "xstart": 0,
+   "live": [
+    "local:209",
+    "local:211",
+    "local:216",
+    "script:151",
+    "script:75"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 2
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 2
+   },
+   "T": {
+    "kept": false,
+    "novel": 0
+   }
+  },
+  {
+   "input": 1,
+   "click_frame": 1320,
+   "stop": 1405,
+   "reason": "idle",
+   "room": 63,
+   "xstart": 88,
+   "live": [
+    "local:202",
+    "script:151",
+    "script:59",
+    "script:75"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 15
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 9
+   },
+   "T": {
+    "kept": true,
+    "novel": 3
+   }
+  }
+ ],
+ "ambient": [
+  "local:209",
+  "script:151",
+  "script:75",
+  "script:86"
+ ],
+ "longest_unkept": {
+  "E": 0,
+  "TUW": 0,
+  "T": 1
+ }
+}

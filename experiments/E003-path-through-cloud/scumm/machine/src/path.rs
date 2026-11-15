@@ -620,6 +620,24 @@ impl Seen {
     }
 }
 
+/// E014's switch FMI_READ_WIDEN (`Machine::widen_loops`): what a path held at a join point it came back to in the same
+/// frame (a loop), by (unit, instruction, frame sid): its visits, its writes and every frame's locals at the last
+/// visit, and the facts and locals widened there (each made a plain unknown). Shared by a path's clones until one
+/// changes it; empty with the switch off.
+#[derive(Clone, Debug, Default)]
+pub struct LoopVisit {
+    pub visits: u32,
+    /// the path's assumptions then (more now: it forked on an unknown test since)
+    pub forks: usize,
+    pub writes: Store,
+    pub locals: Vec<(u32, Locals)>,
+    pub facts: FxHashSet<Fact>,
+    pub locs: FxHashSet<(u32, i32)>,
+}
+
+/// `Path.loops`: the loop visits (`LoopVisit`), None until the first.
+pub type Loops = Option<Rc<FxHashMap<(UnitId, u32, u32), LoopVisit>>>;
+
 /// model.py `Path.rw`: owner -> (keys read before it wrote them, keys written) in this round's turns. One flat map of
 /// (owner, key) -> read and written flags, and the owners `rw.setdefault` added (an owner may hold no key). Shared by
 /// a path's forks until one adds to it: a read or write it already holds changes nothing.
@@ -864,6 +882,8 @@ pub struct Path {
     pub joined: Option<Rc<Sig>>,
     /// states met at jump targets in the running frame's turn (calls; not dumped)
     pub seen: Seen,
+    /// E014 FMI_READ_WIDEN: the join points this path came back to (`LoopVisit`; not dumped)
+    pub loops: Loops,
     pub resumed: bool,
     // --- settle
     pub settle: bool,

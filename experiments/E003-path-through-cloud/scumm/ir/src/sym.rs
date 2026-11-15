@@ -134,4 +134,7 @@ known! {
     // sub-ops
     NEW = "New", ON = "On", OFF = "Off", DIM = "Dim", DELETE = "Delete", SET_XY = "setXY", SET_IMAGE = "setImage",
     TEXT = "Text",
+    // E014 amendment (8): output-only ops, a rule under FMI_READ_SOUND (scumm-machine heads.rs `effect_with`); last,
+    // so that every other name keeps its symbol
+    SOUND_KLUDGE = "soundKludge", SET_ROOM_SHADOW = "setRoomShadow", DEBUG = "debug",
 }

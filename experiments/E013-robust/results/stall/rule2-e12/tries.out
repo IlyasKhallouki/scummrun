@@ -1,0 +1,5 @@
+j00000: class "refinement" (= A's), new [2767,2848,2850,2862,2929], same as A
+j00001: class "refinement" (= A's), new [2863], same as A
+j00002: class "refinement" (= A's), new [2930,2997,2955,2987,2955], same as A
+j00003: class "refinement" (= A's), new [2988,3033,3023], same as A
+G0 /var/tmp/fast-mi/e013-stall/r2-e12/on/kitchen: 4 tries, stop class = A's in 4, everything = A's in 4

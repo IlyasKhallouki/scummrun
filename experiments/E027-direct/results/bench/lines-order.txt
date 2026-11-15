@@ -1,0 +1,39 @@
+E027 bench, 2026-11-13: three changes to the order of the lines' stops, each behind a flag (off: as before).
+  --count-lines  a walk made with a count whose stop is new by more than the count's value (queue 0 or 1), in a
+                 room its line knows, begins a line: the first for that value in a line of gains
+  --stay-lines   a line whose set of flags, without the flags seen unset since, an older line of its line of
+                 gains holds all of has its turns after the others; the flags seen unset are written to
+                 OUT/toggles.txt and read by --toggles FILE
+  --born-first   in a line's turn the results of the stop that began the line, in that stop's room, go first
+Old: tree 88cdd0b (binary vals1). A form tried and taken out: --new-first (the stops new to the whole search
+first in their line's turn).
+
+From part3b's stop 787 (room 20), by the stop expanded (--shares --go --motion-once in all):
+                         part3d: old tree      check 1: news1       check 2: news2       check 3: born1
+                         no flags given        new-first, count,    the same, 50 flags   born-first, count,
+                                               stay; none given     given                stay; 51 flags given
+var:145 = 5              9th                   28th                 6th                  13th
+state:142 = 1            245th                 not in 223           131st                155th
+room 69                  about the 434th       not in 223           268th                164th
+owner:761                about the 438th       not in 223           270th                170th
+lines by a set of flags  16 in 235 stops       17 in 211            4 in 251             4 in 171
+stops of queue 2         12 of 235             50 of 211            80 of 251            41 of 171
+Check 1 began with no flag known to be unset again, as part3d did: a line of such flags is the newest until
+its flags are seen unset (the last trace: 5 of 12 lines). Checks 2 and 3 were given the flags the checks before
+them saw unset. In check 2 the stop before room 69 (new in its line by a walk box that was stood in before)
+waited 137 stops in the third queue of its line; in check 3, 9.
+
+The flags off (binary born2), five stops from each reference (default flags): as the old tree
+p7top       4843   104  9cba4c7715
+cake        8306   124  a91ca2c9eb
+crew        3212   271  cb39ef7d95
+meathook    7919    51  a4cee03988
+boot        1549    40  6213300783
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).
+
+The three flags on (--shares), no flags given:    old tree, off                this tree, on
+p7top: owner:420=1                          stop 31                      stop 23
+       40 stops                             80474 trials, kept 762       64250 trials, kept 693
+cake:  var:196=3                            stop 15                      stop 22
+       30 stops                             31371 trials, kept 369       29238 trials, kept 345
+Not run with the flags on: the checks from cont2's and cont4's stops, the demo.

@@ -1,0 +1,1 @@
+verify-new /var/tmp/fast-mi/e013-int/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18

@@ -18,8 +18,19 @@ pub enum Effect {
 
 /// The effect of an op or start named `name` (model.py `HEADS.get(head, ("unmodelled", "", "no rule"))`).
 pub fn effect(name: Sym) -> Effect {
+    effect_with(name, false)
+}
+
+/// `effect`, with E014 amendment (8)'s switch `FMI_READ_SOUND` (`Machine::sound_ops`): the ops whose only effect in
+/// ScummVM is on the sound or the screen have no tracked effect, as startSound and stopSound have none:
+/// soundKludge (script_v5.cpp o5_soundKludge: the sound engine's command queue; its answer reaches the scripts only
+/// through VAR_SOUNDRESULT, which the engine writes outside them, sound.cpp processSoundQueues), setRoomShadow
+/// (o5_roomOps: the palette's shadow table) and debug (o5_debug: a debug print). Off, each has no rule and ends its
+/// path "unmodelled", which the reader drops: every path through a sound command is lost.
+pub fn effect_with(name: Sym, sound: bool) -> Effect {
     use Effect::*;
     match name {
+        known::SOUND_KLUDGE | known::SET_ROOM_SHADOW | known::DEBUG if sound => None,
         known::BREAK_HERE | known::DELAY | known::DELAY_VARIABLE => Yield,
         known::WAIT_FOR_ACTOR | known::WAIT_FOR_MESSAGE | known::WAIT_FOR_CAMERA | known::WAIT_FOR_SENTENCE => Wait,
         known::STOP_OBJECT_CODE | known::CHAIN_SCRIPT => End,

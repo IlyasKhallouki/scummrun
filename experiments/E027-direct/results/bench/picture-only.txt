@@ -1,0 +1,35 @@
+E027 bench, 2026-11-12: a result that is another picture of the expanded stop and no more is not kept for its
+interface or its cell alone (`pic`). Old: tree ef8514e. New: the tree of this commit. Laptop, 6 threads; the
+trials, the kept stops and the digests do not depend on the machine.
+
+Five stops from each reference (default flags):
+           old trials  kept  digest       new trials  kept  digest
+p7top          4336    249  c54349f7e8       4331    116  d6ac309865
+cake           7773    322  c11f6468e5       7718    143  5dcf95f7e8
+crew           2245    302  fe0c4ab338       2245    249  beec602c81
+meathook       7559    235  3f65f00366       7559    105  a11e044da2
+boot           1461     46  e94400041b       1461     45  a47429b266
+
+The two checks (--shares, 30 stops): the stop that first holds the value, and the trials up to it.
+                         old                      new
+cake:  room 42           stop 15, 15907 trials    stop 13, 14374 trials
+       var:196=3         stop 17, 17487           stop 15, 16472
+       bit:304=1         stop 18, 17531           stop 17, 17499
+       30 stops          30261 trials, kept 1128  31974 trials, kept 492
+p7top: owner:420=1       stop 23, 36059           stop 23, 36054
+       class:420:3=1     stop 25, 39980           stop 25, 39975
+       30 stops          53409 trials, kept 1766  53404 trials, kept 884
+
+One stop of cont2 expanded once (--shares --go, from cont2's nodes):
+              old trials  kept  kept for the interface alone    new trials  kept  for the interface alone
+stop 1161         1503     99    37                                 1140     38    1
+stop 863          3056    229    23                                 3056    124    1
+
+Tried and not kept: the same with a slot's click read as a sentence half made in the rounds after a wait and
+inside a window too (they have a twin now). The stop's own round is the same; each of those rounds grows (cake's
+first stop: 436-450 trials each to 1162-1203, six of them; the stop 4161 trials to 8757).
+              30 stops         var:196=3 / owner:420=1 first held
+cake          39650 trials     stop 17, 24715 trials
+p7top         96144 trials     stop 23, 64806 trials
+
+The Fate of Atlantis demo, 25 stops from boot, the new binary: 2921 trials, 3 rooms, no error (as before).

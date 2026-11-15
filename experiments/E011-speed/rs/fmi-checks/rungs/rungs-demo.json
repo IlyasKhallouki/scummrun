@@ -1,0 +1,19 @@
+{
+  "ladder": "the Fate of Atlantis demo's C0-C9 (E016 plan.md, \"The outside ladder\"; E026 plan.md I2: moved here from ladder.rs). Evaluation only: the system never reads it",
+  "rungs": [
+    {"rung": "C0", "what": "room=49 and var:32=4", "note": "the opening's dialog answered: the input script back from the dialog's (17)",
+     "all": [["room", "=", 49], ["var:32", "=", 4]]},
+    {"rung": "C1", "what": "room=63", "all": [["room", "=", 63]]},
+    {"rung": "C2", "what": "room=69", "all": [["room", "=", 69]]},
+    {"rung": "C3", "what": "owner:946=ego", "note": "the ego fact, present", "all": [["owner:946", "=", "ego"]]},
+    {"rung": "C4", "what": "room=49 and owner:946=ego", "all": [["room", "=", 49], ["owner:946", "=", "ego"]]},
+    {"rung": "C5", "what": "room=42 and owner:946=ego", "all": [["room", "=", 42], ["owner:946", "=", "ego"]]},
+    {"rung": "C6", "what": "class:491:12=0 (a full state)", "note": "class 12 cleared on object 491 (a cleared class is absent)",
+     "full": true, "all": [["class:491:12", "=", 0]]},
+    {"rung": "C7", "what": "room=82", "all": [["room", "=", 82]]},
+    {"rung": "C8", "what": "room=48", "all": [["room", "=", 48]]},
+    {"rung": "C9", "what": "end=1, end:kind=1, end:number=582, end:offset=0x67, end:where in {0,1,4}",
+     "note": "object 582's restart at 0x0067, from an object's slot (0 inventory, 1 room, 4 floating; patch 0006-e014's site)",
+     "all": [["end", "=", 1], ["end:kind", "=", 1], ["end:number", "=", 582], ["end:offset", "=", 103], ["end:where", "in", [0, 1, 4]]]}
+  ]
+}

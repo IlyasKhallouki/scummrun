@@ -1,0 +1,7 @@
+cake      stops  30 trials   30261 kept  1126 digest 7bc9556cc9 mids max 294 room=53@27s room=42@79s var:196=3@86s bit:304=1@86s | wall  165
+p7top     stops  30 trials   53409 kept  1766 digest 02ca2aca77 mids max 294 owner:420=1@173s class:420:3=1@190s | wall  261.3 s explore  25
+meathook  stops   5 trials    7559 kept   235 digest 7ac89d0219 mids max 106 | wall   39.7 s explore   34.2 commit   0.2 engines  0.0 | tria
+crew      stops   5 trials    2245 kept   302 digest fe0c4ab338 mids max  70 | wall   11.3 s explore    7.1 commit   0.4 engines  0.0 | tria
+p7top     stops   5 trials    4336 kept   249 digest c54349f7e8 mids max  92 | wall   13.6 s explore   11.6 commit   0.2 engines  0.0 | tria
+cake      stops   5 trials    7773 kept   322 digest c11f6468e5 mids max 294 | wall   20.3 s explore   18.2 commit   0.3 engines  0.0 | tria
+boot      stops   5 trials    1461 kept    46 digest e94400041b mids max  19 | wall    3.2 s explore    2.9 commit   0.0 engines  0.0 | tria

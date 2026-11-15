@@ -1,0 +1,43 @@
+E027 bench, 2026-11-12: counting keeps each of a count's shortest movers. Before, the shortest movers of a
+count were held one for each different thing done at the stop, so of two sentences that did the same there the
+second was no input, though they differ at the next state. Now each of the shortest movers is an input where they
+are at most 4 (else one for each thing done, as before); an input counts with the variables it is a shortest
+mover of, and no others; a group's shortest sentences stay where it has more than 4; 256 states at most (128).
+Old: tree 7371da5. Checks on the VM and the laptop; trials and stops do not depend on the machine.
+
+From bootB's stop 15841 (room 30, the lock of object 390 half turned: var:226 = 3), one stop expanded:
+old tree    inputs v7t390, v6t390, v7v200t390, v7v200t389 (v5t390 none: it did what v7t390 did there);
+            counts var:225 to 228 and var:105, 102, 7, 181, 194; 37 states, 8 inputs deep; the lock not open
+this tree   inputs v7t390, v5t390, v6t390; counts var:225 to 228; 59 states, 177 trials, 13 inputs deep;
+            two stops of class 0 at the 13th input (the lock open)
+In bootB (old tree, from boot, 7,130 s) 363 stops of room 30 were expanded and 107 of them counted with object
+390; object 397 was never owned.
+
+From cont14's stop 1980 (room 30), one stop expanded:
+old tree    3,267 trials; object 397 owned; 119 states, 480 trials of counting
+this tree   2,980 trials; object 397 owned;  60 states, 193 trials of counting
+
+The checks (--shares):                      old                          this tree
+p7top: owner:420=1                          stop 33                      stop 31, 65152 trials
+       40 stops                                                          79661 trials, kept 762
+cake:  var:196=3                            stop 15, 16378               stop 15, 16131
+       30 stops                             31626 trials, kept 347       31366 trials, kept 348
+from cont2's stop 1021: P5                  stop 35, 36158               stop 85, 116718
+       object 397 owned                     not in 60 stops              stop 7, 13615
+       60 stops                             64060 trials, kept 1299      80190 trials, kept 1242
+from cont4's stop 3627: var:282=2           stop 2, 241                  stop 25, 29604
+       var:282=3                            stop 73, 34973               stop 60, 34959
+       150 stops                            74656 trials, kept 2829      102731 trials, kept 2545
+The check from cont2's stop does not hold its bar (P5 in 60 stops). The two trees expand the same 14 stops; the
+7th is in room 30, and there this tree opens the lock and owns object 397. That stop begins a line of gains, the
+newest, and from the 15th stop on the search follows it: it makes the way to room 43 again from there (entered at
+the 17th stop) and holds P5 at the 85th stop, 80,560 trials later than the old tree.
+
+Five stops from each reference (default flags):  trials  kept  digest       (old: trials, kept)
+p7top       4791   104  5a020cf174   (4752, 95)
+cake        8213   124  a91ca2c9eb   (8181, 116)
+crew        3210   271  cb39ef7d95   (2287, 240)
+meathook    7631    51  a4cee03988   (7686, 50)
+boot        1549    40  6213300783   (1552, 42)
+
+The Fate of Atlantis demo, 25 stops from boot: 3163 trials, 226 kept (as before).

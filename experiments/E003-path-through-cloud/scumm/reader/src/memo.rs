@@ -1061,7 +1061,7 @@ impl Builder<'_> {
             let root = scumm_ir::default_root();
             (
                 file_sha1(&exe).expect("the reader's binary"),
-                file_sha1(&root.join("data").join("scripts-dos-cd").join("index.json")).expect("the game index"),
+                file_sha1(&scumm_ir::game_index(&root)).expect("the game index"), // E014: FMI_GAME_SCRIPTS's
             )
         });
         writeln!(t, "reader {exe_sha}").unwrap();
@@ -1089,6 +1089,10 @@ impl Builder<'_> {
             tb.reach.is_some()
         )
         .unwrap();
+        // E026 C1: named only when on, so the key with it off is as before
+        if tb.wait_queued {
+            writeln!(t, "flags wait_queued").unwrap();
+        }
         match &tb.settled {
             None => writeln!(t, "settled none").unwrap(),
             Some(r) => {
@@ -1104,6 +1108,26 @@ impl Builder<'_> {
         }
         writeln!(t, "builder {:?} sig_limit {} path_limit {} machine path limit {}", self.switches, self.sig_limit, self.path_limit_now, crate::machine::PATH_LIMIT).unwrap();
         writeln!(t, "slot locals {:?}", self.slot_locals).unwrap();
+        if crate::builder::read_widen_switch() {
+            // E014's FMI_READ_WIDEN changes the runs the path limit cuts: its store is its own (unset: the text as before)
+            writeln!(t, "read_widen 1").unwrap();
+        }
+        if crate::builder::read_sound_switch() {
+            // E014's FMI_READ_SOUND changes the runs through sound commands: its store is its own (unset: as before)
+            writeln!(t, "read_sound 1").unwrap();
+        }
+        if crate::builder::read_rename_switch() {
+            // E022's FMI_READ_RENAME changes the runs through rename-only tests: its store is its own (unset: as before)
+            writeln!(t, "read_rename 1").unwrap();
+        }
+        if crate::builder::read_queue_switch() {
+            // E022's FMI_READ_QUEUE runs held sentences: its store is its own (unset: as before)
+            writeln!(t, "read_queue 1").unwrap();
+        }
+        if crate::builder::read_string_summary_switch() {
+            // E022's FMI_READ_STRING_SUMMARY summarizes string loops: its store is its own (unset: as before)
+            writeln!(t, "read_string_summary 1").unwrap();
+        }
         t
     }
 

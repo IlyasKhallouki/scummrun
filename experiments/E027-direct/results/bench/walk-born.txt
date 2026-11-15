@@ -1,0 +1,17 @@
+E027 bench, 2026-11-13: --walk-born (with --born-first). The results of a walk the search made for a line's news,
+in the room walked to, go first in that line's turn, as the results of the line's first stop do. Old: tree
+1673e06 (binary runs2). Off: as before.
+
+From part3f's stop 955 (owner:788, room 71), 3 threads, the flags of part3f:
+old tree       part3f itself: stop 1011 (state:821 = 1, a result of the walk to room 75) waited under 230 newer
+               stops of its line's stack; owner:823 at 2,721.8 s
+--walk-born    state:821 = 1 at the 2nd stop expanded (45.7 s), owner:823 at the 3rd (63.4 s), room 83 at
+               128.8 s; 40 stops, 35,850 trials
+
+Off (binary walk1), five stops from each reference (default flags): as the old tree
+p7top       4843   104  9cba4c7715
+cake        8306   124  a91ca2c9eb
+crew        3212   271  cb39ef7d95
+meathook    7919    51  a4cee03988
+boot        1549    40  6213300783
+Not run: the demo (the flag is read only with --born-first, which the demo's check does not set).

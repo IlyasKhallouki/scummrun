@@ -1,0 +1,24 @@
+# grep checks on experiments/E011-speed/rs/fmi-play/src/realize.rs at cd2efe9
+## profile names (DOS_CD, selected_verb, wait_walk_to, DIALOG_FIRST/LAST, executor): expected no line
+(none)
+## every line of code with a numeric literal (comments excluded)
+29:    std::env::var(SWITCH).is_ok_and(|v| v == "1")
+81:        Cfg { max_approach: 6, max_candidates: 60, max_points: 3, max_slots: 15, horizon: afford::W, log_frames: 8 }
+176:            rec.candidates += 1;
+181:            rec.tries += 1;
+210:                        rec.approach += 1;
+266:    (x - (xstart + afford::SCREEN_W / 2)).abs()
+282:            let mut to = last + 1;
+293:                to += 1;
+320:    let top = st.screen.map(|s| s.0).unwrap_or(0);
+323:        let (dx, dy) = ((rx - place.0) as i64, (ry - place.1) as i64);
+330:        rec.tries += 1;
+342:            let toward = view_dist(xs2, place.0) < view_dist(xs, place.0);
+365:    let top = st.screen.map(|s| s.0).unwrap_or(0);
+372:                if at.main.map(|m| m.2) == Some(a) && !out.iter().any(|q: &Point| (q.x, q.y) == *p) {
+373:                    out.push(Point { x: p.0, y: p.1, hit: Hit::Object(a) });
+404:            let bp: Vec<Point> = of.targets.iter().filter(|p| p.hit == Hit::Object(bo) || p.hit == Hit::Actor(bo)).take(1).copied().collect();
+417:    let want = (v, a, b.unwrap_or(0));
+422:        rec.candidates += 1;
+426:            rec.tries += 1;
+434:            att.seen = seen.iter().map(|s| format!("({},{},{})", s.0, s.1, s.2)).collect::<Vec<_>>().join(" ");

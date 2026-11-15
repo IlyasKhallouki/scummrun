@@ -1,0 +1,64 @@
+E027: SPEEDRUN_VERB_IMAGES=1: an image verb's name is "#" and a hash of the image it shows
+
+An inventory slot is an image verb. Its id, mode and place are the same whatever object it shows, and it has no
+text, so a state dump could not tell one page of the inventory from the next. With the switch, verbText() gives an
+image verb the FNV-1a hash of its rtVerb resource (the object image setVerbObject() copied there) as its name. No
+pixel and no game text leaves the process. Off (the default): no name, as before.
+
+On top of patches 0001-0010 (the tree of svm-e024); the engine built with it is svm-e027.
+
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -212,6 +212,7 @@
+ 		{"SPEEDRUN_REPORT_RESTART", &SpeedrunBridge::_reportRestart},
+ 		// E014: the end's site (observation: the reason's text only)
+ 		{"SPEEDRUN_END_SITE", &SpeedrunBridge::_endSite},
++		{"SPEEDRUN_VERB_IMAGES", &SpeedrunBridge::_verbImages},
+ 		// E013 (patch 0007): the input log (observation only)
+ 		{"SPEEDRUN_INPUT", &SpeedrunBridge::_inputLog},
+ 	};
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -285,6 +285,9 @@
+  *                                open, the input handler (VAR_VERB_SCRIPT) is set and idle, and
+  *                                nothing the last input started still runs; its kind is always
+  *                                "sentence" (unset: the rule with MI's verb ids, as before)
++ *  - SPEEDRUN_VERB_IMAGES=1      E027: an image verb's name is "#" and a hash of the image it shows (an
++ *                                 inventory slot shows another object after a page turn; its id, mode and place
++ *                                 are the same on every page). Off: an image verb has no name, as before.
+  *  - SPEEDRUN_END_SITE=1         E014: a restart or quit that a script's systemOps made ends the
+  *                                run as "restart@SITE" or "quit@SITE", SITE = where:number:room:
+  *                                code offset of the opcode (unset: "restart", "quit", as before)
+@@ -868,6 +871,7 @@
+ 	// E014: the decision point without verb ids, and the end's site
+ 	bool _idleHandler = false;      // SPEEDRUN_IDLE=handler
+ 	bool _endSite = false;          // SPEEDRUN_END_SITE
++	bool _verbImages = false;       // SPEEDRUN_VERB_IMAGES
+ 	Common::String _quitSite;       // the site of a script's quit (onScriptQuit()), "" for any other quit
+ 	/** "@where:number:room:offset" of the opcode the running script slot is executing, "" outside a script. */
+ 	Common::String scriptSite() const;
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -441,8 +441,21 @@
+ 	// them does not perturb a run. An image verb's rtVerb resource holds the
+ 	// object image instead (setVerbObject(), verbs.cpp), so it has no text.
+ 	const ResourceManager::Resource &res = _vm->_res->_types[rtVerb][slot];
+-	if (!res._address || _vm->_verbs[slot].type == kImageVerbType)
++	if (!res._address)
+ 		return false;
++	if (_vm->_verbs[slot].type == kImageVerbType) {
++		// E027 (SPEEDRUN_VERB_IMAGES): the image's hash (FNV-1a over the resource) stands for the name, so that what
++		// an inventory slot shows can be told from what it showed. No pixel and no text leaves the process.
++		if (!_verbImages)
++			return false;
++		uint32 h = 2166136261u;
++		for (uint32 i = 0; i < res._size; i++) {
++			h ^= res._address[i];
++			h *= 16777619u;
++		}
++		out = Common::String::format("#%08x", h);
++		return true;
++	}
+ 	if (!rendered) {
+ 		// The sentence line (verb 100) is built from references, e.g.
+ 		// Text(getVerb(Var[107]) + ...) in global/script-012.txt [00A3]; its

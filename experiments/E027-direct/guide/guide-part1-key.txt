@@ -1,0 +1,11 @@
+goal {"owner:901": [1], "owner:902": [1], "owner:903": [1]}  map direct
+|R| 1164 atoms over 805 keys, depth at most 6, writer units 681, 0.382 s
+depth histogram 0:3 1:15 2:605 3:497 4:38 5:4 6:2
+wide map: |R| 1189 atoms over 817 keys
+atoms with no writer: 383
+writers of owner:901=1: global:1 local:83:200
+writers of owner:902=1: global:1 global:104 local:83:200
+writers of owner:903=1: global:1 local:83:200
+room atoms (value@depth): 25@1 83@1 1@2 11@2 12@2 14@2 15@2 19@2 2@2 20@2 21@2 27@2 28@2 29@2 3@2 30@2 31@2 32@2 34@2 35@2 36@2 37@2 38@2 39@2 4@2 40@2 42@2 43@2 45@2 48@2 49@2 5@2 50@2 51@2 53@2 57@2 59@2 6@2 61@2 63@2 ...
+rooms: start 33, reached 80
+key (evaluation only): 99 Part I facts, key in R 86, (key, value) or (key, null) in R 83

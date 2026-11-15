@@ -1,0 +1,34 @@
+{
+ "entry": 169,
+ "frame": 11767,
+ "trials": 318,
+ "kept": 2,
+ "per_depth": [
+  {
+   "depth": 1,
+   "nodes": 1,
+   "trials": 179,
+   "kept": 1
+  },
+  {
+   "depth": 2,
+   "nodes": 1,
+   "trials": 80,
+   "kept": 1
+  },
+  {
+   "depth": 3,
+   "nodes": 1,
+   "trials": 59,
+   "kept": 0
+  }
+ ],
+ "first_unit_depth": null,
+ "first_room_depth": null,
+ "stop": "no kept stop",
+ "ambient": [
+  "local:209",
+  "script:75"
+ ],
+ "seconds": 2.898915401
+}

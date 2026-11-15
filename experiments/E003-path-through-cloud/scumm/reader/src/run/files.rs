@@ -290,6 +290,9 @@ impl Files {
 
     /// A pass starts again: what was written goes.
     pub fn reset(&mut self) -> io::Result<()> {
+        // the old writer's buffer goes out before the file is cut: dropped after, it would land at the old offset,
+        // past the new pass's end when that pass writes less (NULs, then stale lines: E022 amendment (19))
+        self.actions.flush()?;
         self.actions = BufWriter::with_capacity(1 << 20, File::create(self.dir.join(ACTIONS))?);
         self.act_off.clear();
         self.act_end = 0;
@@ -752,5 +755,27 @@ mod tests {
     fn fnv_known() {
         assert_eq!(fnv1a64(b""), 0xcbf2_9ce4_8422_2325);
         assert_eq!(fnv1a64(b"a"), 0xaf63_dc4c_8601_ec8c);
+    }
+}
+
+#[cfg(test)]
+mod reset_tests {
+    use super::*;
+
+    /// E022 amendment (19): a pass that writes less than the one before leaves the actions file its own lines only.
+    #[test]
+    fn reset_drops_the_old_pass() {
+        let dir = std::env::temp_dir().join(format!("files-reset-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut f = Files::create(&dir, false).unwrap();
+        let prep = |n: usize| LinePrep { tail: format!(", \"pad\": \"{}\"}}\n", "x".repeat(n)), lists: vec![] };
+        f.batch_prepared(0, (0..3).map(|_| prep(5000)).collect(), &[0, 1, 2]).unwrap();
+        f.reset().unwrap();
+        f.batch_prepared(0, vec![prep(10)], &[0]).unwrap();
+        let lines = f.finish(&[true], &BTreeSet::new(), &[]).unwrap();
+        let text = std::fs::read(dir.join(ACTIONS)).unwrap();
+        assert_eq!(text, b"{\"i\": 0, \"rec\": 0, \"pad\": \"xxxxxxxxxx\"}\n".to_vec());
+        assert_eq!(lines.action_off, vec![0, text.len() as u64]);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

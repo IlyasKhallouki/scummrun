@@ -1,0 +1,176 @@
+diff --git a/engines/scumm/script_v5.cpp b/engines/scumm/script_v5.cpp
+index 599a2c6a..d02ee122 100644
+--- a/engines/scumm/script_v5.cpp
++++ b/engines/scumm/script_v5.cpp
+@@ -29,6 +29,7 @@
+ #include "scumm/players/player_towns.h"
+ #include "scumm/util.h"
+ #include "scumm/verbs.h"
++#include "scumm/speedrun/speedrun_bridge.h" // E014: onScriptQuit()
+ 
+ #include "common/savefile.h"
+ #include "common/config-manager.h"
+@@ -2206,6 +2207,7 @@ void ScummEngine_v5::o5_systemOps() {
+ 		break;
+ 	case 3:		// SO_QUIT
+ 		_quitFromScriptCmd = true;
++		if (_speedrun) _speedrun->onScriptQuit(); // E014: the site, for the end's reason (SPEEDRUN_END_SITE)
+ 		quitGame();
+ 		break;
+ 	default:
+diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+index 90fb0c2d..41d29075 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -209,6 +209,8 @@ void SpeedrunBridge::readEnv() {
+ 		{"SPEEDRUN_DUMP_NOPIXELS", &SpeedrunBridge::_dumpNoPixels},
+ 		// E012 (patch 0005): restart() and pauseGame() end the run (onRestart(), onPause()).
+ 		{"SPEEDRUN_REPORT_RESTART", &SpeedrunBridge::_reportRestart},
++		// E014: the end's site (observation: the reason's text only)
++		{"SPEEDRUN_END_SITE", &SpeedrunBridge::_endSite},
+ 	};
+ 	for (const auto &var : kBoolVars) {
+ 		const char *value = envValue(var.name);
+@@ -234,6 +236,12 @@ void SpeedrunBridge::readEnv() {
+ 		_dumpNoPixels = true;
+ 	if ((_cutCountMixer || _cutNoPixels) && !_videoPrefix.empty() && _envError.empty())
+ 		_envError = "SPEEDRUN_VIDEO cannot be used with SPEEDRUN_COUNT_MIXER or SPEEDRUN_NO_PIXELS";
++	// E014: SPEEDRUN_IDLE=handler, the decision point without verb ids (evaluateIdle()).
++	const char *idleRule = envValue("SPEEDRUN_IDLE");
++	if (idleRule && !strcmp(idleRule, "handler"))
++		_idleHandler = true;
++	else if (idleRule && _envError.empty())
++		_envError = Common::String::format("invalid SPEEDRUN_IDLE '%s': expected handler", idleRule);
+ 	// E012 (patch 0005), tests only: SPEEDRUN_TEST_RESTART=<frame>, restart() at the start of that frame.
+ 	const char *testRestart = envValue("SPEEDRUN_TEST_RESTART");
+ 	if (testRestart && (!parseUint64(testRestart, _testRestartFrame) || _testRestartFrame == 0) && _envError.empty())
+@@ -336,8 +344,10 @@ void SpeedrunBridge::validateEnv() {
+ }
+ 
+ SpeedrunBridge::~SpeedrunBridge() {
+-	// Still running here means the engine quit by itself (e.g. window closed).
+-	endTrace("quit", nullptr, nullptr);
++	// Still running here means the engine quit by itself (e.g. window closed). E014: with SPEEDRUN_END_SITE, a quit
++	// a script's systemOps made carries its site.
++	const Common::String quitReason = "quit" + _quitSite;
++	endTrace(quitReason.c_str(), nullptr, nullptr);
+ 	// The error handler deliberately stays installed (it returns true without
+ 	// a live bridge): ScummVM has no way to restore the engine's default
+ 	// handler, and a headless run must never get a message box or debugger.
+@@ -780,10 +790,32 @@ void SpeedrunBridge::finish(const char *reason) {
+ bool SpeedrunBridge::onRestart() {
+ 	if (!_reportRestart)
+ 		return false;
+-	finish("restart"); // a no-op if the run has already ended: the engine is on its way out
++	// E014: with SPEEDRUN_END_SITE, "restart@SITE" when a script's systemOps called restart() (the restart key's
++	// path runs outside any script: no site)
++	const Common::String reason = "restart" + (_endSite ? scriptSite() : Common::String());
++	finish(reason.c_str()); // a no-op if the run has already ended: the engine is on its way out
+ 	return true;
+ }
+ 
++void SpeedrunBridge::onScriptQuit() {
++	if (_endSite)
++		_quitSite = scriptSite();
++}
++
++Common::String SpeedrunBridge::scriptSite() const {
++	// E014: the running slot (_currentScript) and its code position: _scriptPointer is past the opcode and its one
++	// sub-op byte when o5_systemOps calls restart() or quitGame(), so the opcode is 2 bytes back. The offset counts
++	// from the script's first opcode (scriptCode(), the [XXXX] of the decompiled files).
++	const ScummEngine &e = *_vm;
++	const int i = e._currentScript;
++	if (i == 0xFF || i >= NUM_SCRIPT_SLOT || e.vm.slot[i].status == ssDead || !e._scriptPointer || !e._scriptOrgPointer)
++		return Common::String();
++	const ScriptSlot &ss = e.vm.slot[i];
++	const int64 code = scriptCode(i, (uint32)(e._scriptPointer - e._scriptOrgPointer));
++	const int room = (ss.where == WIO_LOCAL || ss.where == WIO_ROOM || ss.where == WIO_FLOBJECT) ? (int)e._roomResource : -1;
++	return Common::String::format("@%d:%d:%d:%04X", (int)ss.where, (int)ss.number, room, code >= 2 ? (uint)(code - 2) : 0xFFFFu);
++}
++
+ bool SpeedrunBridge::onPause() {
+ 	if (!_reportRestart)
+ 		return false;
+diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+index 4e57dbfb..3ed52f3f 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -280,6 +280,13 @@ bool parseSpeedrunInterrupts(const Common::String &text, Common::Array<SpeedrunI
+  *  - SPEEDRUN_REPORT_RESTART=1   E012 (patch 0005): restart() ends the run as "restart" and
+  *                                pauseGame() as "pause" (off: the engine restarts, or opens
+  *                                its pause dialog, as before)
++ *  - SPEEDRUN_IDLE=handler       E014: the decision point without verb ids: the click gate is
++ *                                open, the input handler (VAR_VERB_SCRIPT) is set and idle, and
++ *                                nothing the last input started still runs; its kind is always
++ *                                "sentence" (unset: the rule with MI's verb ids, as before)
++ *  - SPEEDRUN_END_SITE=1         E014: a restart or quit that a script's systemOps made ends the
++ *                                run as "restart@SITE" or "quit@SITE", SITE = where:number:room:
++ *                                code offset of the opcode (unset: "restart", "quit", as before)
+  *  - SPEEDRUN_TEST_RESTART=<n>   E012 (patch 0005), tests only: restart() at the start of
+  *                                frame n, as the engine's restart key calls it
+  * The RNG seed is ScummVM's own --random-seed (ConfMan "random_seed").
+@@ -365,6 +372,8 @@ public:
+ 	bool onRestart();
+ 	/** pauseGame(), first statement (SO_PAUSE, the pause key): true if the run ended as "pause" (no pause dialog). */
+ 	bool onPause();
++	/** E014: o5_systemOps' SO_QUIT, before quitGame(): the script's site, for the end's reason (SPEEDRUN_END_SITE). */
++	void onScriptQuit();
+ 
+ private:
+ 	enum IdleKind { kNotIdle, kIdleSentence, kIdleDialog };
+@@ -779,6 +788,12 @@ private:
+ 	void wireAt(SpeedrunBytes &o, int x, int y);
+ 	// E012 (patch 0005): the end hooks' switch and test trigger, and the walk boxes (Boxes, BoxesJson, "boxes")
+ 	bool _reportRestart = false;    // SPEEDRUN_REPORT_RESTART
++	// E014: the decision point without verb ids, and the end's site
++	bool _idleHandler = false;      // SPEEDRUN_IDLE=handler
++	bool _endSite = false;          // SPEEDRUN_END_SITE
++	Common::String _quitSite;       // the site of a script's quit (onScriptQuit()), "" for any other quit
++	/** "@where:number:room:offset" of the opcode the running script slot is executing, "" outside a script. */
++	Common::String scriptSite() const;
+ 	uint64 _testRestartFrame = 0;   // SPEEDRUN_TEST_RESTART=<frame>: restart() at the start of that frame (tests only)
+ 	/** fmi-core Boxes: the current room and each box's corners and flags (getBoxCoordinates, getBoxFlags). */
+ 	void wireBoxes(SpeedrunBytes &o) const;
+diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
+index 95a37ba3..8fc5a303 100644
+--- a/engines/scumm/speedrun/speedrun_control.cpp
++++ b/engines/scumm/speedrun/speedrun_control.cpp
+@@ -221,7 +221,7 @@ void SpeedrunBridge::controlAtDecisionPoint() {
+ 		reason = "until";
+ 	else if (_stopOnIdle && _lastIdle.kind != kNotIdle)
+ 		reason = "idle";
+-	else if (_stopOnMenu && clickGateOpen() && anyVisibleVerb(120, 128)) // dialogue lines (speedrun_state.cpp)
++	else if (_stopOnMenu && !_idleHandler && clickGateOpen() && anyVisibleVerb(120, 128)) // dialogue lines (speedrun_state.cpp); E014: none without verb ids
+ 		reason = "menu";
+ 	if (!reason) {
+ 		for (uint i = 0; i < _stopUntilAny.size(); i++) {
+diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
+index 7ae39576..23927ad5 100644
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -343,7 +343,8 @@ SpeedrunBridge::IdleState SpeedrunBridge::evaluateIdle() const {
+ 	// menus can stay up under ongoing speech. The circus brothers keep
+ 	// bickering (local 205) while menu 1 waits for Var[194]
+ 	// (room-051-circus-te/local-207.txt [01F4]-[03A3]).
+-	if (anyVisibleVerb(kDialogVerbFirst, kDialogVerbLast)) {
++	// E014 (SPEEDRUN_IDLE=handler): no verb ids, so no dialogue branch.
++	if (!_idleHandler && anyVisibleVerb(kDialogVerbFirst, kDialogVerbLast)) {
+ 		for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
+ 			if (e.vm.slot[i].status != ssDead && e.vm.slot[i].number == verbScript)
+ 				return blocked("input_script", i, verbScript);
+@@ -409,6 +410,15 @@ SpeedrunBridge::IdleState SpeedrunBridge::evaluateIdle() const {
+ 	}
+ 
+ 	IdleState s;
++	if (_idleHandler) {
++		// E014 (SPEEDRUN_IDLE=handler): with the gate open, checkExecVerbs() passes a click or a key to the script
++		// VAR_VERB_SCRIPT names (runInputScript(), script.cpp), whether or not any verb slot shows; what the script
++		// does with it is the game's own. So the last clause is that the handler is set. The kind is "sentence".
++		if (verbScript == 0)
++			return blocked("no_handler");
++		s.kind = kIdleSentence;
++		return s;
++	}
+ 	if (anyVisibleVerb(kActionVerbFirst, kActionVerbLast)) {
+ 		s.kind = kIdleSentence;
+ 	} else if (verbScript >= e._numGlobalScripts) {

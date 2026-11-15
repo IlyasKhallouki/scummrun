@@ -1,0 +1,124 @@
+{
+ "key": "/home/ilyask/projects/scummrun/experiments/E001-goals-from-scripts/key.json",
+ "archives": [
+  {
+   "archive": "/var/tmp/fast-mi/e012-archives/kitchen",
+   "entries": 151,
+   "rooms": [
+    28,
+    29,
+    31,
+    32,
+    33,
+    34,
+    35,
+    38,
+    41
+   ],
+   "facts": 99,
+   "held": {
+    "1": {
+     "fact": [
+      "state",
+      428,
+      1
+     ],
+     "frame": 13924,
+     "entry": 135
+    },
+    "8": {
+     "fact": [
+      "owner",
+      566,
+      1
+     ],
+     "frame": 18416,
+     "entry": 150
+    },
+    "15": {
+     "fact": [
+      "bit",
+      16,
+      1
+     ],
+     "frame": 10111,
+     "entry": 45
+    },
+    "16": {
+     "fact": [
+      "bit",
+      475,
+      1
+     ],
+     "frame": 10934,
+     "entry": 78
+    },
+    "19": {
+     "fact": [
+      "state",
+      444,
+      1
+     ],
+     "frame": 2945,
+     "entry": 47
+    },
+    "20": {
+     "fact": [
+      "owner",
+      377,
+      1
+     ],
+     "frame": 2978,
+     "entry": 51
+    },
+    "21": {
+     "fact": [
+      "state",
+      367,
+      1
+     ],
+     "frame": 2945,
+     "entry": 47
+    },
+    "45": {
+     "fact": [
+      "bit",
+      481,
+      1
+     ],
+     "frame": 14143,
+     "entry": 108
+    },
+    "51": {
+     "fact": [
+      "owner_not",
+      568,
+      1
+     ],
+     "frame": 2728,
+     "entry": 0
+    }
+   },
+   "best_chain": {
+    "facts": 5,
+    "entry": 78,
+    "indices": [
+     15,
+     16,
+     19,
+     21,
+     51
+    ],
+    "chain": [
+     0,
+     33,
+     49,
+     60,
+     66,
+     69,
+     78
+    ]
+   }
+  }
+ ]
+}

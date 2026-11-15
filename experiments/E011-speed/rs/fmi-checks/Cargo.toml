@@ -10,6 +10,8 @@ fmi-core = { path = "../fmi-core" }
 fmi-engine = { path = "../fmi-engine" }
 fmi-play = { path = "../fmi-play", features = ["json-double"] }
 fmi-explore = { path = "../fmi-explore" }
+scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
+scumm-machine = { path = "../../../E003-path-through-cloud/scumm/machine" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [[bin]]
@@ -31,3 +33,59 @@ path = "src/bin/delay_check.rs"
 [[bin]]
 name = "kitchen-report"
 path = "src/bin/kitchen_report.rs"
+
+[[bin]]
+name = "inventory"
+path = "src/bin/inventory.rs"
+
+[[bin]]
+name = "probe"
+path = "src/bin/probe.rs"
+
+[[bin]]
+name = "refuse-check"
+path = "src/bin/refuse_check.rs"
+
+[[bin]]
+name = "stall-report"
+path = "src/bin/stall_report.rs"
+
+[[bin]]
+name = "a3"
+path = "src/bin/a3.rs"
+
+[[bin]]
+name = "e013-report"
+path = "src/bin/e013_report.rs"
+
+[[bin]]
+name = "e015"
+path = "src/bin/e015/main.rs"
+
+[[bin]]
+name = "e015chk"
+path = "src/bin/e015chk.rs"
+
+[[bin]]
+name = "e015-g2"
+path = "src/bin/e015_g2.rs"
+
+[[bin]]
+name = "ladder"
+path = "src/bin/ladder.rs"
+
+[[bin]]
+name = "ladder-fixture"
+path = "src/bin/ladder_fixture.rs"
+
+[[bin]]
+name = "e016"
+path = "src/bin/e016/main.rs"
+
+[[bin]]
+name = "e024"
+path = "src/bin/e024/main.rs"
+
+[[bin]]
+name = "keyfacts"
+path = "src/bin/keyfacts.rs"

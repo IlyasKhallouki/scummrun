@@ -20,6 +20,7 @@ mod esc;
 mod hooks;
 mod rooms;
 mod settle;
+mod widen;
 
 pub use dialog::{LEFT_CLICK, VERB_CLICK_AREA};
 
@@ -40,9 +41,10 @@ pub fn no_fork<T>(r: R<T>) -> T {
 }
 pub use hooks::Hooks;
 pub use settle::ROUND;
+pub use widen::WIDENED;
 
 use crate::enc;
-use crate::heads::{effect, Effect};
+use crate::heads::{effect_with, Effect};
 use crate::oracle::{FactOracle, OVal, Prefix};
 use crate::path::*;
 use crate::trace::Tracer;
@@ -92,10 +94,14 @@ pub const SCREEN_WIDTH: i32 = 320;
 pub const PATH_LIMIT: usize = 256;
 pub const STEP_LIMIT: u32 = 5000;
 pub const ROUND_LIMIT: u32 = 400;
+/// E026 C2 (experiments/E026-part1/plan.md): the steps between two looks at a reading's stop flag (`Machine::stop`)
+pub const STOP_LOOK: u32 = 4096;
+/// E026 C2: the unwind a stopped run ends with (`Machine::stop`); the reader's pool catches it
+pub const STOPPED: &str = "the reading was stopped";
 /// model.py `TIME_VARS`' keys: VAR_CAMERA_POS_X, VAR_HAVE_MSG, VAR_LAST_SOUND, VAR_TALK_ACTOR
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
-/// path ends left out of the predictions (model.py `INFEASIBLE`)
-pub const INFEASIBLE: [&str; 3] = ["spin", "nesting", "error"];
+/// path ends left out of the predictions (model.py `INFEASIBLE`; "widened" is E014's FMI_READ_WIDEN's, `widen.rs`)
+pub const INFEASIBLE: [&str; 4] = ["spin", "nesting", "error", "widened"];
 
 /// model.py `FEATURES`, as flags.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
@@ -260,6 +266,14 @@ pub struct Machine<'g> {
     pub path_limit: usize,
     pub step_limit: u32,
     pub round_limit: u32,
+    /// E014's switch FMI_READ_WIDEN (`widen.rs`): loops are widened in this run; off by default
+    pub widen_loops: bool,
+    /// E014 amendment (8)'s switch FMI_READ_SOUND (`heads::effect_with`): output-only ops (sound commands) have no
+    /// tracked effect instead of no rule; off by default
+    pub sound_ops: bool,
+    /// E022 amendment (27) (the reader's FMI_READ_QUEUE): steps a sentence run's call takes after its sentence; empty
+    /// by default
+    pub sentence_tail: Vec<Step>,
     /// golden.py's TraceMachine events, when a run is traced
     pub trace: Option<Tracer>,
     /// the current run's unknowns (handed to its `Run`)
@@ -288,6 +302,11 @@ pub struct Machine<'g> {
     pub find_objects: Option<Rc<[i32]>>,
     /// F12: the tallest main screen the scripts set (`mouse_range`), worked out once
     screen_h: std::cell::Cell<Option<i32>>,
+    /// E026 C2: the reading's stop flag (the reader's par.rs `Pool::set_abort`): every STOP_LOOK steps a run looks at
+    /// it and, set, ends by an unwind with STOPPED (no panic message); None (the default): never looked at
+    pub stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// the steps since the last look
+    stop_n: u32,
 }
 
 /// F12: the engine's mouse bounds for SCUMM v5 (input.cpp:414-434): the mouse is clipped to the screen,
@@ -400,6 +419,9 @@ impl<'g> Machine<'g> {
             path_limit: PATH_LIMIT,
             step_limit: STEP_LIMIT,
             round_limit: ROUND_LIMIT,
+            widen_loops: false,
+            sound_ops: false,
+            sentence_tail: Vec::new(),
             trace: None,
             v: Vals::default(),
             cites: vec![None; game.ins.len()],
@@ -416,8 +438,25 @@ impl<'g> Machine<'g> {
             ext: None,
             find_objects: None,
             screen_h: Default::default(),
+            stop: None,
+            stop_n: 0,
         }
         .with_wide()
+    }
+
+    /// E026 C2: every STOP_LOOK steps, the stop flag; set, the run ends by an unwind (a stopped reading's files are never
+    /// used, so what the run leaves half done is dropped)
+    #[inline]
+    fn look_stop(&mut self) {
+        if let Some(f) = &self.stop {
+            self.stop_n += 1;
+            if self.stop_n >= STOP_LOOK {
+                self.stop_n = 0;
+                if f.load(std::sync::atomic::Ordering::Relaxed) {
+                    std::panic::resume_unwind(Box::new(STOPPED));
+                }
+            }
+        }
     }
 
     /// The run's values follow switch value_sets (F12).
@@ -658,7 +697,9 @@ impl<'g> Machine<'g> {
                         // it out again, and gets the same: a merge changes nothing the signature holds)
                         let sig = p.joined.clone().expect("a merged path's join");
                         debug_assert!(self.join(&p, o).as_ref() == Some(&*sig));
-                        if matches!(p.stack.last(), Some(Entry::Frame(_))) && self.spins(&mut p, &sig) {
+                        if matches!(p.stack.last(), Some(Entry::Frame(_)))
+                            && (self.spins(&mut p, &sig) || (self.widen_loops && self.widen(&mut p)))
+                        {
                             break;
                         }
                     } else {
@@ -667,7 +708,9 @@ impl<'g> Machine<'g> {
                                 parked = Some(sig);
                                 break;
                             }
-                            if matches!(p.stack.last(), Some(Entry::Frame(_))) && self.spins(&mut p, &sig) {
+                            if matches!(p.stack.last(), Some(Entry::Frame(_)))
+                                && (self.spins(&mut p, &sig) || (self.widen_loops && self.widen(&mut p)))
+                            {
                                 break;
                             }
                         }
@@ -1449,6 +1492,7 @@ impl<'g> Machine<'g> {
             let x = X { u: uid, i: idx };
             let ins = &g.ins(uid)[idx as usize];
             p.steps += 1;
+            self.look_stop();
             let Some(st) = ins.st else {
                 let c = self.cite(x);
                 p.unmodelled.push((rc("unparsed"), c.clone(), rc(g.text(ins))));
@@ -1462,7 +1506,7 @@ impl<'g> Machine<'g> {
                 Stmt::Assign(a) => self.assign(p, o, a, Some(x))?,
                 Stmt::Start { .. } => more = self.start(p, o, x, st)?,
                 Stmt::Op { name, .. } => {
-                    let eff = effect(name);
+                    let eff = effect_with(name, self.sound_ops);
                     match eff {
                         Effect::Yield => {
                             // after breakHere or a delay the slot resumes at the next instruction (facts.py at:)

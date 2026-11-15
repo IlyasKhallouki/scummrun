@@ -16,7 +16,7 @@ use crate::wiring::Wiring;
 use crate::events;
 use fmi_core::{facts_of, Checkpoint, Engine, Facts, Key, Obs, ObsReq, PlayState, ReadingSource, RunSpec, Search, Status, Val};
 use serde_json::{json, Map, Value};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -120,6 +120,23 @@ pub fn same_facts(want: &Value, got: &Facts) -> bool {
     matched == m.len()
 }
 
+/// E014 (FMI_GAME_ID): the engines run another game than MI's DOS CD release. Its engine may set its own boot param
+/// (ScummVM's copy-protection skip for some game ids, scumm.cpp); the host still passes 0, so the boot checks accept
+/// what the engine holds.
+pub fn other_game() -> bool {
+    std::env::var("FMI_GAME_ID").is_ok_and(|v| !v.is_empty())
+}
+
+/// VAR_SOUNDRESULT (SCUMM v5's var 56): the answer to the last sound query, a scratch register the scripts set with
+/// soundKludge([-1]) and read at the next instruction.
+const SOUND_RESULT: &str = "var:56";
+
+/// E020 (`FMI_SKIP_SOUNDRESULT=1`): checkpoints are compared without VAR_SOUNDRESULT. A try's live engine and a return
+/// to the same frame can hold different answers there (amendment (4)); no script reads it across a frame.
+fn sound_result_skip_on() -> bool {
+    std::env::var("FMI_SKIP_SOUNDRESULT").is_ok_and(|v| v == "1")
+}
+
 /// replay.compare_checkpoint: the differences between a checkpoint and the engine's state and status.
 pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<String, Value> {
     let mut out = Map::new();
@@ -131,6 +148,9 @@ pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<Str
         let wf = start::facts_of_json(&want[1]);
         wf.diff(&got).into_iter().map(|(k, a, b)| (k.text(), a, b)).collect()
     };
+    if sound_result_skip_on() {
+        d.retain(|(k, _, _)| k != SOUND_RESULT);
+    }
     if !d.is_empty() {
         d.sort_by(|a, b| a.0.cmp(&b.0));
         out.insert("facts".into(), json!(d.len()));
@@ -160,7 +180,7 @@ fn boot_checks(st: &Status, obs: &Obs) -> Vec<String> {
     if obs.seed != Some(1) {
         out.push(format!("dump seed {}", obs.seed.map(|s| s.to_string()).unwrap_or("None".into())));
     }
-    if obs.boot_param != 0 {
+    if obs.boot_param != 0 && !other_game() {
         out.push(format!("dump boot_param {}", obs.boot_param));
     }
     let dbg = obs.vars.get(39).copied().unwrap_or(0);
@@ -234,7 +254,7 @@ fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String
         return measure_idle_whole(root, frames);
     }
     let t = Instant::now();
-    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:244"))).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;
     let mut rule = step::IdleRule::new();
     let mut prev: Option<Facts> = None;
@@ -274,7 +294,7 @@ fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String
 /// each, the rule run over them all at the end.
 fn measure_idle_whole(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
     let t = Instant::now();
-    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:284"))).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;
     let start_f = machine::port(|| b.facts()).map_err(|e| format!("EngineError: {e}"))?;
     let mut seq = Vec::with_capacity(frames as usize);
@@ -435,6 +455,11 @@ fn choose_reading(r: &Resident, job: &Value, facts: &EntryFacts) -> Result<Choic
             row["reuse_keys"] = json!(extra.len());
             row["e009"] = det2;
         }
+        if ok && other_inventory(&d) {
+            ok = false;
+            row["reusable"] = json!(false);
+            row["inventory"] = json!(true);
+        }
         let e009 = row.get("e009").is_some();
         checked.push(row);
         if ok {
@@ -443,6 +468,36 @@ fn choose_reading(r: &Resident, job: &Value, facts: &EntryFacts) -> Result<Choic
     }
     let first = checked[0].get("e009").cloned().unwrap_or_else(|| checked[0].clone());
     Ok((None, format!("differs on {} keys", first["other"]), checked))
+}
+
+/// E019 (`FMI_READ_HELD=1`): a reading read the code of the objects held at its start, so an entry holding other
+/// objects (an owner key that is held on one side only) needs a reading of its own.
+fn other_inventory(d: &BTreeMap<String, (i64, i64)>) -> bool {
+    let held = |w: i64| w != 0 && w != 0x0F;
+    crate::archive::read_held_on() && d.iter().any(|(k, &(a, b))| k.starts_with("owner:") && held(a) != held(b))
+}
+
+/// E022 (`FMI_SLOT_LOCALS=1`): the slots running at a fresh reading's start with their dumped locals, as the reader's
+/// `--slot-locals` lines (fix round 1's F10), so a script live at the start resumes with its own locals; fmi sets the
+/// provider (fmi-play's `dumped_slots`; this crate does not depend on fmi-play). None: no dump of the locals.
+pub static SLOT_LOCALS: std::sync::OnceLock<fn(&Obs) -> Option<Vec<Value>>> = std::sync::OnceLock::new();
+
+fn slot_locals_of(state: &Obs) -> Vec<Value> {
+    if !std::env::var("FMI_SLOT_LOCALS").is_ok_and(|v| v == "1") {
+        return vec![];
+    }
+    SLOT_LOCALS.get().and_then(|f| f(state)).unwrap_or_default()
+}
+
+/// E020: `FMI_READ_SHARE=1`, the tries of this process read a scope fresh one at a time and share the readings.
+fn read_share_on() -> bool {
+    std::env::var("FMI_READ_SHARE").is_ok_and(|v| v == "1")
+}
+
+/// E020: the fresh readings this process made of a scope (job.json "scope"), behind the scope's lock.
+fn share_gate(scope: &Value) -> Arc<Mutex<Vec<PathBuf>>> {
+    static G: std::sync::OnceLock<Mutex<std::collections::HashMap<String, Arc<Mutex<Vec<PathBuf>>>>>> = std::sync::OnceLock::new();
+    G.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner()).entry(scope.to_string()).or_default().clone()
 }
 
 /// The reading choice as round 1 made it (FMI_TRY_MEMO=0).
@@ -471,6 +526,11 @@ fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap)
             row["reuse_keys"] = json!(extra.len());
             row["e009"] = step::reusable_detail(&sf, &k2, facts);
         }
+        if ok && other_inventory(&step::diff(&sf, facts)) {
+            ok = false;
+            row["reusable"] = json!(false);
+            row["inventory"] = json!(true);
+        }
         let e009 = row.get("e009").is_some();
         checked.push(row);
         if ok {
@@ -481,21 +541,36 @@ fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap)
     Ok((None, format!("differs on {} keys", first["other"]), checked))
 }
 
-/// Step 2's fresh reading from the returned engine's state (step.py `read_fresh`): (reading, wall s, load s).
-fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: u32, log: &JobLog, cancel: &AtomicBool)
-              -> Result<(Arc<dyn ReadingSource>, f64, f64), String> {
+/// A fresh reading's outcome: the reading (wall s, load s, and with E014's bound the wait's record), or the bound
+/// (E014 amendment (4) (a): its record).
+enum Fresh {
+    Read(Arc<dyn ReadingSource>, f64, f64, Option<Value>),
+    Bound(Value),
+}
+
+/// Step 2's fresh reading from the returned engine's state (step.py `read_fresh`). With E014's bound (`FMI_READ_BOUND`,
+/// bound.rs) the reading runs on a thread of its own and the try waits for it at most the bound (`live`: the try's own
+/// stop while it waits).
+#[allow(clippy::too_many_arguments)]
+fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: u32, log: &JobLog, cancel: &AtomicBool,
+              live: &AtomicBool) -> Result<Fresh, String> {
     let rdir = PathBuf::from(job["reading_dir"].as_str().unwrap_or(""));
     if !rdir.is_absolute() || rdir.to_string_lossy().chars().any(|c| c.is_whitespace()) {
         return Err(format!("ValueError: reading_dir {}: an absolute path with no spaces (the reach extender's start-rows rule)", rdir.display()));
     }
     std::fs::create_dir_all(&rdir).map_err(|e| files::io_err(&rdir, e))?;
     let rows = rdir.join("start.jsonl");
-    std::fs::write(&rows, step::start_row_text(step::SEED, state, status)? + "\n").map_err(|e| files::io_err(&rows, e))?;
+    let row_text = step::start_row_text(step::SEED, state, status)?;
+    std::fs::write(&rows, row_text.clone() + "\n").map_err(|e| files::io_err(&rows, e))?;
     let name = rdir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let mut scope: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default();
     scope.sort();
     log.say(&format!("reading {:?} fresh from frame {} into {}", scope, status.frame, rdir.display()));
     let goal = step::goal_of(job);
+    let fact_vars = crate::ctx::input_vars(&scope);
+    if !fact_vars.is_empty() {
+        log.say(&format!("reading: the rooms' input vars as facts {fact_vars:?}"));
+    }
     let t = Instant::now();
     let req = ReadReq {
         rooms: scope,
@@ -504,26 +579,86 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
         name,
         out: rdir.clone(),
         threads,
-        slot_locals: vec![],
+        slot_locals: slot_locals_of(state),
         domain_goals: "none".into(),
         elsewhere: true,
         live_locals: true,
         split_limit: true,
-        switches: step::SWITCHES.into(),
+        switches: step::switches(),
         reach: true,
         frame_costs: true,
         reach_also: vec![],
         start_rows: Some(rows),
-        fact_vars: vec![],
+        fact_vars,
         stream: true,
     };
-    let path = machine::port(|| r.readings.read(&req, cancel))?;
+    let mut info = None;
+    let path = match crate::bound::cfg() {
+        None => machine::port(|| r.readings.read(&req, cancel))?,
+        Some(cfg) => {
+            if !fmi_reading_in_process() {
+                return Err("E014: FMI_READ_BOUND needs the in-process reader (FMI_READER_LIB=1)".into());
+            }
+            let id = crate::bound::ident(&req.rooms, &req.goal_text, &row_text);
+            let (rr, q) = (r.readings.clone(), req.clone());
+            let got = machine::port(|| crate::bound::bounder().read(&id, cfg, live, move |stop| rr.read(&q, stop)));
+            match got {
+                crate::bound::Got::Done { ref out, joined, .. } => {
+                    if joined {
+                        log.say("reading: the same reading was running already; it ended within the bound");
+                    }
+                    info = Some(got.record(cfg.s));
+                    out.clone()?
+                }
+                crate::bound::Got::Bound { background, at_once, waited, .. } => {
+                    log.say(&format!("reading: the bound ({} s) after {waited:.1} s: {}", cfg.s,
+                                     if at_once { "stopped before in this process" } else if background { "it goes on in the background" } else { "stopped" }));
+                    return Ok(Fresh::Bound(got.record(cfg.s)));
+                }
+                crate::bound::Got::Cancelled { .. } => return Err("the guard's kill".into()),
+            }
+        }
+    };
     let wall = t.elapsed().as_secs_f64();
     let t = Instant::now();
     let rd = machine::port(|| r.readings.open(&path))?;
     let load_s = t.elapsed().as_secs_f64();
     let _ = std::fs::remove_file(rdir.join(format!("{}.golden.jsonl.gz", rdir.file_name().unwrap().to_string_lossy())));
-    Ok((rd, wall, load_s))
+    Ok(Fresh::Read(rd, wall, load_s, info))
+}
+
+/// The in-process reader's switch (fmi-reading's `inproc`, read here from the environment).
+fn fmi_reading_in_process() -> bool {
+    std::env::var("FMI_READER_LIB").is_ok_and(|v| v == "1")
+}
+
+/// E014 amendment (4) (a): the reading that stands in for a bounded one, for T and the wait only: the newest of the
+/// scope's (the candidates checked, in their order), else the newest registered reading of another scope that holds
+/// the entry's room (job.json "readings_room").
+fn stand_in(r: &Resident, job: &Value, checked: &[Value]) -> Option<Arc<dyn ReadingSource>> {
+    let mut paths: Vec<PathBuf> = checked.iter().filter_map(|c| c["path"].as_str()).map(PathBuf::from).collect();
+    for x in job.get("readings_room").and_then(|x| x.as_array()).map(|a| a.as_slice()).unwrap_or(&[]) {
+        if let Some(p) = x["path"].as_str() {
+            let p = PathBuf::from(p);
+            let dir = p.parent().unwrap_or(Path::new(""));
+            if p.is_file() && dir.join("reading.reached").exists() {
+                paths.push(p);
+            }
+        }
+    }
+    paths.into_iter().find_map(|p| machine::port(|| r.readings.open(&p)).ok())
+}
+
+/// E016 D (`free::t_archive`): the registered reading a free try's wait views T through when its scope has none: E014's
+/// stand-in (another scope's that holds the entry's room), else the newest registered reading of any scope (job.json
+/// "readings_any"). None: the archive has none, and the try keeps nothing.
+fn free_stand_in(r: &Resident, job: &Value, checked: &[Value]) -> Option<Arc<dyn ReadingSource>> {
+    stand_in(r, job, checked).or_else(|| {
+        job.get("readings_any").and_then(|x| x.as_array()).map(|a| a.as_slice()).unwrap_or(&[]).iter()
+            .filter_map(|x| x["path"].as_str().map(PathBuf::from))
+            .filter(|p| p.is_file())
+            .find_map(|p| machine::port(|| r.readings.open(&p)).ok())
+    })
 }
 
 /// One attempt's outcome (step.py `attempt`'s return).
@@ -543,7 +678,7 @@ struct Attempt {
 #[allow(clippy::too_many_arguments)]
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
            adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
-           cancel: &Arc<AtomicBool>, x: &PlayExtras, keep: bool) -> Result<Attempt, String> {
+           cancel: &Arc<AtomicBool>, x: &PlayExtras, keep: bool, ng: Option<&crate::nogood::Shared>) -> Result<Attempt, String> {
     // the harness's goal (step::target_goal: E012's one target per key gives the key a value list); tier 0's goal has
     // reader-scope's form
     if tg.tier == 0 {
@@ -554,7 +689,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let frame_costs = files::or(doc.get("frame_costs"), &json!({})).clone();
     std::fs::create_dir_all(adir).map_err(|e| files::io_err(adir, e))?;
     let (cpu0, t0) = (cpu_now(), Instant::now());
-    let branch = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let branch = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:635"))).map_err(|e| format!("EngineError: {e}"))?;
     let cfg = HarnessCfg {
         replan_limit: step::REPLAN_LIMIT,
         time_limit_s: step::TIME_LIMIT,
@@ -590,6 +725,13 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let say = |m: &str| log.say(m);
     log.say(&format!("attempt {}: target {} (tier {}) from frame {}", adir.file_name().unwrap().to_string_lossy(), tg.text(), tg.tier, root.status().frame));
     let mut h = Harness::new(cfg, &r.planners, player, Some(&mut wiring), rd.clone(), hgoal, ps, &say)?;
+    if let Some(m) = ng {
+        // E016 C (FMI_NOGOOD): the try's failure memory, with the readings' tested keys for the no-plan key
+        let tp = r.mech.tested.clone();
+        let tested: Option<Arc<dyn Fn(&dyn ReadingSource) -> Option<Vec<Key>> + Send + Sync>> =
+            tp.map(|p| Arc::new(move |rd: &dyn ReadingSource| p.tested(rd).ok().map(|t| t.keys().to_vec())) as _);
+        h.set_nogood(crate::nogood::Ctx { mem: m.clone(), tested });
+    }
     let ta = Instant::now();
     let pa = machine::port_s();
     let res = h.run();
@@ -708,7 +850,12 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     let mut prof = Prof::new();
     // E012's mechanisms in the try (plan.md, "How a try runs"); every switch off: none runs, the try is round 2's
     let sw = Switches::from_env();
+    // E016 C (FMI_NOGOOD): the try's failure memory, from job.json's for its entry, shared by its attempts
+    let ng: Option<crate::nogood::Shared> = crate::nogood::on().then(|| Arc::new(Mutex::new(crate::nogood::Memory::of_job(&job))));
     let mut e12 = Map::new();
+    // E013 (FMI_FREE, component free): a free try plans nothing; its offers follow the wait (free.rs)
+    let mut free_try = crate::free::job_is_free(&job);
+    let mut free_rec: Option<Value> = None;
     let res: Result<(), Result<ReturnDiffers, String>> = (|| {
         if job.get("seed").and_then(|s| s.as_i64()) != Some(step::SEED) {
             return Err(Err(format!("ValueError: seed {}: E008 runs seed {} only (plan.md)", files::py_str(job.get("seed")), step::SEED)));
@@ -762,10 +909,86 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"] = reading_record(&*rd, false, &why, 0.0, load_s);
                 rd
             }
-            None => {
-                let (rd, wall, load_s) = read_fresh(r, &job, &state, &status, threads, log, &cancel_arc).map_err(Err)?;
-                out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
+            // E013: a free try needs a reading for T only: the newest cached reading of the scope when none is reusable
+            None if free_try && !checked.is_empty() => {
+                let p = PathBuf::from(checked[0]["path"].as_str().unwrap_or(""));
+                let rd = machine::port(|| r.readings.open(&p)).map_err(Err)?;
+                out["reading"] = reading_record(&*rd, false, &format!("T only: {why}"), 0.0, t.elapsed().as_secs_f64());
                 rd
+            }
+            // E016 D (FMI_FREE_T=archive): a free try never starts a reading; another scope's registered reading
+            // stands in for the wait, and T is the archive's
+            None if free_try && crate::free::t_archive() => match free_stand_in(r, &job, &checked) {
+                Some(rd) => {
+                    out["reading"] = reading_record(&*rd, false, &format!("T from the archive: {why}"), 0.0, t.elapsed().as_secs_f64());
+                    log.say(&format!("the free try reads nothing; {} stands in for the wait", reading_path(&*rd).display()));
+                    rd
+                }
+                None => {
+                    log.say("the free try reads nothing, and no registered reading stands in: the try keeps nothing");
+                    out["reading"] = json!({"path": null, "fresh": false, "why": format!("T from the archive: {why}; no registered reading"),
+                                            "load_s": t.elapsed().as_secs_f64(), "candidates": checked});
+                    cpu_add(&mut cpu, "read", cpu_now() - c0);
+                    out["exhausted"] = json!(false);
+                    out["ok"] = json!(true);
+                    return Ok(());
+                }
+            },
+            None => {
+                // E020 (FMI_READ_SHARE=1): one fresh reading of a scope at a time in this process; a try that needs one
+                // while another try reads the scope waits for it, then takes it when the reuse rule allows
+                let gate = read_share_on().then(|| share_gate(&job["scope"]));
+                let mut made = gate.as_ref().map(|g| g.lock().unwrap_or_else(|e| e.into_inner()));
+                let shared = match made.as_ref() {
+                    Some(ps) if ps.iter().any(|p| p.exists()) => {
+                        let mut j2 = job.clone();
+                        j2["readings"] = json!(ps.iter().rev().filter(|p| p.exists())
+                            .map(|p| json!({"path": p.to_string_lossy()})).collect::<Vec<_>>());
+                        choose_reading(r, &j2, &facts).map_err(Err)?.0
+                    }
+                    _ => None,
+                };
+                match shared {
+                    Some(rd) => {
+                        out["reading"] = reading_record(&*rd, false, "shared: another try's fresh reading of the scope", 0.0,
+                                                        t.elapsed().as_secs_f64());
+                        rd
+                    }
+                    None => match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
+                        Fresh::Read(rd, wall, load_s, info) => {
+                            if let Some(ps) = made.as_mut() {
+                                ps.push(reading_path(&*rd));
+                            }
+                            out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
+                            if let Some(i) = info {
+                                out["reading"]["bound_wait"] = i;
+                            }
+                            rd
+                        }
+                        // E014 amendment (4) (a): the bound; the try goes on model-free from a stand-in reading
+                        Fresh::Bound(rec) => {
+                            let t1 = Instant::now();
+                            match stand_in(r, &job, &checked) {
+                                Some(rd) => {
+                                    out["reading"] = reading_record(&*rd, false, &format!("bound: {why}"), 0.0, t1.elapsed().as_secs_f64());
+                                    out["reading"]["bound"] = rec;
+                                    log.say(&format!("the try goes on model-free from the stand-in {}", reading_path(&*rd).display()));
+                                    free_try = true;
+                                    rd
+                                }
+                                None => {
+                                    log.say("no reading stands in: the try keeps nothing");
+                                    out["reading"] = json!({"path": null, "fresh": false, "why": format!("bound: {why}; no reading stands in"),
+                                                            "load_s": t1.elapsed().as_secs_f64(), "bound": rec, "candidates": checked});
+                                    cpu_add(&mut cpu, "read", cpu_now() - c0);
+                                    out["exhausted"] = json!(false);
+                                    out["ok"] = json!(true);
+                                    return Ok(());
+                                }
+                            }
+                        }
+                    },
+                }
             }
         };
         out["reading"]["candidates"] = json!(checked);
@@ -775,19 +998,45 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         prof.mark("reading");
         // E012, 2: T (the reading's tested atoms) and the try's novelty over T and the rooms
         let entry_frame_u = status.frame;
-        let entry_facts = if sw.any() { facts_of(&state) } else { Facts::new() };
+        let entry_facts = if sw.any() || free_try { facts_of(&state) } else { Facts::new() };
         let mut extras: Vec<Extra> = Vec::new();
         let mut dead: Vec<Value> = Vec::new();
-        let (tt, nov): (Option<TestedT>, Option<TryNovel>) = if sw.any() {
+        let mut free_keys: Option<TestedT> = None;
+        let (tt, nov): (Option<TestedT>, Option<TryNovel>) = if sw.any() || free_try {
             let t0 = Instant::now();
             let port = r.mech.tested.as_ref().ok_or_else(|| Err("E012: the E012 switches read T, and no tested port is wired".to_string()))?;
             let t = port.tested(&*rd).map_err(|e| Err(format!("E012 tested: {e}")))?;
+            // E014 (FMI_NOVEL_VERBS, FMI_NOVEL_GUIDE): T with the interface's and the guide's atoms
+            let t = if ["FMI_NOVEL_VERBS", "FMI_NOVEL_GUIDE"].iter().any(|k| std::env::var(k).is_ok_and(|v| v == "1")) {
+                let mut flat = t.flat.clone();
+                let n = mech::novelty_extra(&mut flat, &job, &doc_of(&*rd)["scope"], &entry_facts);
+                let mut rec = t.record.clone();
+                rec["e014_extra"] = json!(n);
+                TestedT::new(flat, rec)
+            } else {
+                t
+            };
             let atoms = progress::t_atoms(&t.flat, rd.domains());
             if sw.select {
                 out["tested"] = progress::atoms_json(&atoms);
             }
-            let nov = TryNovel::new(&job, &atoms, &entry_facts);
+            let nov = if free_try {
+                // E013: a free try's novelty is over its T merged with the archive's (job.json "novelty"), each atom once
+                let arch = progress::atoms_of_json(job.get("novelty").and_then(|n| n.get("t")));
+                let mut merged = atoms.clone();
+                let have: HashSet<progress::TAtom> = atoms.iter().cloned().collect();
+                merged.extend(arch.iter().filter(|a| !have.contains(*a)).cloned());
+                free_keys = Some(crate::free::merged_keys(&t, &arch));
+                TryNovel::new(&job, &merged, &entry_facts)
+            } else {
+                TryNovel::new(&job, &atoms, &entry_facts)
+            };
             let mut rec = t.record.clone();
+            if free_try && crate::free::t_archive() {
+                // E016 D: T is the archive's union over its registered readings, with the stand-in's own
+                rec["free_t"] = json!("archive");
+                rec["archive_atoms"] = json!(job.get("novelty").and_then(|n| n.get("t")).and_then(|x| x.as_array()).map(|a| a.len()).unwrap_or(0));
+            }
             rec["atoms"] = json!(atoms.len());
             rec["keys"] = json!(t.keys().len());
             rec["novelty"] = json!(nov.source);
@@ -800,7 +1049,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         };
         // E012, 3 (FMI_WAIT): time passes; the stops become candidate entries, kept by novelty
         let mut waited: Option<mech::Waited> = None;
-        if sw.wait {
+        if sw.wait || free_try {
             let (t, nov) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
             let port = r.mech.wait.as_ref().ok_or_else(|| Err("E012: FMI_WAIT=1, and no wait port is wired".to_string()))?;
             let c0 = cpu_now();
@@ -823,6 +1072,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             if let Some((reason, frame)) = &w.ended {
                 if fmi_core::is_game_end(reason) {
                     dead.push(mech::dead_json(reason, *frame, &[], "wait"));
+                    // E014 (FMI_GOAL_END): the wait that ends the game through a script is also the goal's entry
+                    if let Some(x) = w.ended_at.and_then(|(f, t)| mech::end_extra(reason, f, t, vec![], &[])) {
+                        extras.push(x);
+                    }
                 }
             }
             let mut rec = w.record.clone();
@@ -832,8 +1085,26 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             waited = Some(w);
             prof.mark("wait");
         }
-        // 3. targets
-        let ts = targets_of(r, &*rd, &job, &job_dir, &facts, &goal, tt.as_ref()).map_err(Err)?;
+        // E013 (component free): the free try's offers at the entry and the wait's stops, delays, one more level
+        if free_try {
+            let (t, nv) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
+            let wait = r.mech.wait.clone().ok_or_else(|| Err("E013 free: no wait port is wired".to_string()))?;
+            let dead_moves: Vec<Value> = job.get("dead").and_then(|d| d.as_array()).cloned().unwrap_or_default();
+            let stops: Vec<mech::Stop> = waited.as_ref().map(|w| w.stops.clone()).unwrap_or_default();
+            let cx = crate::free::Ctx { t, keys: free_keys.as_ref().unwrap_or(t), nov: nv, wait, rd: &*rd, dead_moves: &dead_moves,
+                                        cancel };
+            let c0 = cpu_now();
+            let f = machine::port(|| crate::free::explore(root, &stops, &cx)).map_err(Err)?;
+            cpu_set(&mut cpu, "free", cpu_now() - c0 + f.cpu_s);
+            log.say(&format!("free: {} offers, {} trials, {} kept, {} dead, {:.2} s", f.record["offers"], f.record["trials"],
+                             f.kept.len(), f.dead.len(), f.record["seconds"].as_f64().unwrap_or(0.0)));
+            extras.extend(f.kept);
+            dead.extend(f.dead);
+            free_rec = Some(f.record);
+            prof.mark("free");
+        }
+        // 3. targets (none for a free try)
+        let ts = if free_try { Vec::new() } else { targets_of(r, &*rd, &job, &job_dir, &facts, &goal, tt.as_ref()).map_err(Err)? };
         let by = |n: i64| ts.iter().filter(|x| x.tier == n).count();
         out["targets"] = json!({"by_tier": {"0": by(0), "1": by(1), "2": by(2)},
                                 "first": ts.iter().take(20).map(|x| x.json()).collect::<Vec<_>>(), "n": ts.len()});
@@ -859,6 +1130,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             }
         };
         let keep_engine = sw.afford;
+        // E014 amendment (4) (b) (job.json "ring", FMI_SCOPE_GROW): the room the try's scope needs, if any
+        let ring_of: Option<Vec<i64>> = job.get("ring").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_i64()).collect());
+        let scope_v: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default();
+        let mut need: Option<crate::grow::Need> = None;
         let mut goal_again = false;
         let mut goal_again_rec: Vec<Value> = Vec::new();
         let mut n_att = 0;
@@ -870,19 +1145,23 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             let first_limit = deepen.map(|l0| step::deepen_limit(l0, n_def));
             let x = extras_of(nov.as_ref());
             let att = match from_stop {
-                None => attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine).map_err(Err)?,
+                None => attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine, ng.as_ref()).map_err(Err)?,
                 Some(si) => {
                     // the goal again from a wait's stop: the entry's state run on with no input to the stop's frame
                     // (a fork of the entry; the stop's checkpoint is held to it)
                     let stop = &waited.as_ref().unwrap().stops[si];
                     let mut b = engine_at(root, &stop.checkpoint).map_err(Err)?;
-                    let a = attempt(r, &rd, &mut b, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine);
+                    let a = attempt(r, &rd, &mut b, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine, ng.as_ref());
                     machine::port(|| b.quit());
                     a.map_err(Err)?
                 }
             };
             prof.mark("attempt");
             n_att += 1;
+            if let (Some(rg), true) = (ring_of.as_ref(), need.is_none()) {
+                let room = att.checkpoints.last().and_then(|c| c.facts.get(Key::parse("room")));
+                need = crate::grow::plan_need(att.res.get("stop").and_then(|s| s.as_str()), room, &scope_v, rg);
+            }
             let status_ = step::first_plan_status(att.res["plans"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
             let rd_packed = rd.dir().join(doc_of(&*rd).get("packed").and_then(|p| p.as_str()).unwrap_or("reading.tc"));
             let made = step::made_reading(&att.packed, &rd_packed);
@@ -946,17 +1225,54 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 fresh_again = true;
                 let c0 = cpu_now();
                 let old = out["reading"].clone();
-                let (nrd, wall, load_s) = read_fresh(r, &job, &state, &status, threads, log, &cancel_arc).map_err(Err)?;
-                rd = nrd;
-                out["reading"] = reading_record(&*rd, true, step::NOT_A_PLAN_RETRY, wall, load_s);
-                out["reading"]["replaced"] = json!({"path": old["path"], "why": old["why"]});
-                out["reading"]["candidates"] = json!(checked);
-                cpu_add(&mut cpu, "read", cpu_now() - c0);
-                out["tried"].as_array_mut().unwrap().pop();
-                queue.push_front((tg, n_def, None));
+                match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
+                    Fresh::Read(nrd, wall, load_s, info) => {
+                        rd = nrd;
+                        out["reading"] = reading_record(&*rd, true, step::NOT_A_PLAN_RETRY, wall, load_s);
+                        out["reading"]["replaced"] = json!({"path": old["path"], "why": old["why"]});
+                        out["reading"]["candidates"] = json!(checked);
+                        if let Some(i) = info {
+                            out["reading"]["bound_wait"] = i;
+                        }
+                        cpu_add(&mut cpu, "read", cpu_now() - c0);
+                        out["tried"].as_array_mut().unwrap().pop();
+                        queue.push_front((tg, n_def, None));
+                    }
+                    // E014 amendment (4) (a): the reading again reached the bound; the cached one stays, the target
+                    // is tried
+                    Fresh::Bound(rec) => {
+                        out["reading"]["retry_bound"] = rec;
+                        cpu_add(&mut cpu, "read", cpu_now() - c0);
+                    }
+                }
             }
         }
         prof.mark("probes");
+        // E014 amendment (4) (b), case 1: a model try in which no attempt played names the room a target needs
+        if let (Some(rg), true, true, true) = (ring_of.as_ref(), need.is_none(), !free_try, played.is_none()) {
+            let g = crate::warm::guide(Path::new(job["guide"].as_str().unwrap_or(""))).map_err(Err)?;
+            let reached = crate::warm::reached(&*rd);
+            let rmap: std::collections::HashMap<&str, &Vec<i64>> = reached.iter().map(|(k, v)| (k.as_str(), v)).collect();
+            let root_f = step::root_facts_of_memo(&job, &job_dir);
+            let rootv = |k: &str| root_f.as_ref().and_then(|m| m.get(k).copied()).unwrap_or(0);
+            let now = |k: &str| crate::archive::FactLook::look(&facts, k).unwrap_or(0);
+            let held = |k: &str, v: Option<i64>| match v {
+                Some(v) => now(k) == v,
+                None => now(k) != rootv(k),
+            };
+            let reach = |k: &str, v: Option<i64>| match rmap.get(k) {
+                None => false,
+                Some(vs) => match v {
+                    Some(v) => vs.contains(&v),
+                    None => vs.iter().any(|x| *x != rootv(k)),
+                },
+            };
+            need = crate::grow::target_need(&g, &scope_v, rg, &held, &reach, crate::grow::obj_rooms());
+        }
+        if let Some(n) = &need {
+            log.say(&format!("the scope {:?} needs room {} ({})", scope_v, n.room, n.why));
+            out["scope_need"] = n.json();
+        }
         if goal_again {
             e12.insert("goal_again".into(), json!(goal_again_rec));
         }
@@ -970,7 +1286,19 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["tried"].as_array_mut().unwrap().push(rec);
             }
             let entry_frame = entry["frame"].as_i64().unwrap_or(0);
-            let frames: Vec<i64> = att.checkpoints.iter().map(|c| c.frame as i64).collect();
+            let att_stop: Option<String> = att.res.get("stop").and_then(|s| s.as_str()).map(|s| s.to_string());
+            // E024 Part 1 (FMI_AFFORD_P0=1): an attempt whose stop triggers the affordance step, on its trailing empty
+            // windows with no input after their start P0, commits no checkpoint after P0 and runs the step there
+            let at_p0 = if mech::afford_p0() && att.engine.is_some() && tt.is_some() && nov.is_some()
+                && mech::trigger_of_stop(att_stop.as_deref()).is_some()
+            {
+                let stop_cp = played_from.map(|si| &waited.as_ref().unwrap().stops[si].checkpoint);
+                p0_engine(root, &att, entry_frame, stop_cp)
+            } else {
+                None
+            };
+            let p0 = at_p0.as_ref().filter(|x| !matches!(x.1, AtP0::Missed(_))).map(|x| x.0);
+            let frames: Vec<i64> = att.checkpoints.iter().map(|c| c.frame as i64).filter(|f| p0.is_none_or(|p| *f <= p)).collect();
             let plan = step::entries_plan(entry_frame, &att.inputs, &frames).map_err(Err)?;
             let reached = match att.checkpoints.last() {
                 Some(c) => step::target_holds_in(&tg, &goal, &c.facts),
@@ -980,11 +1308,35 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             att.res["_reached"] = json!(reached);
             att.res["_ready"] = json!(ready);
             out["attempt"] = step::attempt_record(&tg, &att.res, att.secs);
-            let att_engine = att.engine.take();
-            let att_stop: Option<String> = att.res.get("stop").and_then(|s| s.as_str()).map(|s| s.to_string());
+            let mut att_engine = att.engine.take();
+            // E024 Part 1: P0's engine in place of the end's (none at the try's entry: the step runs on the root)
+            let mut p0_rec: Option<Value> = None;
+            let mut p0_root = false;
+            if let Some((p, at)) = at_p0 {
+                let n_after = att.checkpoints.iter().filter(|c| c.frame as i64 > p).count();
+                let how = match at {
+                    AtP0::Missed(why) => {
+                        p0_rec = Some(json!({"frame": p, "missed": why}));
+                        format!("not reached again ({why}): at the attempt's end")
+                    }
+                    at => {
+                        if let Some(e) = att_engine.take() {
+                            machine::port(|| e.quit());
+                        }
+                        p0_root = matches!(at, AtP0::Root);
+                        if let AtP0::Engine(b) = at {
+                            att_engine = Some(b);
+                        }
+                        p0_rec = Some(json!({"frame": p, "root": p0_root, "after": n_after}));
+                        format!("{}, the attempt's {n_after} checkpoints after it not committed", if p0_root { "the entry" } else { "reached again" })
+                    }
+                };
+                log.say(&format!("afford at P0, frame {p}: {how}"));
+            }
             // the entries share the attempt's checkpoints (each a prefix): each checkpoint's text is made once, and the
             // files are written together; the ingest of this process takes them from the stash
-            let kept: Vec<Checkpoint> = att.checkpoints.into_iter().filter(|c| c.frame as i64 > entry_frame).collect();
+            let kept: Vec<Checkpoint> = att.checkpoints.into_iter()
+                .filter(|c| c.frame as i64 > entry_frame && p0.is_none_or(|p| c.frame as i64 <= p)).collect();
             // E012: the attempt's entries are kept, so what they hold is novel no more in this try; the affordance
             // step's entries continue the attempt's movie and checkpoints
             if let Some(n) = nov.as_ref() {
@@ -1040,28 +1392,45 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 if let Some(reason) = mech::game_end_of_stop(att_stop.as_deref()) {
                     let evs: Vec<Value> = att.inputs.iter().filter(|e| files::as_i64(e.get("frame")).unwrap_or(0) > last_cp).cloned().collect();
                     dead.push(mech::dead_json(&reason, att.res["frame_end"].as_u64().unwrap_or(0), &evs, "attempt"));
+                    // E014 (FMI_GOAL_END): an attempt that ends the game through a script is also the goal's entry,
+                    // its inputs from the try's entry on (the harness's end status: frame_end, tick_end)
+                    if let (Some(f), Some(t)) = (att.res["frame_end"].as_u64(), att.res["tick_end"].as_u64()) {
+                        let all: Vec<Value> = att.inputs.iter().filter(|e| files::as_i64(e.get("frame")).map(|x| x > entry_frame_u as i64 && x <= f as i64).unwrap_or(false)).cloned().collect();
+                        if let Some(x) = mech::end_extra(&reason, f, t, all, &[]) {
+                            extras.push(x);
+                        }
+                    }
                 }
             }
             // E012, 6 (FMI_AFFORD): the interface's own inputs where the model could not act (R0, the same empty window)
-            if let Some(mut e) = att_engine {
+            if att_engine.is_some() || p0_root {
                 if let (Some(trig), Some(t), Some(nv)) = (mech::trigger_of_stop(att_stop.as_deref()), tt.as_ref(), nov.as_ref()) {
+                    let e: &mut Box<dyn Engine> = match att_engine.as_mut() {
+                        Some(e) => e,
+                        None => &mut *root,
+                    };
                     let f = e.status().frame as i64;
                     let prefix: Vec<Value> = att.inputs.iter().filter(|x| files::as_i64(x.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
                     let c0 = cpu_now();
-                    let a = run_afford(r, &sw, &mut e, trig, t, nv, &*rd, &job, &prefix, &prefix_cps, log);
-                    machine::port(|| e.quit());
-                    let a = a.map_err(Err)?;
+                    let a = run_afford(r, &sw, e, trig, t, nv, &*rd, &job, &prefix, &prefix_cps, log);
+                    if let Some(e) = att_engine {
+                        machine::port(|| e.quit());
+                    }
+                    let mut a = a.map_err(Err)?;
+                    if let Some(p) = p0_rec {
+                        a.record["p0"] = p;
+                    }
                     cpu_set(&mut cpu, "afford", cpu_now() - c0 + a.cpu_s);
                     afford_recs.push(a.record);
                     extras.extend(a.kept);
                     dead.extend(a.dead);
-                } else {
+                } else if let Some(e) = att_engine {
                     machine::port(|| e.quit());
                 }
             }
         }
         // E012, 6 (FMI_AFFORD): no target of the try plans: the interface's own inputs at the entry
-        if sw.afford && played_none(&out) {
+        if sw.afford && !free_try && played_none(&out) {
             let (t, nv) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
             let c0 = cpu_now();
             let a = run_afford(r, &sw, root, Trigger::NoPlan, t, nv, &*rd, &job, &[], &[], log).map_err(Err)?;
@@ -1074,7 +1443,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         prof.mark("new entries");
         // E012, 7: the commit: the candidate entries kept by novelty (after the attempt's), and the dead moves
         let n_extra = extras.len();
-        if sw.any() {
+        if sw.any() || free_try {
             let mut by_how = Map::new();
             for x in &extras {
                 let n = by_how.get(x.how).and_then(|v| v.as_u64()).unwrap_or(0);
@@ -1099,13 +1468,25 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         let e12_exhausted = !sw.any()
             || (n_extra == 0 && (!sw.wait || waited.as_ref().map(|w| w.is_static).unwrap_or(false))
                 && (!sw.afford || afford_offered == Some(0)));
-        out["exhausted"] = json!(played_none(&out) && !deferred_now && e12_exhausted);
+        // (E013: a free try tries no target, so it never marks its entry exhausted)
+        out["exhausted"] = json!(!free_try && played_none(&out) && !deferred_now && e12_exhausted);
         out["ok"] = json!(true);
         Ok(())
     })();
-    if sw.any() {
+    if sw.any() || free_try {
         e12.insert("switches".into(), sw.json());
         out["e012"] = Value::Object(e12);
+    }
+    // E013 (FMI_FREE): the job's kind, and a free try's record
+    if let Some(k) = job.get("kind") {
+        out["kind"] = k.clone();
+    }
+    if let Some(f) = free_rec {
+        out["free"] = f;
+    }
+    // E016 C: what the try's attempts added to the failure memory
+    if let Some(m) = &ng {
+        out["nogood"] = m.lock().unwrap().result_json();
     }
     match res {
         Ok(()) => {}
@@ -1146,7 +1527,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
 /// E012: an engine at a wait's stop: a fork of the entry's engine run with no input to the stop's frame, held to the
 /// stop's checkpoint (facts, tick, random state, actors), so the goal is requested again from that state.
 fn engine_at(root: &mut Box<dyn Engine>, cp: &Checkpoint) -> Result<Box<dyn Engine>, String> {
-    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:1403"))).map_err(|e| format!("EngineError: {e}"))?;
     let st = machine::port(|| b.run(&RunSpec { frame: Some(cp.frame), ..Default::default() }));
     let differ = match st {
         Ok(st) if st.frame == cp.frame => {
@@ -1167,6 +1548,38 @@ fn engine_at(root: &mut Box<dyn Engine>, cp: &Checkpoint) -> Result<Box<dyn Engi
         return Err(format!("E012: the wait's stop at frame {} is not reached again from the entry: {d}", cp.frame));
     }
     Ok(b)
+}
+
+/// E024 Part 1: where the affordance step runs instead of the attempt's end engine.
+enum AtP0 {
+    /// P0 is the try's entry: the root itself (as the step with no plan)
+    Root,
+    /// a fork of the root played to P0 and held to P0's checkpoint
+    Engine(Box<dyn Engine>),
+    /// P0's state not reached again: the attempt's end engine, every checkpoint committed
+    Missed(String),
+}
+
+/// E024 Part 1 (FMI_AFFORD_P0): P0 of a played attempt (mech::p0_of over its window records, from its start frame0) when
+/// no input of the attempt lies after it, and the engine there: the root's fork with the attempt's inputs to P0, run to
+/// P0 and held to the attempt's checkpoint at P0 (or the wait's stop it started from), as engine_at holds it.
+fn p0_engine(root: &mut Box<dyn Engine>, att: &Attempt, entry_frame: i64, stop_cp: Option<&Checkpoint>) -> Option<(i64, AtP0)> {
+    let ws = att.res["windows"].as_array()?;
+    let frame0 = att.res["frame0"].as_i64().unwrap_or(entry_frame);
+    let p = mech::p0_of(ws, frame0)?;
+    if att.inputs.iter().any(|x| files::as_i64(x.get("frame")).unwrap_or(i64::MAX) > p) {
+        return None;
+    }
+    if p == entry_frame {
+        return Some((p, AtP0::Root));
+    }
+    let Some(cp) = att.checkpoints.iter().chain(stop_cp).find(|c| c.frame as i64 == p) else {
+        return Some((p, AtP0::Missed(format!("no checkpoint at frame {p}"))));
+    };
+    match machine::port(|| crate::free::engine_at(root, &att.inputs, cp)) {
+        Ok(b) => Some((p, AtP0::Engine(b))),
+        Err(e) => Some((p, AtP0::Missed(e))),
+    }
 }
 
 /// E012's affordance step in the try (mech::afford_step) with the wait's horizon and stops when the wait is on, and

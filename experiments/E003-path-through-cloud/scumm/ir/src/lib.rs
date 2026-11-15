@@ -33,7 +33,7 @@ pub mod vars;
 pub use analysis::{Analyses, Loop, LoopKind, Read, Reason, WaitKind, WaitPoint};
 pub use ast::*;
 pub use facts::{Fact, FactMap, Slot};
-pub use game::{default_root, Game, GameData, Resist};
+pub use game::{data_root, default_root, game_index, scripts_dir, Game, GameData, Resist};
 pub use read::Script;
 pub use sym::{known, Interner, Sym};
 

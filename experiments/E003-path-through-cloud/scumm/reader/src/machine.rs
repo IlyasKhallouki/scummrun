@@ -16,7 +16,7 @@
 //! * the runs `run_click_verb` and `run_event` start with a call whose one step is a marked note that the `eng`
 //!   hook runs as `_eng_input` (model.py's, without its switch) and `_eng_resume_at`.
 
-use crate::builder::{Ctx, Machine as RunMachine, RdCounts, RunOut, DROP_ENDS};
+use crate::builder::{Ctx, Machine as RunMachine, RdCounts, RunOut};
 use crate::domain::{Domain, Label, Labels};
 use crate::py::Py;
 use crate::record::{
@@ -28,7 +28,9 @@ use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use scumm_ir::{
     known, CmpOp, Expr, ExprId, Fact, FactMap, Game, Reason, Slot, Span, Stmt, Sym, UnitId, UnitKey, Yield,
 };
-use scumm_machine::machine::{Fork, Hooks, R, VAR_INVENTORY_SCRIPT, VAR_OVERRIDE, VAR_ROOM, VAR_ROOM_RESOURCE, X};
+use scumm_machine::machine::{
+    Fork, Hooks, R, VAR_INVENTORY_SCRIPT, VAR_OVERRIDE, VAR_ROOM, VAR_ROOM_RESOURCE, WIDENED, X,
+};
 use scumm_machine::oracle::{FactOracle, Prefix};
 use scumm_machine::path::{fmix, Assumption, Call, Entry, Owned, Path, PathExt, Run, Side, Sig, Step, S};
 use scumm_machine::value::{i16w, Dec, Op, Unknown, Val};
@@ -63,6 +65,8 @@ const RESUME_STEP: &str = "\u{1}reader: _eng_resume_at";
 const F1C_CLICK_A: &str = "\u{1}reader: F1c click A";
 const F1C_CLICK_B: &str = "\u{1}reader: F1c click B";
 const F1C_END: &str = "\u{1}reader: F1c end";
+/// E022 amendment (27) (`FMI_READ_QUEUE=1`): the step a sentence or event run takes after its own (`queue_end`)
+const QUEUE_END: &str = "\u{1}reader: queue end";
 const VERB_CLICK_AREA: i32 = 1; // model.py, verbs.h:35
 const LEFT_CLICK: i32 = 1; // model.py, verbs.cpp:666
 const VAR_VERB_SCRIPT: i32 = 32;
@@ -255,6 +259,7 @@ fn reason_of(s: &str) -> Reason {
         R_STEP,
         R_COND,
         R_COPY,
+        WIDENED,
     ];
     if let Some(r) = all.iter().find(|r| r.as_str() == s) {
         return *r;
@@ -428,6 +433,8 @@ struct St {
     verb_reads: u64,
     click_read: bool,
     clicked: bool,
+    /// E022 amendment (26): `rename_test` of each jump read so far, by (unit, instruction)
+    renames: FxHashMap<(u32, u32), bool>,
 }
 
 /// F1c: one input's run from input script `n` (machine.rs `f1c_click`).
@@ -587,6 +594,119 @@ fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> R<Op
     }
     count(m, "F12: forks on read into value sets");
     Err(Fork(Box::new(ForkOn(k, Some(sets)))))
+}
+
+/// E022 amendment (26) (`FMI_READ_RENAME=1`): a read of fact `k`, whose values left are `cands`, by a rename-only
+/// test (`rename_test`): its first value, with no fork and nothing assumed. None: not such a test, or no plain value.
+fn rename_read(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Val> {
+    if !crate::builder::read_rename_switch() {
+        return None;
+    }
+    let x = st(m).cur?;
+    let l = *cands.iter().find(|l| matches!(l, Label::Int(_)))?;
+    let key = (x.u.0, x.i);
+    let ok = match st(m).renames.get(&key) {
+        Some(&b) => b,
+        None => {
+            let b = rename_test(m.game, x.u, x.i);
+            st_mut(m).renames.insert(key, b);
+            if std::env::var_os("FMI_READ_RENAME_DEBUG").is_some() {
+                let g = m.game;
+                eprintln!("[rename] {} {} {:04X}: {b}", Game::unit_name(g.unit(x.u).key), k, g.ins(x.u)[x.i as usize].offset);
+            }
+            b
+        }
+    };
+    if !ok {
+        return None;
+    }
+    count(m, "E022: facts a rename-only test reads, read with no fork");
+    let i = info(m, k);
+    Some(value(m, &i, l))
+}
+
+/// E022 amendment (26): whether the jump at instruction `i` of unit `u` only picks object names, so that the fact its
+/// test reads needs no fork. Its test reads only classOfIs, getObjectState, getObjectOwner, locals and constants; its
+/// two arms, up to the instruction where they meet, hold only setObjectName, such tests and forward jumps inside
+/// them; and every way through each arm either runs a setObjectName or, after the meeting point, runs one before any
+/// other statement (through such tests and forward jumps). setObjectName's one effect the machine keeps is the
+/// inventory hook's run (`inventory_hook`, `eng_script`): the hook script stopped and its keys written with one
+/// value, the same at every run, which no such test reads. So both arms are in the same state at the first rename
+/// after the test, whichever value the fact has.
+pub(crate) fn rename_test(g: &Game, u: UnitId, i: u32) -> bool {
+    let ins = g.ins(u);
+    let n = ins.len() as u32;
+    let ast = &g.ast;
+    fn pure(ast: &scumm_ir::Ast, e: ExprId) -> bool {
+        match ast.expr(e) {
+            Expr::Const(_) | Expr::Local(_) | Expr::Str(_) => true,
+            Expr::Getter { name, args } => {
+                matches!(name, known::CLASS_OF_IS | known::GET_OBJECT_STATE | known::GET_OBJECT_OWNER)
+                    && ast.kids(args).iter().all(|&a| pure(ast, a))
+            }
+            Expr::List(args) => ast.kids(args).iter().all(|&a| pure(ast, a)),
+            Expr::Cmp { a, b, .. } => pure(ast, a) && pure(ast, b),
+            Expr::Not(a) | Expr::Truth(a) | Expr::Neg(a) => pure(ast, a),
+            _ => false,
+        }
+    }
+    let rename = |j: u32| matches!(ins[j as usize].st, Some(Stmt::Op { name: known::SET_OBJECT_NAME, .. }));
+    // a test or jump the region may hold: forward, its test pure; (fall-through, target)
+    let step = |j: u32| -> Option<(Option<u32>, u32)> {
+        let x = &ins[j as usize];
+        match x.st? {
+            Stmt::Jump { cond, .. } => {
+                let t = x.target?;
+                if t <= j || cond.is_some_and(|c| !pure(ast, c)) {
+                    return None;
+                }
+                Some((if cond.is_some() { x.next } else { None }, t))
+            }
+            _ => None,
+        }
+    };
+    let Some((Some(a), b)) = step(i) else { return false };
+    // where the arms meet: past the then arm's closing jump over the else arm, or the test's target
+    let join = match (b > a).then(|| step(b - 1)).flatten() {
+        Some((None, t)) if t >= b => t,
+        _ => b,
+    };
+    if join > n {
+        return false;
+    }
+    for j in a..join {
+        if rename(j) {
+            continue;
+        }
+        match step(j) {
+            Some((_, t)) if t <= join => {}
+            _ => return false,
+        }
+    }
+    // every way from `j` runs a rename before `stop` (inside the region) or before any other statement (after it)
+    fn first<F: Fn(u32) -> bool, S: Fn(u32) -> Option<(Option<u32>, u32)>>(
+        j: u32,
+        stop: Option<u32>,
+        n: u32,
+        rename: &F,
+        step: &S,
+        budget: &mut u32,
+    ) -> bool {
+        if Some(j) == stop || j >= n || *budget == 0 {
+            return false;
+        }
+        *budget -= 1;
+        if rename(j) {
+            return true;
+        }
+        match step(j) {
+            Some((f, t)) => f.is_none_or(|f| first(f, stop, n, rename, step, budget)) && first(t, stop, n, rename, step, budget),
+            None => false,
+        }
+    }
+    let mut budget = 256;
+    let arms = first(a, Some(join), n, &rename, &step, &mut budget) && first(b, Some(join), n, &rename, &step, &mut budget);
+    arms || first(join, None, n, &rename, &step, &mut budget)
 }
 
 fn info(m: &mut Machine<'_>, k: Fact) -> Rc<Info> {
@@ -846,6 +966,9 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Va
                 return Ok(lazy_of(m, &i, Some(&s)));
             }
             let s = s.clone();
+            if let Some(v) = rename_read(m, k, &s) {
+                return Ok(v);
+            }
             if let Some(v) = read_by_sets(m, k, &s, p)? {
                 return Ok(v);
             }
@@ -877,6 +1000,9 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Va
                     return Ok(lazy_of(m, &i, None));
                 }
                 let all = d.values.clone();
+                if let Some(v) = rename_read(m, k, &all) {
+                    return Ok(v);
+                }
                 if let Some(v) = read_by_sets(m, k, &all, p)? {
                     return Ok(v);
                 }
@@ -1307,7 +1433,7 @@ impl Hooks for ReaderHooks {
                 p.assumptions.push(Assumption { cite, cond: cond.into(), side: Side::Bool(false), why: why.into() });
                 return Ok(Vec::new());
             }
-            if st(m).table.as_ref().is_some_and(|t| t.wait_both) {
+            if st(m).table.as_ref().is_some_and(|t| t.wait_both || t.wait_queued) {
                 return wait_both(m, p, o, x, name);
             }
             count(m, "WaitFor ops that yield (their later part is an event)");
@@ -1335,6 +1461,7 @@ impl Hooks for ReaderHooks {
                 known::RESTORE_VERBS => restore_verbs(m, p, o, x, st, args)?,
                 known::VERB_OPS => lazily(m, |m| m.op_base(p, o, x, st))?,
                 known::DO_SENTENCE if sx(p).settled_target != 0 => f1c_do_sentence(m, p, o, x, st)?,
+                known::DO_SENTENCE if crate::builder::read_queue_switch() => queue_do_sentence(m, p, o, x, st)?,
                 _ => m.op_base(p, o, x, st)?,
             }
         })
@@ -1491,6 +1618,7 @@ impl Hooks for ReaderHooks {
                 Step::Note(s) if &**s == F1C_CLICK_A => f1c_click(m, p, false),
                 Step::Note(s) if &**s == F1C_CLICK_B => f1c_click(m, p, true),
                 Step::Note(s) if &**s == F1C_END => f1c_end(m, p),
+                Step::Note(s) if &**s == QUEUE_END => queue_end(m, p, o)?,
                 Step::Scene { room, .. } => {
                     // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
                     let res = match *room {
@@ -1500,6 +1628,14 @@ impl Hooks for ReaderHooks {
                     if res.is_none() || !st(m).scope_rooms.contains(&res) {
                         let (_, cite) = call_at(p, ci);
                         let at = format!("{cite}: room {}", m.vals_ref().show(*room));
+                        // E022 amendment (11) (`FMI_READ_EXITS=1`): a room change to a known room outside the scope is
+                        // an action that ends there, writing the room, as a change inside it ends "room"; the planner
+                        // can then reach a room the scope leaves for. Unset: dropped ("left the scope").
+                        if read_exits_on() && matches!(*room, Val::Int(_)) {
+                            m.h_write(p, Fact::Room, *room);
+                            m.h_halt(p, "room", at.into());
+                            return Ok(Vec::new());
+                        }
                         m.h_halt(p, "left the scope", at.into());
                         return Ok(Vec::new());
                     }
@@ -1528,7 +1664,10 @@ impl Hooks for ReaderHooks {
         Ok({
             if n != 0 && m.game.id(UnitKey::Global(n)).is_some() {
                 let hook = lazily(m, |m| m.read(p, Fact::Var(VAR_INVENTORY_SCRIPT), o))?;
-                if hook == Val::Int(n) {
+                if hook == Val::Int(n)
+                    || (read_inventory_summary_on() && scope::enumerates_inventory(m.game, n))
+                    || (crate::builder::read_string_summary_switch() && scope::loops_over_strings(m.game, n))
+                {
                     let (head, cite) = call_at(p, ci);
                     if recursive != Some(true) {
                         m.h_stop_script(p, o, n, &cite, &head)?;
@@ -2158,6 +2297,75 @@ fn f1c_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: 
     })
 }
 
+/// E022 amendment (27) (`FMI_READ_QUEUE=1`): doSentence on a path outside a click's run holds a sentence of known
+/// values (the first; STOP empties it), as F1c's `f1c_do_sentence` does on a click's; the op's own note as before.
+fn queue_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
+    Ok({
+        let Stmt::Op { args, flags, .. } = st else { unreachable!() };
+        let g = m.game;
+        if g.ast.flags(flags).contains(&known::STOP) {
+            sx_mut(p).queued = None;
+            return Ok(m.op_base(p, o, x, st)?);
+        }
+        if sx(p).queued.is_none() {
+            let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
+            let vals: Vec<Val> = kids.iter().map(|&a| m.val(p, o, a, Some(x))).collect::<R<Vec<Val>>>()?;
+            if std::env::var_os("FMI_READ_QUEUE_DEBUG").is_some() {
+                let strs: Vec<String> = vals.iter().map(|&v| m.vals_ref().show(v).to_string()).collect();
+                eprintln!("[queue] doSentence [{}]", strs.join(", "));
+            }
+            if let [Val::Int(v), Val::Int(a), Val::Int(b)] = vals[..] {
+                sx_mut(p).queued = Some((v, a, b));
+                count(m, "FMI_READ_QUEUE: sentences a doSentence holds");
+            }
+        }
+        m.op_base(p, o, x, st)?
+    })
+}
+
+/// E022 amendment (27) (`FMI_READ_QUEUE=1`): where a sentence or event run's own step ends, a sentence the path holds
+/// runs as checkAndRunSentenceScript runs it at the frame's end (script.cpp:1244-1246), when the path's facts say the
+/// sentence script is idle (its slots not live); else, or with nothing held, the path ends as before. A v5 sentence
+/// whose B is A and not 0 is dropped (script.cpp:1202-1204).
+fn queue_end(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> R<Vec<Path>> {
+    Ok({
+        let Some((verb, a, b)) = sx(p).queued else { return Ok(Vec::new()) };
+        // the sentence script idle: VAR_SENTENCE_SCRIPT known and its slots known and not live (script.cpp:1186-1191)
+        let n = m.read(p, Fact::Var(scumm_machine::machine::VAR_SENTENCE_SCRIPT), o)?;
+        let idle = match n {
+            Val::Int(n) if n != 0 => {
+                let mut ok = true;
+                for k in [m.game.script_key(n), Fact::ObjScript(n)] {
+                    let v = m.read(p, k, o)?;
+                    ok &= v == Val::Int(0);
+                }
+                ok
+            }
+            _ => false,
+        };
+        if std::env::var_os("FMI_READ_QUEUE_DEBUG").is_some() {
+            eprintln!("[queue] end with ({verb},{a},{b}) held: sentence script idle {idle}");
+        }
+        if (b != 0 && a == b) || !idle {
+            return Ok(Vec::new());
+        }
+        sx_mut(p).queued = None;
+        count(m, "FMI_READ_QUEUE: held sentences run where the run's step ended");
+        let cid = m.h_cid();
+        let step = Step::Sentence { verb, a, b: (b != 0).then_some(b) };
+        p.stack.push(Entry::Call(Call {
+            head: "checkAndRunSentenceScript".into(),
+            cite: "script.cpp:1244-1246".into(),
+            steps: vec![step].into(),
+            caller: None,
+            active: false,
+            i: 0,
+            cid,
+        }));
+        Vec::new()
+    })
+}
+
 /// F1c rule 7: where the click's run ends, a sentence held runs as today's record runs it (the job's pins hold the
 /// sentence script idle, or live and frozen); a v5 sentence whose B is A and not 0 is dropped (script.cpp:1202-1204).
 /// None held: the record ends, and what it leaves waiting carries the constants (rule 8).
@@ -2195,6 +2403,9 @@ fn f1c_end(m: &mut Machine<'_>, p: &mut Path) -> Vec<Path> {
 /// VAR_HAVE_MSG (var 3, which the engine writes every frame, domains::ENGINE), WaitForCamera the camera's current and
 /// target x; no fact of the reading holds them. WaitForSentence reads the sentence queue and whether the sentence
 /// script is in use: where the path decides it (`sentence_wait_known`), it takes that branch alone; else both.
+/// E026 C1, the switch wait_queued (wait_both off): the passing path only where the path holds a sentence
+/// (`SymX::queued`, FMI_READ_QUEUE), which the passing run's end can run (`queue_end`); elsewhere the op yields as with
+/// both off. Every path it adds is one wait_both adds, so by Lemma W the reading still over-approximates.
 fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
     Ok({
         let g = m.game;
@@ -2213,6 +2424,15 @@ fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym)
                 Vec::new()
             }
             None => {
+                if st(m).table.as_ref().is_some_and(|t| t.wait_queued && !t.wait_both) {
+                    if sx(p).queued.is_none() {
+                        count(m, "wait_queued: WaitFor ops that only yield (the path holds no sentence)");
+                        count(m, "WaitFor ops that yield (their later part is an event)");
+                        m.h_done(p, o, "yield", c, Some(ins.offset))?;
+                        return Ok(Vec::new());
+                    }
+                    count(m, "wait_queued: WaitFor ops that also pass (the path holds a sentence)");
+                }
                 let (reason, what) = Machine::h_waits(name);
                 let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
                 let why = format!("?({}: {what})", reason.as_str());
@@ -2417,7 +2637,7 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
     let sym = p.ext.is_some();
     // the switch havoc_cut: a path the step limit ended is handed over whole, with where it stood (havoc.rs)
     let cut = (havoc && sym && end.as_deref() == Some("limit")).then(|| cut_of(game, p, settled));
-    if !sym || (cut.is_none() && end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e))) {
+    if !sym || (cut.is_none() && end.as_deref().is_some_and(crate::builder::dropped_end)) {
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
@@ -2552,6 +2772,8 @@ fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::C
         },
         // F1c's end: the sentence its click queued (`f1c_end`)
         Step::Note(s) if &**s == F1C_END => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
+        // FMI_READ_QUEUE's end: the sentence a doSentence on the path held (`queue_end`)
+        Step::Note(s) if &**s == QUEUE_END => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
         _ => other(st),
     }
 }
@@ -2571,6 +2793,10 @@ impl<'g> Reader<'g> {
             Features { own_entry: true, dispatch: true, calls: true, room_change: true, ..Default::default() };
         let mut m = Machine::new(game, features, Switches::default());
         m.path_limit = PATH_LIMIT;
+        m.sound_ops = crate::builder::read_sound_switch();
+        if crate::builder::read_queue_switch() {
+            m.sentence_tail = vec![Step::Note(QUEUE_END.into())];
+        }
         m.hooks = Some(&HOOKS);
         m.ext = Some(Box::new(St::default()));
         Reader { m, o: FactOracle::new(FactMap::default(), None) }
@@ -2724,7 +2950,12 @@ impl Reader<'_> {
                 let call = Call {
                     head: "runAllScripts".into(),
                     cite: "script.cpp:968-987".into(),
-                    steps: vec![Step::Note(RESUME_STEP.into())].into(),
+                    steps: if crate::builder::read_queue_switch() {
+                        vec![Step::Note(RESUME_STEP.into()), Step::Note(QUEUE_END.into())]
+                    } else {
+                        vec![Step::Note(RESUME_STEP.into())]
+                    }
+                    .into(),
                     caller: None,
                     active: false,
                     i: 0,
@@ -2771,6 +3002,10 @@ impl Reader<'_> {
 impl RunMachine for Reader<'_> {
     fn set_path_limit(&mut self, n: usize) {
         self.m.path_limit = if n == 0 { PATH_LIMIT } else { n };
+    }
+
+    fn set_widen(&mut self, on: bool) {
+        self.m.widen_loops = on;
     }
 
     /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`. The label names the run only; under --reach its
@@ -2912,8 +3147,9 @@ impl Reader<'_> {
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
         let settled = st(&self.m).settled.clone();
-        // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths
-        let paths = if cx.table.split_limit && run.limit != 0 {
+        // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths (E014,
+        // FMI_READ_CUT=paths: it may read the run short, from these paths, when no split lifts it)
+        let paths = if cx.table.split_limit && run.limit != 0 && crate::builder::read_cut_mode() != 2 {
             Vec::new()
         } else {
             run.paths
@@ -2983,6 +3219,14 @@ pub fn dump_capture_run(rd: &mut Reader, cx: &Ctx, i: usize, c: &Py) -> Py {
 mod tests {
     use super::*;
     use crate::record::CutStep;
+
+    /// Every reason the machine half makes reads back as itself, the widened loop's among them (E016 play9's panic).
+    #[test]
+    fn reasons_read_back() {
+        for r in [WIDENED, R_FACT, R_NONFACT, R_COLLAPSED, R_STEP, R_COND, R_COPY, Reason::Var(56), Reason::Sound] {
+            assert_eq!(reason_of(r.as_str().as_ref()), r);
+        }
+    }
 
     /// A path whose stack holds one call with these steps, `done` of them run.
     fn path(steps: Vec<Step>, done: u32) -> Path {
@@ -3063,4 +3307,18 @@ mod tests {
         let p = path(vec![Step::Sentence { verb: 7, a: 320, b: None }], 0);
         assert_eq!(cut_of(&game, &p, None).steps, vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)]);
     }
+}
+
+/// E022 amendment (11): `FMI_READ_EXITS=1`, a room change to a room outside the scope is kept as an action that ends
+/// there (machine.rs `eng`).
+pub fn read_exits_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_EXITS").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (14): `FMI_READ_INVENTORY_SUMMARY=1`, a start of a global script that enumerates the inventory is
+/// summarized as the inventory hook's run (not run, its writes guessed).
+pub fn read_inventory_summary_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_INVENTORY_SUMMARY").is_ok_and(|v| v == "1"))
 }

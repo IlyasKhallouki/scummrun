@@ -1,0 +1,2970 @@
+{
+  "mi-dos-cd": {
+    "rooms": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      23,
+      25,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      95,
+      96,
+      97,
+      98,
+      99
+    ],
+    "units": {
+      "entry": 83,
+      "exit": 83,
+      "global": 178,
+      "local": 377,
+      "object": 474
+    },
+    "instructions": 40786,
+    "opcodes": {
+      "o5_actorFollowCamera": {
+        "n": 71,
+        "units": 61
+      },
+      "o5_actorFromPos": {
+        "n": 7,
+        "units": 5
+      },
+      "o5_actorOps": {
+        "n": 847,
+        "units": 246
+      },
+      "o5_add": {
+        "n": 726,
+        "units": 108
+      },
+      "o5_animateActor": {
+        "n": 1694,
+        "units": 292
+      },
+      "o5_beginOverride": {
+        "n": 355,
+        "units": 97
+      },
+      "o5_breakHere": {
+        "n": 4625,
+        "units": 392
+      },
+      "o5_chainScript": {
+        "n": 51,
+        "units": 33
+      },
+      "o5_cursorCommand": {
+        "n": 242,
+        "units": 79
+      },
+      "o5_cutscene": {
+        "n": 315,
+        "units": 225
+      },
+      "o5_decrement": {
+        "n": 28,
+        "units": 23
+      },
+      "o5_delay": {
+        "n": 616,
+        "units": 155
+      },
+      "o5_delayVariable": {
+        "n": 41,
+        "units": 33
+      },
+      "o5_divide": {
+        "n": 8,
+        "units": 3
+      },
+      "o5_doSentence": {
+        "n": 122,
+        "units": 92
+      },
+      "o5_drawBox": {
+        "n": 21,
+        "units": 2
+      },
+      "o5_drawObject": {
+        "n": 585,
+        "units": 91
+      },
+      "o5_endCutscene": {
+        "n": 315,
+        "units": 225
+      },
+      "o5_equalZero": {
+        "n": 682,
+        "units": 241
+      },
+      "o5_expression": {
+        "n": 1032,
+        "units": 206
+      },
+      "o5_faceActor": {
+        "n": 62,
+        "units": 27
+      },
+      "o5_findInventory": {
+        "n": 1,
+        "units": 1
+      },
+      "o5_findObject": {
+        "n": 11,
+        "units": 10
+      },
+      "o5_freezeScripts": {
+        "n": 2,
+        "units": 2
+      },
+      "o5_getActorCostume": {
+        "n": 30,
+        "units": 20
+      },
+      "o5_getActorElevation": {
+        "n": 1,
+        "units": 1
+      },
+      "o5_getActorFacing": {
+        "n": 14,
+        "units": 13
+      },
+      "o5_getActorMoving": {
+        "n": 19,
+        "units": 18
+      },
+      "o5_getActorRoom": {
+        "n": 40,
+        "units": 23
+      },
+      "o5_getActorWalkBox": {
+        "n": 38,
+        "units": 26
+      },
+      "o5_getActorWidth": {
+        "n": 1,
+        "units": 1
+      },
+      "o5_getActorX": {
+        "n": 101,
+        "units": 75
+      },
+      "o5_getActorY": {
+        "n": 43,
+        "units": 36
+      },
+      "o5_getDist": {
+        "n": 33,
+        "units": 23
+      },
+      "o5_getObjectOwner": {
+        "n": 142,
+        "units": 81
+      },
+      "o5_getObjectState": {
+        "n": 130,
+        "units": 73
+      },
+      "o5_getRandomNr": {
+        "n": 194,
+        "units": 86
+      },
+      "o5_getVerbEntrypoint": {
+        "n": 5,
+        "units": 4
+      },
+      "o5_ifClassOfIs": {
+        "n": 154,
+        "units": 83
+      },
+      "o5_increment": {
+        "n": 832,
+        "units": 181
+      },
+      "o5_isEqual": {
+        "n": 2146,
+        "units": 401
+      },
+      "o5_isGreater": {
+        "n": 178,
+        "units": 128
+      },
+      "o5_isGreaterEqual": {
+        "n": 55,
+        "units": 39
+      },
+      "o5_isLess": {
+        "n": 364,
+        "units": 203
+      },
+      "o5_isLessEqual": {
+        "n": 87,
+        "units": 66
+      },
+      "o5_isNotEqual": {
+        "n": 136,
+        "units": 72
+      },
+      "o5_isScriptRunning": {
+        "n": 335,
+        "units": 135
+      },
+      "o5_isSoundRunning": {
+        "n": 29,
+        "units": 28
+      },
+      "o5_jumpRelative": {
+        "n": 3196,
+        "units": 564
+      },
+      "o5_loadRoom": {
+        "n": 183,
+        "units": 42
+      },
+      "o5_loadRoomWithEgo": {
+        "n": 157,
+        "units": 104
+      },
+      "o5_matrixOps": {
+        "n": 345,
+        "units": 58
+      },
+      "o5_move": {
+        "n": 261,
+        "units": 118
+      },
+      "o5_move_segafix": {
+        "n": 2940,
+        "units": 642
+      },
+      "o5_multiply": {
+        "n": 11,
+        "units": 8
+      },
+      "o5_notEqualZero": {
+        "n": 758,
+        "units": 272
+      },
+      "o5_panCameraTo": {
+        "n": 37,
+        "units": 27
+      },
+      "o5_pickupObject": {
+        "n": 219,
+        "units": 59
+      },
+      "o5_print": {
+        "n": 2306,
+        "units": 215
+      },
+      "o5_printEgo": {
+        "n": 879,
+        "units": 366
+      },
+      "o5_pseudoRoom": {
+        "n": 8,
+        "units": 1
+      },
+      "o5_putActor": {
+        "n": 408,
+        "units": 198
+      },
+      "o5_putActorAtObject": {
+        "n": 37,
+        "units": 23
+      },
+      "o5_putActorInRoom": {
+        "n": 499,
+        "units": 238
+      },
+      "o5_resourceRoutines": {
+        "n": 878,
+        "units": 125
+      },
+      "o5_roomOps": {
+        "n": 179,
+        "units": 74
+      },
+      "o5_saveRestoreVerbs": {
+        "n": 23,
+        "units": 3
+      },
+      "o5_setCameraAt": {
+        "n": 20,
+        "units": 16
+      },
+      "o5_setClass": {
+        "n": 399,
+        "units": 159
+      },
+      "o5_setObjectName": {
+        "n": 79,
+        "units": 44
+      },
+      "o5_setOwnerOf": {
+        "n": 153,
+        "units": 48
+      },
+      "o5_setState": {
+        "n": 383,
+        "units": 109
+      },
+      "o5_setVarRange": {
+        "n": 15,
+        "units": 10
+      },
+      "o5_startObject": {
+        "n": 90,
+        "units": 72
+      },
+      "o5_startScript": {
+        "n": 1657,
+        "units": 552
+      },
+      "o5_startSound": {
+        "n": 190,
+        "units": 107
+      },
+      "o5_stopObjectCode": {
+        "n": 2022,
+        "units": 1193
+      },
+      "o5_stopScript": {
+        "n": 319,
+        "units": 131
+      },
+      "o5_stopSound": {
+        "n": 98,
+        "units": 76
+      },
+      "o5_stringOps": {
+        "n": 460,
+        "units": 14
+      },
+      "o5_subtract": {
+        "n": 626,
+        "units": 73
+      },
+      "o5_systemOps": {
+        "n": 11,
+        "units": 3
+      },
+      "o5_verbOps": {
+        "n": 720,
+        "units": 70
+      },
+      "o5_wait": {
+        "n": 2163,
+        "units": 267
+      },
+      "o5_walkActorTo": {
+        "n": 351,
+        "units": 131
+      },
+      "o5_walkActorToActor": {
+        "n": 45,
+        "units": 26
+      },
+      "o5_walkActorToObject": {
+        "n": 95,
+        "units": 52
+      }
+    },
+    "heads": {
+      "(assignment)": {
+        "class": "write",
+        "n": 7642,
+        "units": 817
+      },
+      "(jump)": {
+        "class": "control",
+        "n": 7756,
+        "units": 738
+      },
+      "ActorOps": {
+        "class": "none",
+        "n": 847,
+        "units": 246
+      },
+      "CopyString": {
+        "class": "none",
+        "n": 1,
+        "units": 1
+      },
+      "CreateString": {
+        "class": "none",
+        "n": 3,
+        "units": 3
+      },
+      "CursorCommand": {
+        "class": "none",
+        "n": 1,
+        "units": 1
+      },
+      "CursorHide": {
+        "class": "write",
+        "n": 25,
+        "units": 22
+      },
+      "CursorShow": {
+        "class": "write",
+        "n": 49,
+        "units": 42
+      },
+      "CursorSoftOff": {
+        "class": "write",
+        "n": 4,
+        "units": 4
+      },
+      "CursorSoftOn": {
+        "class": "write",
+        "n": 4,
+        "units": 4
+      },
+      "InitCharset": {
+        "class": "none",
+        "n": 71,
+        "units": 27
+      },
+      "PseudoRoom": {
+        "class": "none",
+        "n": 8,
+        "units": 1
+      },
+      "PutCodeInString": {
+        "class": "none",
+        "n": 125,
+        "units": 10
+      },
+      "Resource.clearHeap": {
+        "class": "none",
+        "n": 2,
+        "units": 2
+      },
+      "Resource.loadCharset": {
+        "class": "none",
+        "n": 6,
+        "units": 3
+      },
+      "Resource.loadCostume": {
+        "class": "none",
+        "n": 122,
+        "units": 61
+      },
+      "Resource.loadRoom": {
+        "class": "none",
+        "n": 5,
+        "units": 5
+      },
+      "Resource.loadScript": {
+        "class": "none",
+        "n": 179,
+        "units": 44
+      },
+      "Resource.loadSound": {
+        "class": "none",
+        "n": 98,
+        "units": 36
+      },
+      "Resource.lockCostume": {
+        "class": "none",
+        "n": 67,
+        "units": 33
+      },
+      "Resource.lockRoom": {
+        "class": "none",
+        "n": 1,
+        "units": 1
+      },
+      "Resource.lockScript": {
+        "class": "none",
+        "n": 151,
+        "units": 32
+      },
+      "Resource.lockSound": {
+        "class": "none",
+        "n": 40,
+        "units": 17
+      },
+      "Resource.unlockCostume": {
+        "class": "none",
+        "n": 68,
+        "units": 36
+      },
+      "Resource.unlockRoom": {
+        "class": "none",
+        "n": 1,
+        "units": 1
+      },
+      "Resource.unlockScript": {
+        "class": "none",
+        "n": 114,
+        "units": 35
+      },
+      "Resource.unlockSound": {
+        "class": "none",
+        "n": 24,
+        "units": 11
+      },
+      "RoomIntensity": {
+        "class": "none",
+        "n": 13,
+        "units": 7
+      },
+      "RoomScroll": {
+        "class": "write",
+        "n": 12,
+        "units": 7
+      },
+      "SetPalColor": {
+        "class": "none",
+        "n": 52,
+        "units": 11
+      },
+      "SetScreen": {
+        "class": "none",
+        "n": 36,
+        "units": 35
+      },
+      "SetStringChar": {
+        "class": "none",
+        "n": 327,
+        "units": 6
+      },
+      "ShakeOff": {
+        "class": "none",
+        "n": 3,
+        "units": 2
+      },
+      "ShakeOn": {
+        "class": "none",
+        "n": 2,
+        "units": 2
+      },
+      "UserputOff": {
+        "class": "write",
+        "n": 26,
+        "units": 23
+      },
+      "UserputOn": {
+        "class": "write",
+        "n": 52,
+        "units": 44
+      },
+      "UserputSoftOff": {
+        "class": "write",
+        "n": 5,
+        "units": 5
+      },
+      "UserputSoftOn": {
+        "class": "write",
+        "n": 5,
+        "units": 5
+      },
+      "VerbOps": {
+        "class": "write",
+        "n": 720,
+        "units": 70
+      },
+      "WaitForActor": {
+        "class": "wait",
+        "n": 387,
+        "units": 146
+      },
+      "WaitForCamera": {
+        "class": "wait",
+        "n": 44,
+        "units": 28
+      },
+      "WaitForMessage": {
+        "class": "wait",
+        "n": 1730,
+        "units": 190
+      },
+      "WaitForSentence": {
+        "class": "wait",
+        "n": 2,
+        "units": 1
+      },
+      "actorFollowCamera": {
+        "class": "write",
+        "n": 71,
+        "units": 61
+      },
+      "animateCostume": {
+        "class": "none",
+        "n": 1694,
+        "units": 292
+      },
+      "beginOverride": {
+        "class": "write",
+        "n": 224,
+        "units": 96
+      },
+      "breakHere": {
+        "class": "yield",
+        "n": 4625,
+        "units": 392
+      },
+      "chainScript": {
+        "class": "end",
+        "n": 51,
+        "units": 33
+      },
+      "createBoxMatrix": {
+        "class": "none",
+        "n": 5,
+        "units": 4
+      },
+      "cutscene": {
+        "class": "write",
+        "n": 315,
+        "units": 225
+      },
+      "delay": {
+        "class": "yield",
+        "n": 616,
+        "units": 155
+      },
+      "delayVariable": {
+        "class": "yield",
+        "n": 41,
+        "units": 33
+      },
+      "doSentence": {
+        "class": "deferred",
+        "n": 122,
+        "units": 92
+      },
+      "drawBox": {
+        "class": "none",
+        "n": 21,
+        "units": 2
+      },
+      "drawObject": {
+        "class": "write",
+        "n": 585,
+        "units": 91
+      },
+      "endCutscene": {
+        "class": "write",
+        "n": 315,
+        "units": 225
+      },
+      "endOverride": {
+        "class": "write",
+        "n": 131,
+        "units": 57
+      },
+      "faceActor": {
+        "class": "none",
+        "n": 62,
+        "units": 27
+      },
+      "freezeScripts": {
+        "class": "write",
+        "n": 2,
+        "units": 2
+      },
+      "loadRoom": {
+        "class": "write",
+        "n": 183,
+        "units": 42
+      },
+      "loadRoomWithEgo": {
+        "class": "write",
+        "n": 157,
+        "units": 104
+      },
+      "panCameraTo": {
+        "class": "none",
+        "n": 37,
+        "units": 27
+      },
+      "pickupObject": {
+        "class": "write",
+        "n": 219,
+        "units": 59
+      },
+      "print": {
+        "class": "write",
+        "n": 2306,
+        "units": 215
+      },
+      "printEgo": {
+        "class": "none",
+        "n": 879,
+        "units": 366
+      },
+      "putActor": {
+        "class": "none",
+        "n": 408,
+        "units": 198
+      },
+      "putActorAtObject": {
+        "class": "none",
+        "n": 37,
+        "units": 23
+      },
+      "putActorInRoom": {
+        "class": "none",
+        "n": 499,
+        "units": 238
+      },
+      "restoreVerbs": {
+        "class": "write",
+        "n": 11,
+        "units": 2
+      },
+      "saveVerbs": {
+        "class": "write",
+        "n": 12,
+        "units": 2
+      },
+      "screenEffect": {
+        "class": "none",
+        "n": 41,
+        "units": 25
+      },
+      "setBoxFlags": {
+        "class": "none",
+        "n": 340,
+        "units": 58
+      },
+      "setCameraAt": {
+        "class": "write",
+        "n": 20,
+        "units": 16
+      },
+      "setClass": {
+        "class": "write",
+        "n": 399,
+        "units": 159
+      },
+      "setObjectName": {
+        "class": "write",
+        "n": 79,
+        "units": 44
+      },
+      "setOwnerOf": {
+        "class": "write",
+        "n": 153,
+        "units": 48
+      },
+      "setRGBRoomIntensity": {
+        "class": "none",
+        "n": 20,
+        "units": 2
+      },
+      "setState": {
+        "class": "write",
+        "n": 383,
+        "units": 109
+      },
+      "setVarRange": {
+        "class": "write",
+        "n": 15,
+        "units": 10
+      },
+      "startObject": {
+        "class": "write",
+        "n": 90,
+        "units": 72
+      },
+      "startScript": {
+        "class": "write",
+        "n": 1657,
+        "units": 552
+      },
+      "startSound": {
+        "class": "none",
+        "n": 190,
+        "units": 107
+      },
+      "stopObjectCode": {
+        "class": "end",
+        "n": 2022,
+        "units": 1193
+      },
+      "stopScript": {
+        "class": "write",
+        "n": 319,
+        "units": 131
+      },
+      "stopSound": {
+        "class": "none",
+        "n": 98,
+        "units": 76
+      },
+      "systemOps": {
+        "class": "unmodelled (restart, pause or quit)",
+        "n": 11,
+        "units": 3
+      },
+      "walkActorTo": {
+        "class": "none",
+        "n": 351,
+        "units": 131
+      },
+      "walkActorToActor": {
+        "class": "none",
+        "n": 45,
+        "units": 26
+      },
+      "walkActorToObject": {
+        "class": "none",
+        "n": 95,
+        "units": 52
+      }
+    },
+    "subops": {
+      "ActorOps.Costume": {
+        "n": 333,
+        "units": 175
+      },
+      "ActorOps.Elevation": {
+        "n": 78,
+        "units": 40
+      },
+      "ActorOps.FollowBoxes": {
+        "n": 43,
+        "units": 34
+      },
+      "ActorOps.IgnoreBoxes": {
+        "n": 114,
+        "units": 93
+      },
+      "ActorOps.Init": {
+        "n": 161,
+        "units": 111
+      },
+      "ActorOps.InitAnimNr": {
+        "n": 5,
+        "units": 4
+      },
+      "ActorOps.Name": {
+        "n": 31,
+        "units": 23
+      },
+      "ActorOps.NeverZClip": {
+        "n": 71,
+        "units": 57
+      },
+      "ActorOps.Palette": {
+        "n": 116,
+        "units": 32
+      },
+      "ActorOps.Scale": {
+        "n": 87,
+        "units": 56
+      },
+      "ActorOps.SetZClip": {
+        "n": 53,
+        "units": 47
+      },
+      "ActorOps.Sound": {
+        "n": 18,
+        "units": 10
+      },
+      "ActorOps.StandAnimNr": {
+        "n": 11,
+        "units": 8
+      },
+      "ActorOps.TalkAnimNr": {
+        "n": 146,
+        "units": 18
+      },
+      "ActorOps.TalkColor": {
+        "n": 141,
+        "units": 57
+      },
+      "ActorOps.WalkAnimNr": {
+        "n": 18,
+        "units": 13
+      },
+      "ActorOps.WalkSpeed": {
+        "n": 71,
+        "units": 51
+      },
+      "ActorOps.Width": {
+        "n": 12,
+        "units": 8
+      },
+      "VerbOps.BackColor": {
+        "n": 3,
+        "units": 1
+      },
+      "VerbOps.Center": {
+        "n": 20,
+        "units": 1
+      },
+      "VerbOps.Color": {
+        "n": 58,
+        "units": 12
+      },
+      "VerbOps.Dim": {
+        "n": 3,
+        "units": 2
+      },
+      "VerbOps.DimColor": {
+        "n": 2,
+        "units": 1
+      },
+      "VerbOps.HiColor": {
+        "n": 35,
+        "units": 7
+      },
+      "VerbOps.Key": {
+        "n": 609,
+        "units": 48
+      },
+      "VerbOps.New": {
+        "n": 61,
+        "units": 8
+      },
+      "VerbOps.Off": {
+        "n": 55,
+        "units": 24
+      },
+      "VerbOps.On": {
+        "n": 605,
+        "units": 52
+      },
+      "VerbOps.SetToObject": {
+        "n": 9,
+        "units": 3
+      },
+      "VerbOps.SetToString": {
+        "n": 2,
+        "units": 2
+      },
+      "VerbOps.SetXY": {
+        "n": 628,
+        "units": 49
+      },
+      "VerbOps.Text": {
+        "n": 614,
+        "units": 49
+      },
+      "drawObject.setXY": {
+        "n": 409,
+        "units": 6
+      },
+      "print.Center": {
+        "n": 49,
+        "units": 25
+      },
+      "print.Clipped": {
+        "n": 7,
+        "units": 4
+      },
+      "print.Color": {
+        "n": 338,
+        "units": 65
+      },
+      "print.Left": {
+        "n": 57,
+        "units": 12
+      },
+      "print.Overhead": {
+        "n": 5,
+        "units": 5
+      },
+      "print.Pos": {
+        "n": 452,
+        "units": 63
+      },
+      "print.Text": {
+        "n": 2271,
+        "units": 210
+      },
+      "printEgo.Center": {
+        "n": 6,
+        "units": 5
+      },
+      "printEgo.Color": {
+        "n": 3,
+        "units": 3
+      },
+      "printEgo.Overhead": {
+        "n": 1,
+        "units": 1
+      },
+      "printEgo.Pos": {
+        "n": 13,
+        "units": 7
+      },
+      "printEgo.Text": {
+        "n": 869,
+        "units": 362
+      }
+    },
+    "getters": {
+      "GetStringChar": {
+        "evaluated": false,
+        "n": 4,
+        "units": 3
+      },
+      "actorFromPos": {
+        "evaluated": true,
+        "n": 7,
+        "units": 5
+      },
+      "classOfIs": {
+        "evaluated": true,
+        "n": 154,
+        "units": 83
+      },
+      "findInventory": {
+        "evaluated": false,
+        "n": 1,
+        "units": 1
+      },
+      "findObject": {
+        "evaluated": true,
+        "n": 11,
+        "units": 10
+      },
+      "getActorCostume": {
+        "evaluated": false,
+        "n": 30,
+        "units": 20
+      },
+      "getActorElevation": {
+        "evaluated": false,
+        "n": 3,
+        "units": 3
+      },
+      "getActorFacing": {
+        "evaluated": false,
+        "n": 15,
+        "units": 14
+      },
+      "getActorMoving": {
+        "evaluated": false,
+        "n": 19,
+        "units": 18
+      },
+      "getActorRoom": {
+        "evaluated": true,
+        "n": 40,
+        "units": 23
+      },
+      "getActorWalkBox": {
+        "evaluated": false,
+        "n": 38,
+        "units": 26
+      },
+      "getActorWidth": {
+        "evaluated": false,
+        "n": 2,
+        "units": 1
+      },
+      "getActorX": {
+        "evaluated": false,
+        "n": 134,
+        "units": 93
+      },
+      "getActorY": {
+        "evaluated": false,
+        "n": 62,
+        "units": 48
+      },
+      "getDist": {
+        "evaluated": false,
+        "n": 34,
+        "units": 23
+      },
+      "getInt": {
+        "evaluated": false,
+        "n": 28,
+        "units": 14
+      },
+      "getInventoryCount": {
+        "evaluated": true,
+        "n": 1,
+        "units": 1
+      },
+      "getName": {
+        "evaluated": false,
+        "n": 5,
+        "units": 3
+      },
+      "getObjectOwner": {
+        "evaluated": true,
+        "n": 142,
+        "units": 81
+      },
+      "getObjectState": {
+        "evaluated": true,
+        "n": 130,
+        "units": 73
+      },
+      "getRandomNr": {
+        "evaluated": false,
+        "n": 335,
+        "units": 135
+      },
+      "getString": {
+        "evaluated": false,
+        "n": 18,
+        "units": 11
+      },
+      "getVerb": {
+        "evaluated": false,
+        "n": 9,
+        "units": 6
+      },
+      "getVerbEntryPoint": {
+        "evaluated": true,
+        "n": 5,
+        "units": 4
+      },
+      "isScriptRunning": {
+        "evaluated": true,
+        "n": 335,
+        "units": 135
+      },
+      "isSoundRunning": {
+        "evaluated": false,
+        "n": 29,
+        "units": 28
+      },
+      "keepText": {
+        "evaluated": false,
+        "n": 40,
+        "units": 10
+      },
+      "newline": {
+        "evaluated": false,
+        "n": 54,
+        "units": 13
+      },
+      "unknown8": {
+        "evaluated": false,
+        "n": 10,
+        "units": 6
+      },
+      "wait": {
+        "evaluated": false,
+        "n": 878,
+        "units": 154
+      }
+    },
+    "unparsed": {},
+    "notes": {
+      "ambiguous name from bytes": {
+        "n": 2,
+        "units": 2
+      },
+      "else chain": {
+        "n": 9,
+        "units": 8
+      },
+      "else-if target from bytes, text rule agrees": {
+        "n": 1111,
+        "units": 183
+      },
+      "else-if target from bytes, text rule differs": {
+        "n": 2,
+        "units": 2
+      },
+      "empty unit": {
+        "n": 2,
+        "units": 2
+      }
+    },
+    "system_ops": [
+      {
+        "unit": "('global', 61)",
+        "offset": "000C",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "0015",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "0030",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "0039",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "0042",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "004B",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "0054",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "005D",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 61)",
+        "offset": "0066",
+        "subop": 1
+      },
+      {
+        "unit": "('global', 155)",
+        "offset": "002E",
+        "subop": 3
+      },
+      {
+        "unit": "('global', 176)",
+        "offset": "00A0",
+        "subop": 3
+      }
+    ]
+  },
+  "fate-play-demo": {
+    "rooms": [
+      24,
+      42,
+      48,
+      49,
+      63,
+      68,
+      69,
+      75,
+      82,
+      83,
+      98
+    ],
+    "units": {
+      "entry": 11,
+      "exit": 11,
+      "global": 93,
+      "local": 78,
+      "object": 66
+    },
+    "instructions": 12998,
+    "opcodes": {
+      "o5_actorFollowCamera": {
+        "n": 24,
+        "units": 14
+      },
+      "o5_actorFromPos": {
+        "n": 4,
+        "units": 3
+      },
+      "o5_actorOps": {
+        "n": 177,
+        "units": 41
+      },
+      "o5_add": {
+        "n": 154,
+        "units": 36
+      },
+      "o5_animateActor": {
+        "n": 293,
+        "units": 63
+      },
+      "o5_beginOverride": {
+        "n": 26,
+        "units": 13
+      },
+      "o5_breakHere": {
+        "n": 941,
+        "units": 116
+      },
+      "o5_chainScript": {
+        "n": 49,
+        "units": 31
+      },
+      "o5_cursorCommand": {
+        "n": 50,
+        "units": 24
+      },
+      "o5_cutscene": {
+        "n": 84,
+        "units": 56
+      },
+      "o5_debug": {
+        "n": 1,
+        "units": 1
+      },
+      "o5_decrement": {
+        "n": 7,
+        "units": 6
+      },
+      "o5_delay": {
+        "n": 45,
+        "units": 20
+      },
+      "o5_delayVariable": {
+        "n": 4,
+        "units": 4
+      },
+      "o5_divide": {
+        "n": 14,
+        "units": 6
+      },
+      "o5_doSentence": {
+        "n": 41,
+        "units": 26
+      },
+      "o5_drawBox": {
+        "n": 23,
+        "units": 5
+      },
+      "o5_drawObject": {
+        "n": 33,
+        "units": 16
+      },
+      "o5_endCutscene": {
+        "n": 84,
+        "units": 56
+      },
+      "o5_equalZero": {
+        "n": 199,
+        "units": 82
+      },
+      "o5_expression": {
+        "n": 415,
+        "units": 64
+      },
+      "o5_faceActor": {
+        "n": 59,
+        "units": 25
+      },
+      "o5_findInventory": {
+        "n": 1,
+        "units": 1
+      },
+      "o5_findObject": {
+        "n": 11,
+        "units": 5
+      },
+      "o5_freezeScripts": {
+        "n": 8,
+        "units": 7
+      },
+      "o5_getActorCostume": {
+        "n": 3,
+        "units": 2
+      },
+      "o5_getActorElevation": {
+        "n": 1,
+        "units": 1
+      },
+      "o5_getActorFacing": {
+        "n": 6,
+        "units": 3
+      },
+      "o5_getActorMoving": {
+        "n": 9,
+        "units": 6
+      },
+      "o5_getActorRoom": {
+        "n": 20,
+        "units": 13
+      },
+      "o5_getActorScale": {
+        "n": 9,
+        "units": 4
+      },
+      "o5_getActorWalkBox": {
+        "n": 5,
+        "units": 3
+      },
+      "o5_getActorWidth": {
+        "n": 3,
+        "units": 2
+      },
+      "o5_getActorX": {
+        "n": 80,
+        "units": 37
+      },
+      "o5_getActorY": {
+        "n": 71,
+        "units": 31
+      },
+      "o5_getDist": {
+        "n": 7,
+        "units": 5
+      },
+      "o5_getObjectOwner": {
+        "n": 65,
+        "units": 29
+      },
+      "o5_getObjectState": {
+        "n": 41,
+        "units": 20
+      },
+      "o5_getRandomNr": {
+        "n": 64,
+        "units": 33
+      },
+      "o5_getVerbEntrypoint": {
+        "n": 5,
+        "units": 3
+      },
+      "o5_ifClassOfIs": {
+        "n": 199,
+        "units": 59
+      },
+      "o5_increment": {
+        "n": 203,
+        "units": 46
+      },
+      "o5_isEqual": {
+        "n": 920,
+        "units": 129
+      },
+      "o5_isGreater": {
+        "n": 113,
+        "units": 46
+      },
+      "o5_isGreaterEqual": {
+        "n": 50,
+        "units": 22
+      },
+      "o5_isLess": {
+        "n": 129,
+        "units": 61
+      },
+      "o5_isLessEqual": {
+        "n": 42,
+        "units": 14
+      },
+      "o5_isNotEqual": {
+        "n": 82,
+        "units": 45
+      },
+      "o5_isScriptRunning": {
+        "n": 105,
+        "units": 43
+      },
+      "o5_isSoundRunning": {
+        "n": 15,
+        "units": 12
+      },
+      "o5_jumpRelative": {
+        "n": 1180,
+        "units": 168
+      },
+      "o5_loadRoom": {
+        "n": 156,
+        "units": 33
+      },
+      "o5_loadRoomWithEgo": {
+        "n": 17,
+        "units": 10
+      },
+      "o5_matrixOps": {
+        "n": 30,
+        "units": 9
+      },
+      "o5_move": {
+        "n": 211,
+        "units": 60
+      },
+      "o5_move_segafix": {
+        "n": 1435,
+        "units": 178
+      },
+      "o5_multiply": {
+        "n": 10,
+        "units": 7
+      },
+      "o5_notEqualZero": {
+        "n": 246,
+        "units": 92
+      },
+      "o5_panCameraTo": {
+        "n": 4,
+        "units": 4
+      },
+      "o5_pickupObject": {
+        "n": 381,
+        "units": 11
+      },
+      "o5_print": {
+        "n": 510,
+        "units": 53
+      },
+      "o5_printEgo": {
+        "n": 228,
+        "units": 62
+      },
+      "o5_pseudoRoom": {
+        "n": 30,
+        "units": 1
+      },
+      "o5_putActor": {
+        "n": 156,
+        "units": 29
+      },
+      "o5_putActorAtObject": {
+        "n": 41,
+        "units": 8
+      },
+      "o5_putActorInRoom": {
+        "n": 194,
+        "units": 27
+      },
+      "o5_resourceRoutines": {
+        "n": 30,
+        "units": 11
+      },
+      "o5_roomOps": {
+        "n": 88,
+        "units": 27
+      },
+      "o5_saveRestoreVerbs": {
+        "n": 11,
+        "units": 1
+      },
+      "o5_setCameraAt": {
+        "n": 14,
+        "units": 11
+      },
+      "o5_setClass": {
+        "n": 252,
+        "units": 50
+      },
+      "o5_setObjectName": {
+        "n": 90,
+        "units": 20
+      },
+      "o5_setOwnerOf": {
+        "n": 108,
+        "units": 19
+      },
+      "o5_setState": {
+        "n": 180,
+        "units": 38
+      },
+      "o5_setVarRange": {
+        "n": 6,
+        "units": 3
+      },
+      "o5_soundKludge": {
+        "n": 275,
+        "units": 39
+      },
+      "o5_startObject": {
+        "n": 42,
+        "units": 17
+      },
+      "o5_startScript": {
+        "n": 401,
+        "units": 114
+      },
+      "o5_startSound": {
+        "n": 61,
+        "units": 29
+      },
+      "o5_stopObjectCode": {
+        "n": 402,
+        "units": 259
+      },
+      "o5_stopScript": {
+        "n": 135,
+        "units": 52
+      },
+      "o5_stopSound": {
+        "n": 17,
+        "units": 10
+      },
+      "o5_stringOps": {
+        "n": 206,
+        "units": 15
+      },
+      "o5_subtract": {
+        "n": 174,
+        "units": 42
+      },
+      "o5_systemOps": {
+        "n": 2,
+        "units": 2
+      },
+      "o5_verbOps": {
+        "n": 335,
+        "units": 34
+      },
+      "o5_wait": {
+        "n": 246,
+        "units": 52
+      },
+      "o5_walkActorTo": {
+        "n": 84,
+        "units": 37
+      },
+      "o5_walkActorToActor": {
+        "n": 6,
+        "units": 5
+      },
+      "o5_walkActorToObject": {
+        "n": 10,
+        "units": 8
+      }
+    },
+    "heads": {
+      "(assignment)": {
+        "class": "write",
+        "n": 3153,
+        "units": 225
+      },
+      "(jump)": {
+        "class": "control",
+        "n": 3160,
+        "units": 211
+      },
+      "ActorOps": {
+        "class": "none",
+        "n": 177,
+        "units": 41
+      },
+      "CursorHide": {
+        "class": "write",
+        "n": 6,
+        "units": 6
+      },
+      "CursorShow": {
+        "class": "write",
+        "n": 11,
+        "units": 9
+      },
+      "CursorSoftOff": {
+        "class": "write",
+        "n": 1,
+        "units": 1
+      },
+      "CursorSoftOn": {
+        "class": "write",
+        "n": 1,
+        "units": 1
+      },
+      "InitCharset": {
+        "class": "none",
+        "n": 20,
+        "units": 12
+      },
+      "PseudoRoom": {
+        "class": "none",
+        "n": 30,
+        "units": 1
+      },
+      "PutCodeInString": {
+        "class": "none",
+        "n": 143,
+        "units": 13
+      },
+      "Resource.clearHeap": {
+        "class": "none",
+        "n": 1,
+        "units": 1
+      },
+      "Resource.loadSound": {
+        "class": "none",
+        "n": 20,
+        "units": 9
+      },
+      "Resource.lockSound": {
+        "class": "none",
+        "n": 4,
+        "units": 3
+      },
+      "Resource.unlockSound": {
+        "class": "none",
+        "n": 5,
+        "units": 4
+      },
+      "RoomIntensity": {
+        "class": "none",
+        "n": 52,
+        "units": 9
+      },
+      "SetScreen": {
+        "class": "none",
+        "n": 10,
+        "units": 9
+      },
+      "SetStringChar": {
+        "class": "none",
+        "n": 58,
+        "units": 4
+      },
+      "ShakeOff": {
+        "class": "none",
+        "n": 3,
+        "units": 3
+      },
+      "ShakeOn": {
+        "class": "none",
+        "n": 3,
+        "units": 3
+      },
+      "UserputOff": {
+        "class": "write",
+        "n": 3,
+        "units": 3
+      },
+      "UserputOn": {
+        "class": "write",
+        "n": 6,
+        "units": 6
+      },
+      "UserputSoftOff": {
+        "class": "write",
+        "n": 1,
+        "units": 1
+      },
+      "UserputSoftOn": {
+        "class": "write",
+        "n": 1,
+        "units": 1
+      },
+      "VerbOps": {
+        "class": "write",
+        "n": 335,
+        "units": 34
+      },
+      "WaitForActor": {
+        "class": "wait",
+        "n": 75,
+        "units": 35
+      },
+      "WaitForCamera": {
+        "class": "wait",
+        "n": 5,
+        "units": 4
+      },
+      "WaitForMessage": {
+        "class": "wait",
+        "n": 164,
+        "units": 36
+      },
+      "WaitForSentence": {
+        "class": "wait",
+        "n": 2,
+        "units": 2
+      },
+      "actorFollowCamera": {
+        "class": "write",
+        "n": 24,
+        "units": 14
+      },
+      "animateCostume": {
+        "class": "none",
+        "n": 293,
+        "units": 63
+      },
+      "beginOverride": {
+        "class": "write",
+        "n": 18,
+        "units": 12
+      },
+      "breakHere": {
+        "class": "yield",
+        "n": 941,
+        "units": 116
+      },
+      "chainScript": {
+        "class": "end",
+        "n": 49,
+        "units": 31
+      },
+      "createBoxMatrix": {
+        "class": "none",
+        "n": 6,
+        "units": 5
+      },
+      "cutscene": {
+        "class": "write",
+        "n": 84,
+        "units": 56
+      },
+      "debug": {
+        "class": "unmodelled (no rule)",
+        "n": 1,
+        "units": 1
+      },
+      "delay": {
+        "class": "yield",
+        "n": 45,
+        "units": 20
+      },
+      "delayVariable": {
+        "class": "yield",
+        "n": 4,
+        "units": 4
+      },
+      "doSentence": {
+        "class": "deferred",
+        "n": 41,
+        "units": 26
+      },
+      "drawBox": {
+        "class": "none",
+        "n": 23,
+        "units": 5
+      },
+      "drawObject": {
+        "class": "write",
+        "n": 33,
+        "units": 16
+      },
+      "endCutscene": {
+        "class": "write",
+        "n": 84,
+        "units": 56
+      },
+      "endOverride": {
+        "class": "write",
+        "n": 8,
+        "units": 6
+      },
+      "faceActor": {
+        "class": "none",
+        "n": 59,
+        "units": 25
+      },
+      "freezeScripts": {
+        "class": "write",
+        "n": 8,
+        "units": 7
+      },
+      "loadRoom": {
+        "class": "write",
+        "n": 156,
+        "units": 33
+      },
+      "loadRoomWithEgo": {
+        "class": "write",
+        "n": 17,
+        "units": 10
+      },
+      "loadString": {
+        "class": "unmodelled (no rule)",
+        "n": 2,
+        "units": 2
+      },
+      "panCameraTo": {
+        "class": "none",
+        "n": 4,
+        "units": 4
+      },
+      "pickupObject": {
+        "class": "write",
+        "n": 381,
+        "units": 11
+      },
+      "print": {
+        "class": "write",
+        "n": 510,
+        "units": 53
+      },
+      "printEgo": {
+        "class": "none",
+        "n": 228,
+        "units": 62
+      },
+      "putActor": {
+        "class": "none",
+        "n": 156,
+        "units": 29
+      },
+      "putActorAtObject": {
+        "class": "none",
+        "n": 41,
+        "units": 8
+      },
+      "putActorInRoom": {
+        "class": "none",
+        "n": 194,
+        "units": 27
+      },
+      "restoreVerbs": {
+        "class": "write",
+        "n": 7,
+        "units": 1
+      },
+      "saveLoad": {
+        "class": "unmodelled (no rule)",
+        "n": 2,
+        "units": 1
+      },
+      "saveString": {
+        "class": "unmodelled (no rule)",
+        "n": 1,
+        "units": 1
+      },
+      "saveVerbs": {
+        "class": "write",
+        "n": 4,
+        "units": 1
+      },
+      "screenEffect": {
+        "class": "none",
+        "n": 11,
+        "units": 7
+      },
+      "setBoxFlags": {
+        "class": "none",
+        "n": 24,
+        "units": 9
+      },
+      "setCameraAt": {
+        "class": "write",
+        "n": 14,
+        "units": 11
+      },
+      "setClass": {
+        "class": "write",
+        "n": 252,
+        "units": 50
+      },
+      "setObjectName": {
+        "class": "write",
+        "n": 90,
+        "units": 20
+      },
+      "setOwnerOf": {
+        "class": "write",
+        "n": 108,
+        "units": 19
+      },
+      "setRGBRoomIntensity": {
+        "class": "none",
+        "n": 1,
+        "units": 1
+      },
+      "setRoomShadow": {
+        "class": "unmodelled (no rule)",
+        "n": 3,
+        "units": 3
+      },
+      "setState": {
+        "class": "write",
+        "n": 180,
+        "units": 38
+      },
+      "setVarRange": {
+        "class": "write",
+        "n": 6,
+        "units": 3
+      },
+      "soundKludge": {
+        "class": "unmodelled (no rule)",
+        "n": 275,
+        "units": 39
+      },
+      "startObject": {
+        "class": "write",
+        "n": 42,
+        "units": 17
+      },
+      "startScript": {
+        "class": "write",
+        "n": 401,
+        "units": 114
+      },
+      "startSound": {
+        "class": "none",
+        "n": 61,
+        "units": 29
+      },
+      "stopObjectCode": {
+        "class": "end",
+        "n": 402,
+        "units": 259
+      },
+      "stopScript": {
+        "class": "write",
+        "n": 135,
+        "units": 52
+      },
+      "stopSound": {
+        "class": "none",
+        "n": 17,
+        "units": 10
+      },
+      "systemOps": {
+        "class": "unmodelled (restart, pause or quit)",
+        "n": 2,
+        "units": 2
+      },
+      "walkActorTo": {
+        "class": "none",
+        "n": 84,
+        "units": 37
+      },
+      "walkActorToActor": {
+        "class": "none",
+        "n": 6,
+        "units": 5
+      },
+      "walkActorToObject": {
+        "class": "none",
+        "n": 10,
+        "units": 8
+      }
+    },
+    "subops": {
+      "ActorOps.Costume": {
+        "n": 113,
+        "units": 30
+      },
+      "ActorOps.Elevation": {
+        "n": 13,
+        "units": 5
+      },
+      "ActorOps.FollowBoxes": {
+        "n": 8,
+        "units": 6
+      },
+      "ActorOps.IgnoreBoxes": {
+        "n": 25,
+        "units": 14
+      },
+      "ActorOps.Init": {
+        "n": 31,
+        "units": 20
+      },
+      "ActorOps.InitAnimNr": {
+        "n": 6,
+        "units": 5
+      },
+      "ActorOps.Name": {
+        "n": 14,
+        "units": 10
+      },
+      "ActorOps.NeverZClip": {
+        "n": 15,
+        "units": 9
+      },
+      "ActorOps.Palette": {
+        "n": 2,
+        "units": 1
+      },
+      "ActorOps.Scale": {
+        "n": 15,
+        "units": 9
+      },
+      "ActorOps.SetZClip": {
+        "n": 12,
+        "units": 6
+      },
+      "ActorOps.StandAnimNr": {
+        "n": 4,
+        "units": 4
+      },
+      "ActorOps.TalkColor": {
+        "n": 15,
+        "units": 8
+      },
+      "ActorOps.WalkAnimNr": {
+        "n": 2,
+        "units": 2
+      },
+      "ActorOps.WalkSpeed": {
+        "n": 28,
+        "units": 15
+      },
+      "VerbOps.BackColor": {
+        "n": 22,
+        "units": 3
+      },
+      "VerbOps.Center": {
+        "n": 1,
+        "units": 1
+      },
+      "VerbOps.Color": {
+        "n": 38,
+        "units": 8
+      },
+      "VerbOps.Dim": {
+        "n": 22,
+        "units": 9
+      },
+      "VerbOps.DimColor": {
+        "n": 4,
+        "units": 1
+      },
+      "VerbOps.HiColor": {
+        "n": 16,
+        "units": 3
+      },
+      "VerbOps.Key": {
+        "n": 115,
+        "units": 11
+      },
+      "VerbOps.New": {
+        "n": 55,
+        "units": 7
+      },
+      "VerbOps.Off": {
+        "n": 46,
+        "units": 12
+      },
+      "VerbOps.On": {
+        "n": 99,
+        "units": 12
+      },
+      "VerbOps.SetToObject": {
+        "n": 13,
+        "units": 3
+      },
+      "VerbOps.SetXY": {
+        "n": 122,
+        "units": 13
+      },
+      "VerbOps.Text": {
+        "n": 61,
+        "units": 11
+      },
+      "drawObject.setImage": {
+        "n": 13,
+        "units": 4
+      },
+      "print.Center": {
+        "n": 108,
+        "units": 11
+      },
+      "print.Color": {
+        "n": 195,
+        "units": 18
+      },
+      "print.Left": {
+        "n": 3,
+        "units": 1
+      },
+      "print.Overhead": {
+        "n": 6,
+        "units": 4
+      },
+      "print.Pos": {
+        "n": 288,
+        "units": 21
+      },
+      "print.Text": {
+        "n": 506,
+        "units": 51
+      },
+      "printEgo.Text": {
+        "n": 228,
+        "units": 62
+      }
+    },
+    "getters": {
+      "GetStringChar": {
+        "evaluated": false,
+        "n": 5,
+        "units": 3
+      },
+      "actorFromPos": {
+        "evaluated": true,
+        "n": 4,
+        "units": 3
+      },
+      "classOfIs": {
+        "evaluated": true,
+        "n": 199,
+        "units": 59
+      },
+      "findInventory": {
+        "evaluated": false,
+        "n": 1,
+        "units": 1
+      },
+      "findObject": {
+        "evaluated": true,
+        "n": 12,
+        "units": 6
+      },
+      "getActorCostume": {
+        "evaluated": false,
+        "n": 3,
+        "units": 2
+      },
+      "getActorElevation": {
+        "evaluated": false,
+        "n": 1,
+        "units": 1
+      },
+      "getActorFacing": {
+        "evaluated": false,
+        "n": 6,
+        "units": 3
+      },
+      "getActorMoving": {
+        "evaluated": false,
+        "n": 9,
+        "units": 6
+      },
+      "getActorRoom": {
+        "evaluated": true,
+        "n": 20,
+        "units": 13
+      },
+      "getActorScale": {
+        "evaluated": false,
+        "n": 15,
+        "units": 5
+      },
+      "getActorWalkBox": {
+        "evaluated": false,
+        "n": 6,
+        "units": 4
+      },
+      "getActorWidth": {
+        "evaluated": false,
+        "n": 9,
+        "units": 4
+      },
+      "getActorX": {
+        "evaluated": false,
+        "n": 100,
+        "units": 39
+      },
+      "getActorY": {
+        "evaluated": false,
+        "n": 79,
+        "units": 32
+      },
+      "getDist": {
+        "evaluated": false,
+        "n": 7,
+        "units": 5
+      },
+      "getInt": {
+        "evaluated": false,
+        "n": 20,
+        "units": 10
+      },
+      "getInventoryCount": {
+        "evaluated": true,
+        "n": 3,
+        "units": 2
+      },
+      "getName": {
+        "evaluated": false,
+        "n": 6,
+        "units": 3
+      },
+      "getObjectOwner": {
+        "evaluated": true,
+        "n": 65,
+        "units": 29
+      },
+      "getObjectState": {
+        "evaluated": true,
+        "n": 41,
+        "units": 20
+      },
+      "getRandomNr": {
+        "evaluated": false,
+        "n": 78,
+        "units": 35
+      },
+      "getString": {
+        "evaluated": false,
+        "n": 16,
+        "units": 5
+      },
+      "getVerb": {
+        "evaluated": false,
+        "n": 7,
+        "units": 2
+      },
+      "getVerbEntryPoint": {
+        "evaluated": true,
+        "n": 5,
+        "units": 3
+      },
+      "isScriptRunning": {
+        "evaluated": true,
+        "n": 105,
+        "units": 43
+      },
+      "isSoundRunning": {
+        "evaluated": false,
+        "n": 15,
+        "units": 12
+      },
+      "newline": {
+        "evaluated": false,
+        "n": 12,
+        "units": 9
+      },
+      "startAnim": {
+        "evaluated": false,
+        "n": 71,
+        "units": 11
+      },
+      "wait": {
+        "evaluated": false,
+        "n": 113,
+        "units": 31
+      }
+    },
+    "unparsed": {},
+    "notes": {
+      "ambiguous name from bytes": {
+        "n": 3,
+        "units": 2
+      },
+      "else chain": {
+        "n": 4,
+        "units": 4
+      },
+      "else-if target from bytes, text rule agrees": {
+        "n": 388,
+        "units": 80
+      },
+      "else-if target from bytes, text rule differs": {
+        "n": 1,
+        "units": 1
+      }
+    },
+    "system_ops": [
+      {
+        "unit": "('global', 57)",
+        "offset": "0D0E",
+        "subop": 1
+      },
+      {
+        "unit": "('obj', 582)",
+        "offset": "0067",
+        "subop": 1
+      }
+    ]
+  },
+  "engine": {
+    "gid_indy4": [
+      [
+        "engines/scumm/boxes.cpp",
+        183,
+        "if (_game.id == GID_INDY4 && _currentRoom == 225 && _roomResource == 94 && box == 8 && enhancementEnabled(kEnhMinorBugFixes))"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        125,
+        "_game.id == GID_INDY4 || _game.id == GID_MONKEY || _game.id == GID_MONKEY2 ||"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        1174,
+        "if (_vm->_game.platform == Common::kPlatformAmiga && _vm->_game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        1407,
+        "if (_vm->_game.platform == Common::kPlatformAmiga && _vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        2237,
+        "} else if (_vm->_game.id != GID_INDY4 && _curId == 1) {"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        2256,
+        "const uint8 *htbl = (_vm->_game.id == GID_MONKEY) ? sjisFontHeightM1 : ((_vm->_game.id == GID_INDY4) ? sjisFontHeightI4 : sjisFontHeightM2);"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        2365,
+        "((_vm->_game.id == GID_INDY4) && (_curId == 2 || _curId == 3 || _curId == 4))) {"
+      ],
+      [
+        "engines/scumm/charset.cpp",
+        2382,
+        "if (((_vm->_game.id == GID_MONKEY2 && _curId != 0) || (_vm->_game.id == GID_INDY4 && _curId != 3)) && (chr > 31 && chr != 94 && chr != 95 && chr != 126 && chr !"
+      ],
+      [
+        "engines/scumm/charset.h",
+        176,
+        "CharsetRendererClassic(ScummEngine *vm) : CharsetRendererClassic(vm, vm->_game.id == GID_INDY4 &&"
+      ],
+      [
+        "engines/scumm/costume.cpp",
+        275,
+        "if (_vm->_game.platform == Common::kPlatformAmiga && _vm->_game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/cursor.cpp",
+        1280,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/detection.h",
+        233,
+        "GID_INDY4,"
+      ],
+      [
+        "engines/scumm/detection_steam.h",
+        34,
+        "{ GID_INDY4, Common::kPlatformWindows,   \"atlantis.%03d\", \"ATLANTIS.000\",  \"Indiana Jones and the Fate of Atlantis.exe\", 224336, 12035 },"
+      ],
+      [
+        "engines/scumm/detection_steam.h",
+        35,
+        "{ GID_INDY4, Common::kPlatformMacintosh, \"atlantis.%03d\", \"ATLANTIS.000\",  \"The Fate of Atlantis\",                       260224, 12035 },"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        212,
+        "{\"atlantis\", \"\", 0, GID_INDY4,    5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO4(GUIO_RENDEREGA, GAMEOPTION_ENHANCEMENTS, GAMEOPTION_OR"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        213,
+        "{\"atlantis\", \"Steam\", \"steam\", GID_INDY4,    5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO4(GUIO_RENDEREGA, GAMEOPTION_ENHANCEMENTS, GA"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        214,
+        "{\"atlantis\", \"Floppy\", 0, GID_INDY4,    5, 0, MDT_PCSPK | MDT_ADLIB | MDT_MIDI | MDT_PREFER_MT32, 0, UNK, GUIO6(GUIO_NOSPEECH, GUIO_RENDEREGA, GAMEOPTION_ENHANC"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        215,
+        "{\"atlantis\", \"Amiga\", 0, GID_INDY4,  5, 0, MDT_AMIGA, 0, Common::kPlatformAmiga, GUIO6(GUIO_NOSPEECH, GUIO_MIDIAMIGA, GAMEOPTION_ENHANCEMENTS, GAMEOPTION_ORIGIN"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        216,
+        "{\"atlantis\", \"Mac\", 0, GID_INDY4,    5, 0, 0, 0, UNK, GUIO4(GAMEOPTION_ENHANCEMENTS, GAMEOPTION_ORIGINALGUI, GUIO_NOASPECT, GAMEOPTION_TTS)},"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        217,
+        "{\"atlantis\", \"Mac Floppy\", 0, GID_INDY4,    5, 0, 0, 0, UNK, GUIO6(GUIO_NOSPEECH, GAMEOPTION_ENHANCEMENTS, GAMEOPTION_ORIGINALGUI, GAMEOPTION_COPY_PROTECTION, G"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        218,
+        "{\"atlantis\", \"FM-TOWNS\", 0, GID_INDY4,    5, 0, MDT_TOWNS | MDT_ADLIB, 0, Common::kPlatformFMTowns, GUIO6(GUIO_MIDITOWNS, GUIO_MIDIADLIB, GAMEOPTION_TRIM_FMTOWN"
+      ],
+      [
+        "engines/scumm/detection_tables.h",
+        945,
+        "{ GID_INDY4, \"\", \"indy_atlantis_rus_v1.0_cd.exe\" }, // CD"
+      ],
+      [
+        "engines/scumm/dialogs.cpp",
+        1485,
+        "if (gameId == GID_MONKEY || gameId == GID_MONKEY2 || (gameId == GID_INDY4 && extra == \"Floppy\"))"
+      ],
+      [
+        "engines/scumm/gfx.cpp",
+        1219,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/gfx.cpp",
+        1459,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/gfx.cpp",
+        1527,
+        "|| (color >= 254 && _game.platform == Common::kPlatformFMTowns && (_game.id == GID_MONKEY2 || _game.id == GID_INDY4))"
+      ],
+      [
+        "engines/scumm/gfx.cpp",
+        2479,
+        "if (_vm->_game.platform == Common::kPlatformAmiga && _vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/gfx_gui.cpp",
+        2243,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/help.cpp",
+        37,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/help.cpp",
+        208,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/help.cpp",
+        295,
+        "if (gameId == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/help.cpp",
+        307,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/help.cpp",
+        318,
+        "if (gameId == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/imuse/drivers/macintosh.cpp",
+        1312,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/imuse/imuse.cpp",
+        51,
+        "_dynamicChanAllocation(vm && vm->_game.id != GID_MONKEY2 && vm->_game.id != GID_INDY4), // For the non-iMuse games that (unfortunately) run on this player we ne"
+      ],
+      [
+        "engines/scumm/imuse/imuse_part.cpp",
+        445,
+        "if (_se->_soundType == MDT_MACINTOSH && (_se->_game_id == GID_MONKEY2 || _se->_game_id == GID_INDY4))"
+      ],
+      [
+        "engines/scumm/input.cpp",
+        976,
+        "(_game.id == GID_MONKEY || _game.id == GID_MONKEY2 || _game.id == GID_INDY4);"
+      ],
+      [
+        "engines/scumm/input.cpp",
+        1093,
+        "(_game.id == GID_INDY4 && strcmp(_game.variant, \"Floppy\") && strcmp(_game.variant, \"Amiga\")))) &&"
+      ],
+      [
+        "engines/scumm/macgui/macgui.cpp",
+        49,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/macgui/macgui_impl.cpp",
+        363,
+        "if (_vm->_game.id == GID_INDY4 && !string.contains(\"Smooth Graphics\") && id == 3) {"
+      ],
+      [
+        "engines/scumm/macgui/macgui_strings.cpp",
+        711,
+        "} else if (_vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v5.cpp",
+        238,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v6.cpp",
+        73,
+        "else if (_vm->_game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v6.cpp",
+        134,
+        "if (_vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v6.cpp",
+        219,
+        "if (_vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v6.cpp",
+        258,
+        "if (_vm->_game.id == GID_INDY4 && id >= 501 && id < 600)"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v6.cpp",
+        1024,
+        "if (_vm->_game.id == GID_TENTACLE || _vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/macgui/macgui_v6.cpp",
+        1117,
+        "} else if (_vm->_game.id == GID_TENTACLE || _vm->_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/metaengine.cpp",
+        683,
+        "widget = new Scumm::MacGameOptionsWidget(boss, name, target, GID_INDY4, extra);"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        254,
+        "if (_game.id == GID_INDY4 || _game.id == GID_MONKEY2)"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        638,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        649,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        666,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        678,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        792,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        834,
+        "if ((_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) || _enableEGADithering)"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        969,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        1053,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        1426,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        1484,
+        "} else if (_game.id == GID_INDY4 && _game.platform == Common::kPlatformAmiga) {"
+      ],
+      [
+        "engines/scumm/palette.cpp",
+        1665,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/resource.cpp",
+        575,
+        "if (_game.id == GID_INDY4 && no == 0)"
+      ],
+      [
+        "engines/scumm/saveload.cpp",
+        1915,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/saveload.cpp",
+        2009,
+        "if (_game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/script.cpp",
+        1147,
+        "if (owner == OF_OWNER_ROOM && _game.id == GID_INDY4 && 336 <= obj && obj <= 340)"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        1822,
+        "if (_game.id == GID_INDY4 && room == 1 && _objectOwnerTable[23] == 1 && enhancementEnabled(kEnhMinorBugFixes)) {"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        2571,
+        "if (_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        2600,
+        "if (_game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        3023,
+        "if (_game.id == GID_INDY4 && script == 164 && _roomResource == 50 &&"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        3345,
+        "if (_game.id == GID_INDY4 && currentScriptSlotIs(kScriptNumENCD) &&"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        3612,
+        "} else if (_game.id == GID_INDY4 && _roomResource == 23 && currentScriptSlotIs(167) &&"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        3628,
+        "} else if (_game.id == GID_INDY4 && _language == Common::EN_ANY && _roomResource == 10 &&"
+      ],
+      [
+        "engines/scumm/script_v5.cpp",
+        3646,
+        "} else if (_game.id == GID_INDY4 && currentScriptSlotIs(161) && _actorToPrintStrFor == 2 &&"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        312,
+        "GID_INDY4,\t\t\t// Not supported in all versions of the original interpreter."
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        460,
+        "_isIndy4Jap = _game.id == GID_INDY4 &&"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1066,
+        "case GID_INDY4 :"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1190,
+        "case GID_INDY4:"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1291,
+        "{ GID_INDY4,    \"Fate of Atlantis\"         },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1292,
+        "{ GID_INDY4,    \"Fate of Atlantis 1.1\"     },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1293,
+        "{ GID_INDY4,    \"Indy Fate\"                },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1294,
+        "{ GID_INDY4,    \"fate v1.5\"                },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1295,
+        "{ GID_INDY4,    \"Indy 12/15/92\"            },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1296,
+        "{ GID_INDY4,    \"Indy 12-15-92\"            },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1297,
+        "{ GID_INDY4,    \"Fate of Atlantis v1.5\"    },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1298,
+        "{ GID_INDY4,    \"Fate of Atlantis v.1.5\"   },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1299,
+        "{ GID_INDY4,    \"Fate of Atlantis PowerPC\" },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1300,
+        "{ GID_INDY4,    \"Indy Demo\"                },"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1351,
+        "else if (_game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1376,
+        "if (_game.id == GID_LOOM || _game.id == GID_TENTACLE || _game.id == GID_SAMNMAX || _game.id == GID_INDY4) {"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        1747,
+        "if (!_copyProtection && _game.id == GID_INDY4 && _bootParam == 0) {"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        2019,
+        "if (_game.platform == Common::kPlatformAmiga && _game.id == GID_INDY4 && !_verbPalette)"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        2435,
+        "if (_game.platform == Common::kPlatformMacintosh && (_game.id == GID_MONKEY2 || _game.id == GID_INDY4)) {"
+      ],
+      [
+        "engines/scumm/scumm.cpp",
+        3921,
+        "bool processIQPoints = (_game.id == GID_INDY4 && (_saveLoadFlag == 2 || _loadFromLauncher));"
+      ],
+      [
+        "engines/scumm/sound.cpp",
+        779,
+        "if (mode == 2 && _vm->_game.id == GID_INDY4 && offset == 0x76ccbd4 && _vm->enhancementEnabled(kEnhGameBreakingBugFixes))"
+      ],
+      [
+        "engines/scumm/string.cpp",
+        705,
+        "if ((_game.id == GID_INDY4 && ltext[ll] == 0x7F) || (_game.id == GID_MONKEY2 && ltext[ll] == 0x07)) {"
+      ],
+      [
+        "engines/scumm/string.cpp",
+        794,
+        "if (_game.id == GID_INDY4 && ltext[0] == 0x7F) {"
+      ],
+      [
+        "engines/scumm/string.cpp",
+        1453,
+        "if (_game.id != GID_INDY4 || buf[0] == 127) {"
+      ],
+      [
+        "engines/scumm/string.cpp",
+        1454,
+        "if (_game.id == GID_INDY4)"
+      ],
+      [
+        "engines/scumm/string.cpp",
+        1726,
+        "if (_game.id == GID_INDY4 && _language == Common::DE_DEU && _currentRoom == 28 &&"
+      ],
+      [
+        "engines/scumm/verbs.cpp",
+        621,
+        "if ((_game.id == GID_INDY4 || _game.id == GID_PASS) && _mouseAndKeyboardStat >= '0' && _mouseAndKeyboardStat <= '9') {"
+      ],
+      [
+        "engines/scumm/verbs.cpp",
+        1204,
+        "((_game.platform == Common::kPlatformFMTowns) && (_game.id == GID_MONKEY2 || _game.id == GID_INDY4) && (vs->bkcolor == _townsOverrideShadowColor)) ? 0 :"
+      ]
+    ],
+    "bridge_verb_ids": [
+      [
+        "engines/scumm/speedrun/speedrun_plan.cpp",
+        42,
+        "const int kDialogVerbFirst = 120, kDialogVerbLast = 128;"
+      ],
+      [
+        "engines/scumm/speedrun/speedrun_plan.cpp",
+        439,
+        "if (id < kDialogVerbFirst || id > kDialogVerbLast || !verbVisible(slot) || !verbText(slot, true, text))"
+      ],
+      [
+        "engines/scumm/speedrun/speedrun_plan.cpp",
+        473,
+        "for (int id = kDialogVerbFirst; id <= kDialogVerbLast; id++) {"
+      ],
+      [
+        "engines/scumm/speedrun/speedrun_state.cpp",
+        60,
+        "const int kActionVerbFirst = 2, kActionVerbLast = 10;"
+      ],
+      [
+        "engines/scumm/speedrun/speedrun_state.cpp",
+        61,
+        "const int kDialogVerbFirst = 120, kDialogVerbLast = 128;"
+      ],
+      [
+        "engines/scumm/speedrun/speedrun_state.cpp",
+        346,
+        "if (anyVisibleVerb(kDialogVerbFirst, kDialogVerbLast)) {"
+      ],
+      [
+        "engines/scumm/speedrun/speedrun_state.cpp",
+        412,
+        "if (anyVisibleVerb(kActionVerbFirst, kActionVerbLast)) {"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,154 @@
+{
+ "entry": 0,
+ "inputs": 5,
+ "rows": [
+  {
+   "input": 0,
+   "click_frame": 993,
+   "stop": 1032,
+   "reason": "idle",
+   "room": 49,
+   "xstart": 256,
+   "live": [
+    "local:209",
+    "local:215",
+    "local:216",
+    "script:151",
+    "script:59",
+    "script:75"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 27
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 27
+   },
+   "T": {
+    "kept": true,
+    "novel": 21
+   }
+  },
+  {
+   "input": 1,
+   "click_frame": 1040,
+   "stop": 1061,
+   "reason": "idle",
+   "room": 49,
+   "xstart": 168,
+   "live": [
+    "local:209",
+    "local:215",
+    "local:216",
+    "script:151",
+    "script:59",
+    "script:75"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 2
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 1
+   },
+   "T": {
+    "kept": true,
+    "novel": 1
+   }
+  },
+  {
+   "input": 2,
+   "click_frame": 1101,
+   "stop": 1137,
+   "reason": "idle",
+   "room": 49,
+   "xstart": 0,
+   "live": [
+    "local:209",
+    "local:215",
+    "local:216",
+    "script:151",
+    "script:59",
+    "script:75",
+    "script:86"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 4
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 2
+   },
+   "T": {
+    "kept": false,
+    "novel": 0
+   }
+  },
+  {
+   "input": 3,
+   "click_frame": 1201,
+   "stop": 1315,
+   "reason": "idle",
+   "room": 49,
+   "xstart": 0,
+   "live": [
+    "local:209",
+    "local:211",
+    "local:216",
+    "script:151",
+    "script:75"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 2
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 2
+   },
+   "T": {
+    "kept": false,
+    "novel": 0
+   }
+  },
+  {
+   "input": 4,
+   "click_frame": 1320,
+   "stop": 1405,
+   "reason": "idle",
+   "room": 63,
+   "xstart": 88,
+   "live": [
+    "local:202",
+    "script:151",
+    "script:59",
+    "script:75"
+   ],
+   "E": {
+    "kept": true,
+    "novel": 16
+   },
+   "TUW": {
+    "kept": true,
+    "novel": 10
+   },
+   "T": {
+    "kept": true,
+    "novel": 4
+   }
+  }
+ ],
+ "ambient": [
+  "local:209",
+  "script:151",
+  "script:75"
+ ],
+ "longest_unkept": {
+  "E": 0,
+  "TUW": 0,
+  "T": 2
+ }
+}

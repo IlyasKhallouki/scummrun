@@ -1,0 +1,551 @@
+{
+  "start": {
+    "frame": 2980,
+    "room": 42,
+    "idle": "sentence",
+    "xstart": 0,
+    "rng": 2450856443,
+    "owner": 1,
+    "class": 1
+  },
+  "boot_s": 0.322859823,
+  "steps": [
+    {
+      "step": "s3:490",
+      "ok": true,
+      "from": 2980,
+      "approach": 0,
+      "candidates": 3,
+      "tries": 7,
+      "seconds": 0.026319347,
+      "accepted_at": 2985,
+      "events": [
+        {
+          "frame": 2981,
+          "click": [
+            17,
+            161
+          ]
+        },
+        {
+          "frame": 2983,
+          "click": [
+            223,
+            79
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.002941647
+        },
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.003878118
+        },
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.003542427
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.003282868
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.003455544
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.003595494
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": true,
+          "seen": "run of 490's script at frame 2983 (slot 1, code 253)",
+          "frame": 2985,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.003744038
+        }
+      ],
+      "next_idle": {
+        "frame": 2984,
+        "reason": "idle",
+        "room": 42,
+        "xstart": 0
+      }
+    },
+    {
+      "step": "s8:946:491",
+      "ok": false,
+      "from": 2984,
+      "reason": "approach",
+      "approach": 0,
+      "candidates": 0,
+      "tries": 20,
+      "seconds": 0.060423648,
+      "attempts": [
+        {
+          "phase": "near",
+          "name": "w10",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                219,
+                109
+              ]
+            }
+          ],
+          "seconds": 0.002804683
+        },
+        {
+          "phase": "approach",
+          "name": "w10",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                228,
+                110
+              ]
+            }
+          ],
+          "seconds": 0.002831956
+        },
+        {
+          "phase": "near",
+          "name": "w4",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                219,
+                117
+              ]
+            }
+          ],
+          "seconds": 0.002534901
+        },
+        {
+          "phase": "approach",
+          "name": "w4",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                234,
+                120
+              ]
+            }
+          ],
+          "seconds": 0.002570406
+        },
+        {
+          "phase": "approach",
+          "name": "w7",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                167,
+                112
+              ]
+            }
+          ],
+          "seconds": 0.001844873
+        },
+        {
+          "phase": "near",
+          "name": "w9",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                133,
+                73
+              ]
+            }
+          ],
+          "seconds": 0.002385203
+        },
+        {
+          "phase": "approach",
+          "name": "w6",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                126,
+                81
+              ]
+            }
+          ],
+          "seconds": 0.002195196
+        },
+        {
+          "phase": "approach",
+          "name": "w3",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                116,
+                110
+              ]
+            }
+          ],
+          "seconds": 0.0024458
+        },
+        {
+          "phase": "approach",
+          "name": "w9",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                107,
+                70
+              ]
+            }
+          ],
+          "seconds": 0.001754822
+        },
+        {
+          "phase": "near",
+          "name": "w3",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                90,
+                105
+              ]
+            }
+          ],
+          "seconds": 0.002383595
+        },
+        {
+          "phase": "near",
+          "name": "w2",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                84,
+                102
+              ]
+            }
+          ],
+          "seconds": 0.002099333
+        },
+        {
+          "phase": "approach",
+          "name": "w2",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                79,
+                99
+              ]
+            }
+          ],
+          "seconds": 0.002443162
+        },
+        {
+          "phase": "near",
+          "name": "w1",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                69,
+                94
+              ]
+            }
+          ],
+          "seconds": 0.002431827
+        },
+        {
+          "phase": "approach",
+          "name": "w5",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                58,
+                76
+              ]
+            }
+          ],
+          "seconds": 0.002279438
+        },
+        {
+          "phase": "approach",
+          "name": "w1",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                56,
+                87
+              ]
+            }
+          ],
+          "seconds": 0.002099537
+        },
+        {
+          "phase": "near",
+          "name": "w5",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                44,
+                80
+              ]
+            }
+          ],
+          "seconds": 0.00233491
+        },
+        {
+          "phase": "stone",
+          "name": "t490",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001950186
+        },
+        {
+          "phase": "stone",
+          "name": "t493",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                187,
+                103
+              ]
+            }
+          ],
+          "seconds": 0.002461338
+        },
+        {
+          "phase": "stone",
+          "name": "t496",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                259,
+                107
+              ]
+            }
+          ],
+          "seconds": 0.002468198
+        },
+        {
+          "phase": "stone",
+          "name": "t497",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                275,
+                67
+              ]
+            }
+          ],
+          "seconds": 0.002092336
+        }
+      ]
+    }
+  ],
+  "all_realized": false,
+  "candidates": 3,
+  "pass": false,
+  "seconds": 0.324168058
+}

@@ -94,6 +94,7 @@ fn play(t: &Table, gen: &mut Gen) -> Run {
         cancelled: 0,
         parallel_from: None,
         delay: Some(delay::Fork::new(delay::forced(t.p))),
+        sequential: false,
     };
     let mut children: Vec<Option<Child>> = vec![];
     let mut child_g: Vec<u64> = vec![];

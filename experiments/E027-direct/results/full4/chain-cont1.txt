@@ -1,0 +1,28 @@
+2026-11-15 09:31:36 UTC  chain: /var/tmp/fast-mi/direct/bench/bin/high7, 7 threads, stall 60 min, 14.0 h at most, from ['/var/tmp/fast-mi/direct/full4/leg05/top.jsonl', '2']
+2026-11-15 09:31:36 UTC  leg 00: begins at /var/tmp/fast-mi/direct/full4/leg05/top.jsonl stop 2
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] WATCH owner:901=1 first held by node 1
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] WATCH owner:903=1 first held by node 1
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P2 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P3 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P5 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P6 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P7 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P8 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P9 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P10 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P11 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P12 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   15.8s] RUNG P13 first held by node 1 (level 0, 876 trials so far)
+2026-11-15 10:17:58 UTC  leg 00: [   34.1s] WATCH room=20 first held by node 119
+2026-11-15 10:17:58 UTC  leg 00: [  312.0s] WATCH room=12 first held by node 1094
+2026-11-15 10:17:58 UTC  leg 00: [  479.4s] WATCH room=69 first held by node 1647
+2026-11-15 10:17:58 UTC  leg 00: [  516.6s] WATCH room=39 first held by node 1725
+2026-11-15 10:17:58 UTC  leg 00: [  565.5s] WATCH room=70 first held by node 1802
+2026-11-15 10:17:58 UTC  leg 00: [  663.2s] WATCH room=75 first held by node 2044
+2026-11-15 10:17:58 UTC  leg 00: [ 2627.2s] WATCH owner:823=1 first held by node 4216
+2026-11-15 10:17:58 UTC  leg 00: [ 2674.1s] WATCH room=83 first held by node 4329
+2026-11-15 10:17:58 UTC  leg 00: [ 2758.5s] WATCH room=59 first held by node 4485
+2026-11-15 10:17:58 UTC  leg 00: [ 2781.0s] WATCH owner:733=1 first held by node 4613
+2026-11-15 10:17:58 UTC  leg 00: [ 2781.1s] WATCH bit:565=1 first held by node 4621
+2026-11-15 10:17:58 UTC  leg 00: [ 2781.1s] UNTIL bit:565=1 held: the run ends
+2026-11-15 10:17:58 UTC  leg 00: the end value is held: the chain ends (0.77 h)

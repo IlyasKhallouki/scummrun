@@ -7,6 +7,7 @@
 //!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
 //!   fmi explore verify ARCHIVE [--entry ID]
 //!   fmi explore status ARCHIVE
+//!   fmi explore stalls ARCHIVE [--json OUT]   (E013: the stall table over the archive's files, stall.rs)
 //!   fmi try JOB_DIR... | - | @FILE [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
 //!
 //! `--search gbfs --tail` are the fast settings (the Rust search; at a replan the last plan's valid suffix first);
@@ -17,6 +18,16 @@
 //!   fmi guide stats GUIDE.json [--key KEY.json]                                     (guide.py stats)
 //!   fmi read FILE      readings one after another through the readings port, one per line of reader-scope's
 //!                      arguments (E012 resident: read.rs)
+//!   fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
+//!                      E024: a movie's steps, anchors and draw keys (fmi-shorten; shorten.rs)
+//!   fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
+//!                   [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT
+//!                      E024: the movie's steps found again from boot (the forward pass, its fallbacks), its route
+//!                      verified, then the reductions (R rounds)
+//!   fmi shorten verify ROUTE [--ends] OUT
+//!                      E024: a route checked from boot from its files (item 9)
+//!   fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT
+//!                      E024: a diagnostic, the movie's stops frame by frame
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
@@ -25,6 +36,7 @@
 //! With several JOB_DIRs (or "-": one per line on stdin) the tries run one after the other in this process, warm.
 
 mod read;
+mod shorten;
 mod wire;
 mod wire_real;
 mod trycheck;
@@ -47,6 +59,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
        fmi explore verify ARCHIVE [--entry ID]
        fmi explore status ARCHIVE
+       fmi explore stalls ARCHIVE [--json OUT]
        fmi try JOB_DIR... | - | @FILE [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
@@ -58,9 +71,14 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi check try-parts SEQ... [--json OUT]
        fmi check wait ARCHIVE --entries I,J,.. (--reading READING.json | --read-scope R,R,.. --read-dir DIR) --out DIR
                 [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
-       fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
+       fmi guide map --goal K=V[,K=V] | part1 | end=1 --out GUIDE.json [--wide] [--seed 1] [--start-boot]
        fmi guide stats GUIDE.json [--key KEY.json]
-       fmi read FILE";
+       fmi read FILE
+       fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
+       fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N] [--no-twins]
+                       [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT
+       fmi shorten verify ROUTE [--ends] OUT
+       fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT";
 
 struct Args {
     pos: Vec<String>,
@@ -126,7 +144,21 @@ fn shlex_split(s: &str) -> Vec<String> {
     out
 }
 
+/// E022: the reader's `--slot-locals` lines from a try's state (fmi-play's `dumped_slots`), for fmi-explore's
+/// `tryjob::SLOT_LOCALS`.
+fn slot_locals_json(s: &fmi_core::Obs) -> Option<Vec<serde_json::Value>> {
+    let (slots, _) = fmi_play::reading::dumped_slots(s)?;
+    let mut v: Vec<&fmi_play::reading::DSlot> = slots.values().collect();
+    v.sort_by(|a, b| a.name.cmp(&b.name));
+    Some(v.into_iter().map(|d| serde_json::json!({
+        "name": d.name, "room": d.room, "w": d.w, "esc": d.esc, "locals": d.locals, "override": d.override_,
+        "cut_data": d.cut_data, "owned": d.owned,
+        "flags": d.flags.map(|(r, c, o)| serde_json::json!({"resistant": r, "recursive": c, "owned": o})),
+    })).collect())
+}
+
 fn main() {
+    let _ = fmi_explore::tryjob::SLOT_LOCALS.set(slot_locals_json);
     let argv: Vec<String> = std::env::args().skip(1).collect();
     if argv.is_empty() {
         usage();
@@ -136,6 +168,7 @@ fn main() {
         ("explore", Some("init")) => cmd_init(&argv[2..]),
         ("explore", Some("verify")) => cmd_verify(&argv[2..]),
         ("explore", Some("status")) => cmd_status(&argv[2..]),
+        ("explore", Some("stalls")) => cmd_stalls(&argv[2..]),
         ("try", Some(_)) => cmd_try(&argv[1..]),
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
         ("check", Some("step")) => cmd_check_step(&argv[2..]),
@@ -150,6 +183,10 @@ fn main() {
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         ("read", Some(_)) => read::cmd_read(&argv[1..]),
+        ("shorten", Some("label")) => shorten::cmd_label(&argv[2..]),
+        ("shorten", Some("run")) => shorten::cmd_run(&argv[2..]),
+        ("shorten", Some("trace")) => shorten::cmd_trace(&argv[2..]),
+        ("shorten", Some("verify")) => shorten::cmd_verify(&argv[2..]),
         _ => usage(),
     };
     std::process::exit(code)
@@ -171,6 +208,16 @@ fn wire_opts(a: &Args) -> Result<wire::WireOpts, String> {
 }
 
 fn cmd_try(argv: &[String]) -> i32 {
+    let rc = cmd_try_in(argv);
+    if std::env::var_os("FMI_FORK_COUNTS").is_some() {
+        for (site, n) in fmi_core::fork_counts() {
+            eprintln!("forks {site} {n}");
+        }
+    }
+    rc
+}
+
+fn cmd_try_in(argv: &[String]) -> i32 {
     let a = Args::parse(argv, &["targets", "search", "doubles", "repeat"]);
     if a.pos.is_empty() {
         usage()
@@ -357,6 +404,12 @@ fn cmd_run(argv: &[String]) -> i32 {
         eprintln!("fmi explore run: the verify needs the engine host (wire.rs); give --no-verify");
         return 2;
     }
+    // E013: stall's two rules as free's port (asked only with FMI_FREE_SHIFT=1)
+    fmi_explore::free::set_shift(Box::new(fmi_explore::stall::ArchivePort::default()));
+    // E024 item 3: the shorten stage after a goal stop (asked only with FMI_SHORTEN=1)
+    if driver::shorten_on() {
+        driver::set_shortener(Box::new(shorten::Stage1));
+    }
     let mut stats = DriverStats::default();
     let ver: Option<&dyn fmi_explore::driver::Verifier> = if a.flag("no-verify") { None } else { verifier.as_ref().map(|v| v as &dyn fmi_explore::driver::Verifier) };
     match driver::run(&PathBuf::from(root), workers, &mode, ver, &mut stats) {
@@ -399,6 +452,19 @@ fn cmd_status(argv: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("fmi explore status: {e}");
+            1
+        }
+    }
+}
+
+/// E013: `fmi explore stalls ARCHIVE [--json OUT]` (explorecmd::stalls).
+fn cmd_stalls(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["json"]);
+    let Some(root) = a.pos.first() else { usage() };
+    match fmi_explore::explorecmd::stalls(&PathBuf::from(root), a.get("json").map(std::path::Path::new)) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("fmi explore stalls: {e}");
             1
         }
     }
@@ -559,7 +625,9 @@ fn cmd_guide_map(argv: &[String]) -> i32 {
     let e003 = root.join("experiments").join("E003-path-through-cloud");
     let run = || -> Result<String, String> {
         let goal = fmi_explore::guide::parse_goal(goal, &e003)?;
-        let start = fmi_explore::guide::start_row(&e003, seed)?;
+        // E014: --start-boot, the start facts of the game's own boot (its first idle stop, the engine host from the
+        // environment: FMI_GAME_ID's game), not MI's start row
+        let start = if a.flag("start-boot") { start_of_boot(seed)? } else { fmi_explore::guide::start_row(&e003, seed)? };
         let game = fmi_explore::guide::load_game(&root)?;
         if std::env::var("FMI_GUIDE_PROFILE").is_ok() {
             eprintln!("Game::load and the start row: {:.3} s", t0.elapsed().as_secs_f64());
@@ -578,6 +646,20 @@ fn cmd_guide_map(argv: &[String]) -> i32 {
             1
         }
     }
+}
+
+/// E014: the facts at the game's first idle stop from boot (seed `seed`, the lean switches), as the guide's start row.
+fn start_of_boot(seed: i64) -> Result<std::collections::HashMap<String, i64>, String> {
+    use fmi_core::{BootCfg, EngineHost, ObsReq};
+    let host = fmi_engine::Host::from_env().map_err(|e| format!("the engine host: {e}"))?;
+    let out = std::env::temp_dir().join(format!("fmi-guide-boot-{}", std::process::id()));
+    let mut b = host
+        .boot(&BootCfg { seed: seed as u32, events: vec![], frame: None, dump_locals: false, lean: true, out_dir: out.clone() })
+        .map_err(|e| format!("the boot: {e}"))?;
+    let o = b.obs(&ObsReq::default()).map_err(|e| format!("the boot: {e}"))?;
+    b.quit();
+    let _ = std::fs::remove_dir_all(&out);
+    Ok(fmi_core::facts_of(&o).iter().map(|(k, v)| (k.text(), *v)).collect())
 }
 
 fn cmd_guide_stats(argv: &[String]) -> i32 {

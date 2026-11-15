@@ -1,0 +1,26 @@
+{
+  "steps": 40,
+  "totals": {
+    "digest_s": 2.373138108000001,
+    "digests": 4831.0,
+    "ended_at_once": 11.0,
+    "pairs": 1379.0,
+    "pairs_same": 1379.0,
+    "shared_trial": 1379.0,
+    "shared_twin": 0.0,
+    "twin_forks": 239.0,
+    "waits_run": 3452.0
+  },
+  "pairs_differ": [],
+  "verdicts": {
+    "ignored": {
+      "trials": 11.0,
+      "seconds": 0.010144761
+    },
+    "taken": {
+      "trials": 4831.0,
+      "seconds": 428.85801573699996
+    }
+  },
+  "ms_per_digest": 0.491231237424964
+}

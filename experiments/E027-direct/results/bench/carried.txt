@@ -1,0 +1,26 @@
+E027 bench, 2026-11-12: what a stop holds only for a while (an object ego owns that one of the stop's own waits
+saw gone) is carried on: a result that still holds it in another room goes first (once for a line of gains, a
+room and the object), an input that passed it on to another object goes first (once for a room and the keys it
+set), such stops before all others and the earliest first, and the stop walks at once to the nearest rooms
+(--go). Old: tree 778361d. Laptop, 6 threads; trials and stops do not depend on the machine.
+
+From cont7's last line (stop 4611: room 41, one of the five objects just given its class at object 569):
+                              bit:76=1 (P13)            carried stops    passed-on stops    all stops
+cont7 on (tree d564bf3's)     not in 915 stops          0                0
+cont14 (flags too, see below) stop 118, 249466 trials   43, all expanded 33, all expanded   118
+cont15 (this tree)            stop 113, 245035 trials   43, all expanded 33, all expanded   113
+Both stops replay from boot in 1134 clicks to frame 65083 (results/cont14, results/cont15): the same ten stops.
+
+With the flags that go off by themselves counted as held for a while as well (cont14's binary), the checks:
+cake:  var:196=3     stop 29, 44993 trials   (stop 15, 16472 with the old tree and with this one)
+p7top: owner:420=1   not in 30 stops         (stop 26, 46049)
+5 and 6 stops carried such a flag in the two checks. Not kept: objects only.
+
+The checks with this tree: each value first held at the same stop and trials as with 778361d, the same stops kept
+(p7top 643, cake 356, from cont2's stop 1021: P5 at 35496 trials, from cont4's stop 3627: var:282=2 at 537
+trials); the five references' digests those of 778361d; the demo 25 stops, 3163 trials, 226 kept.
+
+Counted on the way (cont11, the walks alone): the object was still owned at a stop 361 frames after cont7's stop
+4611 and gone at a stop 464 frames after it (a walk from room 41 to room 31). The stop 4611 is itself some 70
+frames after the click at object 569 (a stop read 60 frames after its click's stop): that the object lasts
+between 430 and 533 frames from the click rests on that, not on a frame counted.

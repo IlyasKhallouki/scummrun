@@ -1,0 +1,22 @@
+boot: frame 56026 room 19 idle Some("sentence") in 4.6 s
+mentions: 342 objects, 211 flags named in rooms' scripts; 78 ways from room to room seen, 87 more the scripts advise
+guide: 805 keys, 115 of them variables
+[   12.6s] WATCH room=20 first held by node 18
+[   13.0s] DEAD END at node 18 (room 20): one click given, node 24 next
+[   16.8s] WATCH room=2 first held by node 28
+[   43.6s] WATCH room=12 first held by node 206
+[ 1338.2s] WATCH room=25 first held by node 2690
+[ 3546.3s] WATCH room=27 first held by node 5293
+[   16.8s] kept 36 [6, 5, 20, 2, 2], expanded 3, level 1 (2 queued there), queued [0, 5, 20, 2, 1], trials 3556 (296/s), rooms 5, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 0
+[  549.9s] kept 1388 [399, 83, 523, 139, 243], expanded 118, level 8 (150 queued there), queued [0, 81, 520, 139, 242], trials 100666 (37/s), rooms 17, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 0
+[ 1066.8s] kept 2196 [509, 194, 553, 139, 800], expanded 340, level 8 (736 queued there), queued [0, 117, 526, 139, 799], trials 119673 (41/s), rooms 17, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 0
+[ 1582.6s] kept 3195 [715, 306, 962, 231, 980], expanded 453, level 9 (572 queued there), queued [0, 211, 930, 231, 979], trials 176552 (126/s), rooms 20, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 0
+[ 2155.4s] kept 3961 [813, 358, 1260, 415, 1114], expanded 547, level 9 (1244 queued there), queued [0, 261, 1224, 415, 1113], trials 234078 (111/s), rooms 20, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 1
+[ 2728.0s] kept 4436 [874, 398, 1438, 504, 1221], expanded 623, level 9 (1643 queued there), queued [0, 288, 1400, 504, 1220], trials 291330 (3/s), rooms 20, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 3
+[ 3292.7s] kept 5114 [958, 466, 1726, 670, 1293], expanded 706, level 9 (2238 queued there), queued [0, 352, 1684, 670, 1292], trials 333062 (5/s), rooms 20, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 3
+[ 3951.8s] kept 5646 [1042, 515, 1956, 716, 1416], expanded 803, level 13 (203 queued there), queued [0, 361, 1907, 716, 1415], trials 397470 (109/s), rooms 21, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 3
+[ 4638.0s] kept 6185 [1103, 578, 2237, 767, 1499], expanded 918, level 13 (619 queued there), queued [0, 375, 2178, 767, 1498], trials 457545 (100/s), rooms 21, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 5
+[ 5329.0s] kept 6740 [1158, 657, 2503, 815, 1606], expanded 1031, level 13 (1061 queued there), queued [0, 401, 2441, 815, 1605], trials 521536 (101/s), rooms 21, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 6
+[ 6026.6s] kept 7033 [1182, 682, 2592, 847, 1729], expanded 1129, level 13 (1256 queued there), queued [0, 394, 2488, 847, 1728], trials 590078 (121/s), rooms 21, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 7
+[ 6631.2s] kept 7282 [1197, 705, 2681, 871, 1827], expanded 1243, level 13 (1391 queued there), queued [0, 397, 2501, 871, 1826], trials 656639 (130/s), rooms 21, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 9
+[ 7144.2s] kept 7371 [1203, 713, 2697, 881, 1876], expanded 1309, level 13 (1414 queued there), queued [0, 394, 2469, 881, 1875], trials 714060 (107/s), rooms 21, rungs ["P0", "P2", "P3", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"], boots 11

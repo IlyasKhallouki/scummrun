@@ -1,0 +1,148 @@
+# E020: a room's reading reads the code of the objects the actors hold
+
+## Problem
+
+E019's run reached C5 (room 42 holding object 946) and stayed there. C6 is `class:491:12` cleared, which happens when
+the player uses 946 on 491. Over the run's room-42 tries the targets were `bit:446`, `var:104`, `var:52` and
+`class:491:6`. `class:491:12` was never one of them.
+
+The cause is in the reader's scope. `Scope::of_with` reads an object's code only when the object's room is in the
+scope. 946 is defined in room 69, and its Use handler is what starts room 42's local script 212 when it is used on 491
+(that script clears the class). So the room-42 reading had no record that could reach `class:491:12 = 0`, and its
+sentence inputs took only room 42's objects as the first object.
+
+## Change (switch `FMI_READ_HELD=1`, off by default)
+
+- **Reader (`scope.rs`, `builder.rs`):** an object of another room that an actor holds at the start is read too.
+  `Scope.held` lists these objects, and they become sentence objects (A and B) next to the rooms' objects. They are not
+  added to `Scope.objects`, which the hit test uses.
+- **Archive (`archive.rs`):** readings registered under the switch are marked `held`. Under the switch only those are
+  offered, so readings made without the held code are not reused.
+- **Reading choice (`tryjob.rs`):** a reading is not reused for an entry whose held set differs from the reading's
+  start. An owner key that is held on one side only means a different held set.
+- **Tests:** `reader/tests/read_held.rs` and `fmi-explore/tests/grow.rs`
+  (`readings_without_held_code_are_not_offered_with_read_held`).
+
+## Offline check (VM, 2026-11-05)
+
+- **Job:** play10's j06448 (entry 9570, room 42, holding 946), with a fresh reading, switch off and then on.
+- **Off:** 55 units, 1,507 records, 4 targets (`bit:446`, `var:104`, `var:52`, `var:123`).
+- **On:** 63 units, 424,163 records (98 s wall, 1.1 GB peak), 12 targets. `class:491:12 = 0` is among them at tier 1,
+  and so are `owner:946`, `bit:20` and `bit:444`. The try planned and reached `bit:20` and kept 8 new entries.
+- **Cost:** the larger reading comes from the kit's handlers, which start global scripts 3 and 10. A room is read once
+  per held set, and that reading is reused afterwards.
+
+## Run
+
+- **What runs:** play10's archive resumed on the VM with `env.sh` (E019's set plus `FMI_READ_HELD=1`) and 24 workers.
+- **Prediction:** C6 within 60 minutes of run wall after the resume.
+- **Stop rule:** if C6 has not been reached after 90 minutes of run wall, stop, then diagnose from the room-42 tries'
+  targets and stops before changing anything.
+
+## Amendment (1), 2026-11-05 15:30 UTC: the first resume ran out of disk
+
+- **What happened:** the resume at 14:51 (24 workers) stopped after 9 tries. The reader's sink panicked on "No space
+  left on device" at 1 GB free.
+- **Cost of one held reading:** a room-42 reading holding 946 is 420-439k records, 62-148 s of wall, 176-2,615 CPU s and
+  about 330 MB on disk (265 MB of actions, 70 MB packed). The off reading is 1,507 records.
+  - Where the records come from: 138k of its 151k actions are events of global script 59, the interface script. The
+    kit's use on the suit starts room 42's script 212, whose cutscene runs scripts 19 and 59.
+  - What was ruled out: scripts 3, 10, 19 and 59 are already in the room's scope without the switch, so leaving out
+    the globals that held objects start changes nothing. Limiting held objects to sentences with a B cut the records
+    by only 1% (424k to 420k). Neither change was kept.
+- **Why the disk filled:** five tries in room 42 each read the room fresh at once, because no held reading was
+  registered yet, and each also wrote reach and refine extensions of about 250 MB.
+- **Change, `FMI_READ_SHARE=1` (tryjob.rs):** in one process, a scope is read fresh by one try at a time. A try that
+  needs a fresh reading while another try reads the scope waits for it, then takes that reading if the reuse rule
+  allows. In play10, 278 of 306 room-42 model tries reused a registered reading (91%).
+- **Run settings:** 12 workers. The old reading cache `play10-run` (not used by this run) is removed for space.
+
+## C6, 2026-11-05 15:33 UTC
+
+- **The rung:** C6 (`class:491:12 = 0`) was reached one minute after the 15:32 resume. j06574 is a model try from a
+  room-42 entry holding 946; it planned the suit and kept entry 10534 at frame 13899.
+- **Verification:** entry 10534 replays from boot with 0 differences (42 inputs, 21 segments).
+- **Time to C6:** 1,183 minutes of run wall since play9's start, including the C5 plateau. That is 1 minute after the
+  resume with the switch on, against the prediction of 60.
+
+## Amendment (2), 2026-11-05 16:05 UTC: disk and workers
+
+- **Disk:** free space fell from 7.8 GB to 2.5 GB in 15 minutes. After C6, room-42 entries differ on 5-8 keys, so fresh
+  330 MB readings keep being made. The VM's boot disk was grown online from 30 to 60 GB.
+- **Workers:** with 12 workers the CPU was 11-48% busy, so the run was cleanly stopped and resumed with 20.
+  - When the stop file was removed, the old driver had not yet exited (it was waiting on its slowest tries) and
+    started new tries next to the new driver for about a minute.
+  - Neither driver committed anything after 15:54:29, so both were killed and one driver was started at 16:06.
+
+## Amendment (3), 2026-11-05 16:30 UTC: a return that differs, and iMUSE in wall time
+
+- **What stopped the run:** the 20-worker resume stopped after 2 tries on "return differs" for j06605 (entry 10686,
+  room 42, frame 6459). The difference is one fact: `var:56` was −1 in the archive and 0 on the return.
+  - Entry 10686 is the end of j06602, another try that planned the suit fix. From boot it differs on the same fact.
+    Its parent, 8451, replays with 0 differences.
+- **Cause:** `var:56` is `VAR_SOUNDRESULT`, iMUSE's answer to a sound query. The suit's cutscene (script 212) starts
+  script 144, a sound command. iMUSE's sequencer advances on the MIDI driver's timer. With SDL audio off, the null
+  mixer runs that timer in wall time while the game runs faster than real time, so the sequencer's state at a frame
+  depends on the machine's load. The bridge already moves the speech and CD timers onto game time
+  (`Sound::advanceTimers`); iMUSE was not covered.
+- **Change, patch 0008 (`patches/0008-scumm-speedrun-imuse-ticks.patch`):**
+  - With `SPEEDRUN_IMUSE_TICKS=1`, iMUSE detaches the drivers' timers at the first wait.
+  - Each driver then gets one `on_timer` per base tempo of game time, from `Sound::advanceTimers`.
+  - fmi passes the switch to its engines with `FMI_IMUSE_TICKS=1` (host.rs).
+- **Check (VM, patched engine with the switch, from boot):**
+  - The rung entries C1-C6 (128, 136, 144, 3412, 7987 and 10534) replay with 0 differences, so the archive stays
+    valid.
+  - Entry 10686 gives `var:56 = 0` both when the VM is idle and next to 24 busy cores. Its archived −1 came from
+    the wall-time engine.
+- **Change, `FMI_DIFFERS_DEAD=1` (archive.rs, driver.rs):** an entry whose return differs is marked dead, in the commit
+  and in the log's replay when the archive opens. Dead entries are never selected again, and the run goes on instead of
+  stopping. Test: `an_entry_whose_return_differs_is_dead`. Entries recorded after C6 by the wall-time engine may differ
+  the same way.
+
+## Amendment (4), 2026-11-05 17:15 UTC: the wall-time diagnosis was wrong; VAR_SOUNDRESULT left out of the comparison
+
+- **Correction to amendment (3):** the bridge already pumps the mixer by game time (`SpeedrunBridge::pumpAudio`, every
+  frame), so iMUSE did not run in wall time. Patch 0008 replaced one game-time schedule with another. It fixes
+  nothing; it stays on in this run only because the entries since 16:30 were recorded with it.
+- **The evidence:** after 16:30, tries on the patched engine also recorded entries that do not replay (10700, 10722 and
+  10723), each differing only on `var:56` (−1 recorded, 0 on the return). Rerunning j06632 offline reproduces −1 at
+  every new entry, with realize off (`FMI_REALIZE=0`) and with the kept engines and the delay fork off. The cause is
+  still open. A try's live engine and a return to the same frame hold different answers in `VAR_SOUNDRESULT`.
+- **Why leaving it out is safe:** every script that uses it (57, 192, room 82's) sets it with `soundKludge([-1])` and
+  reads it at the next instruction. No script reads its value across a frame. If the music state itself diverged, the
+  script slots and the variables script 192 writes (`Var[453..]`, `Bit[25]`, `Var[232]`) would differ, and the
+  comparison still checks those.
+- **Change, `FMI_SKIP_SOUNDRESULT=1` (tryjob.rs `compare_checkpoint`):** var 56 is left out of returns, verification
+  and the free tries' checks. Entries whose logged return differed on var 56 alone are not dead under it. Tests:
+  `the_sound_result_is_left_out_with_the_switch`, and `an_entry_whose_return_differs_is_dead` extended.
+- **Change, `FMI_READ_MAX_RSS_GB` (reader `run/mod.rs`):** the default for `--max-rss-gb` (8 GB). In process, a
+  reading's RSS is the driver's growth during the reading, so the other tries' allocations counted against it. With
+  20 workers the driver held 12 GB, and readings stopped with "the reading's RSS passed 8.0 GB". The run sets it to 40.
+  The MemAvailable floor (3 GB) still guards the machine.
+- **Throughput at 20 workers, 16:45-17:00:** 276 tries in 15 minutes, with the CPU 90% busy.
+
+## Result, 2026-11-05 18:36 UTC: C6; stopped by the rule with C7 out of reach
+
+- **The ladder:** C6 was reached at 15:33, one minute after the first resume that had the switch and the disk to run.
+  The rung is entry 10534 (j06574, planned, frame 13899), and it replays from boot with 0 differences. The prediction
+  (C6 within 60 minutes) holds.
+- **The stop:** the watcher's rule (90 minutes of wall with no new rung) stopped the run at 18:33.
+  - The archive holds 17,587 entries and 7,996 committed tries over play9, play10 and E020.
+  - In room 42, 180 entries hold the suit patched and rigged (`class:491:12` and `class:491:6` cleared). 73 used the
+    suit there, so script 209 ran. 285 have Sophia as ego (`var:1 = 2`), the player who works the hoist.
+- **Why C7 is out of reach:** the dive into room 82 is script 207, which the hoist starts on "use 497 with 500". It
+  loads room 82 only if `Bit[443]` is set. Otherwise Indy finds "nothing" and sets `Bit[732]`.
+  - `Bit[443]` is written by room 49's conversation (local 208, at 0x116D) once its answer counter `Local[0]` reaches
+    2. It is also written by global script 1's debug jump, which play does not reach. Room 49's entry clears it, so it
+    must be set on the last visit to room 49 before the trip to room 42.
+  - None of the 15,402 saved states checked holds `bit:443 = 1`. The room-49 readings have no action that writes it:
+    they reach 29 of local 208's wait points, not the branch that counts the answers. So no room-49 try targets it.
+- **Throughput at 20 workers (17:05-18:33):**
+  - 88-276 tries per 15 minutes, with the CPU 65-90% busy.
+  - No dead entries after amendment (4), and no reading stopped by the RSS bound.
+  - The disk held at about 6 GB free through the evictions.
+- **Open:**
+  - Why a try's live engine and a return disagree on `VAR_SOUNDRESULT` (amendment (4)).
+  - Whether patch 0008 should be reverted, since it fixed nothing.
+  - Rule (2): Monkey Island's checks with every switch on, the K1 rerun, and G4's deferred sentence. Nothing merges to
+    main before these pass.
