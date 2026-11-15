@@ -48,7 +48,7 @@ by a restart or quit that a script ran** (`systemOps`; the bridge reports it as 
 - No: 4 hours with no such end, or the chain's own end rules (three idle legs). Then the notes say where the search
   stood, in mechanics, and whether the blocker is the demo's or the search's.
 
-## Before the run (2026-11-15, 21:10 UTC)
+## Before the run (2026-11-15, 20:45 UTC)
 
 - high9 (this commit): `--until end`, `ends.jsonl`, `verify-end`. Its gate: the six digests of high8 (PASS,
   out/gate-high9). Frozen at /var/tmp/fast-mi/direct/bench/bin/high9.
