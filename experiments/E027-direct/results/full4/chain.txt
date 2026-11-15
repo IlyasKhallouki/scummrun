@@ -1,0 +1,109 @@
+2026-11-14 19:50:43 UTC  chain: /var/tmp/fast-mi/direct/bench/bin/high6, 7 threads, stall 60 min, 14.0 h at most, from the boot
+2026-11-14 19:50:43 UTC  leg 00: begins at the boot
+2026-11-14 22:21:06 UTC  leg 00: [  270.2s] RUNG P2 first held by node 1309 (level 4, 75875 trials so far)
+2026-11-14 22:21:06 UTC  leg 00: [ 1029.6s] RUNG P1 first held by node 3557 (level 6, 243781 trials so far)
+2026-11-14 22:21:06 UTC  leg 00: [ 1141.2s] WATCH room=59 first held by node 3840
+2026-11-14 22:21:06 UTC  leg 00: [ 3777.1s] WATCH room=83 first held by node 7460
+2026-11-14 22:21:06 UTC  leg 00: [ 3777.1s] RUNG P6 first held by node 7460 (level 19, 882354 trials so far)
+2026-11-14 22:21:06 UTC  leg 00: [ 5421.9s] RUNG P3 first held by node 9232 (level 20, 1173599 trials so far)
+2026-11-14 22:21:06 UTC  leg 00: [ 5793.0s] RUNG P4 first held by node 9442 (level 19, 1214539 trials so far)
+2026-11-14 22:21:06 UTC  leg 00: [ 9022.1s] STALL: the highest level (20) not raised for 60 minutes: the run ends
+2026-11-14 22:21:06 UTC  leg 00: top stop 11202, room 30, frame 37139, 20 objects ever owned
+2026-11-14 22:21:06 UTC  leg 01: begins at /var/tmp/fast-mi/direct/full4/leg00/top.jsonl stop 11202
+2026-11-15 01:51:07 UTC  leg 01: [   11.8s] RUNG P1 first held by node 1 (level 0, 850 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [   11.8s] RUNG P2 first held by node 1 (level 0, 850 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [   11.8s] RUNG P3 first held by node 1 (level 0, 850 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [   11.8s] RUNG P4 first held by node 1 (level 0, 850 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [   11.8s] RUNG P6 first held by node 1 (level 0, 850 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [ 4853.5s] WATCH room=59 first held by node 2601
+2026-11-15 01:51:07 UTC  leg 01: [ 5859.7s] RUNG P7 first held by node 3473 (level 1, 673513 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [ 6204.7s] RUNG P5 first held by node 3604 (level 1, 713814 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [ 8253.3s] RUNG P8 first held by node 9357 (level 2, 913458 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [ 8258.7s] WATCH room=83 first held by node 9374
+2026-11-15 01:51:07 UTC  leg 01: [ 8283.8s] RUNG P9 first held by node 9475 (level 3, 915688 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [10521.3s] RUNG P11 first held by node 11192 (level 10, 1225538 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [11923.8s] RUNG P10 first held by node 14188 (level 10, 1499777 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [12522.5s] RUNG P12 first held by node 15220 (level 10, 1640319 trials so far)
+2026-11-15 01:51:07 UTC  leg 01: [12600.1s] STALL: the highest level (10) not raised for 60 minutes: the run ends
+2026-11-15 01:51:07 UTC  leg 01: top stop 15310, room 48, frame 69532, 30 objects ever owned
+2026-11-15 01:51:07 UTC  leg 02: begins at /var/tmp/fast-mi/direct/full4/leg01/top.jsonl stop 15310
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P1 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P2 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P3 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P4 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P5 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P6 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P7 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P8 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P9 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P10 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P11 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [   10.8s] RUNG P12 first held by node 1 (level 0, 1284 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [  131.9s] WATCH room=59 first held by node 263
+2026-11-15 05:24:23 UTC  leg 02: [ 7638.2s] RUNG P13 first held by node 6200 (level 0, 1594503 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [ 7649.4s] WATCH room=83 first held by node 6218
+2026-11-15 05:24:23 UTC  leg 02: [ 7655.5s] WATCH owner:901=1 first held by node 6241
+2026-11-15 05:24:23 UTC  leg 02: [ 7655.5s] WATCH owner:902=1 first held by node 6241
+2026-11-15 05:24:23 UTC  leg 02: [ 7655.5s] WATCH owner:903=1 first held by node 6241
+2026-11-15 05:24:23 UTC  leg 02: [ 7655.5s] RUNG P14 first held by node 6241 (level 3, 1598159 trials so far)
+2026-11-15 05:24:23 UTC  leg 02: [12772.4s] WATCH room=20 first held by node 10395
+2026-11-15 05:24:23 UTC  leg 02: [12796.0s] STALL: the highest level (17) not raised for 60 minutes: the run ends
+2026-11-15 05:24:23 UTC  leg 02: top stop 10347, room 19, frame 83714, 47 objects ever owned
+2026-11-15 05:24:24 UTC  leg 03: begins at /var/tmp/fast-mi/direct/full4/leg02/top.jsonl stop 10347
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] WATCH owner:901=1 first held by node 1
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] WATCH owner:902=1 first held by node 1
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] WATCH owner:903=1 first held by node 1
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P2 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P3 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P5 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P6 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P7 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P8 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P9 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P10 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P11 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P12 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P13 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   13.9s] RUNG P14 first held by node 1 (level 0, 1809 trials so far)
+2026-11-15 07:56:57 UTC  leg 03: [   38.7s] WATCH room=20 first held by node 81
+2026-11-15 07:56:57 UTC  leg 03: [  387.2s] WATCH room=12 first held by node 647
+2026-11-15 07:56:57 UTC  leg 03: [ 3793.0s] WATCH room=69 first held by node 6193
+2026-11-15 07:56:57 UTC  leg 03: [ 3832.3s] WATCH owner:761=1 first held by node 6247
+2026-11-15 07:56:57 UTC  leg 03: [ 9152.5s] STALL: the highest level (18) not raised for 60 minutes: the run ends
+2026-11-15 07:56:57 UTC  leg 03: top stop 9109, room 16, frame 101608, 65 objects ever owned
+2026-11-15 07:56:57 UTC  leg 04: begins at /var/tmp/fast-mi/direct/full4/leg03/top.jsonl stop 9109
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] WATCH owner:901=1 first held by node 1
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] WATCH owner:903=1 first held by node 1
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P2 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P3 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P5 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P6 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P7 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P8 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P9 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P10 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P11 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P12 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [   11.9s] RUNG P13 first held by node 1 (level 0, 1211 trials so far)
+2026-11-15 09:11:53 UTC  leg 04: [  102.1s] WATCH room=69 first held by node 412
+2026-11-15 09:11:53 UTC  leg 04: [  108.5s] WATCH room=20 first held by node 452
+2026-11-15 09:11:53 UTC  leg 04: [  206.7s] WATCH room=12 first held by node 725
+2026-11-15 09:11:53 UTC  leg 04: [ 4495.0s] STALL: the highest level (1) not raised for 60 minutes: the run ends
+2026-11-15 09:11:53 UTC  leg 04: top stop 2123, room 80, frame 104068, 66 objects ever owned
+2026-11-15 09:11:53 UTC  leg 05: begins at /var/tmp/fast-mi/direct/full4/leg04/top.jsonl stop 2123
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] WATCH owner:901=1 first held by node 1
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] WATCH owner:903=1 first held by node 1
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P2 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P3 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P5 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P6 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P7 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P8 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P9 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P10 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P11 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P12 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: [    5.4s] RUNG P13 first held by node 1 (level 0, 65 trials so far)
+2026-11-15 09:12:05 UTC  leg 05: top stop 2, room 80, frame 104150, 66 objects ever owned
+2026-11-15 09:12:05 UTC  leg 06: begins at /var/tmp/fast-mi/direct/full4/leg05/top.jsonl stop 2
+2026-11-15 09:12:11 UTC  leg 06: no top stop: the chain ends
