@@ -757,3 +757,53 @@ All entries were accessed on 2026-10-05. "Local" entries are files in this repos
 | L-HR | Local: docs/human-route.md §1.1 | 2026-10-05 |
 | L-NEXT | Local: docs/next.md | 2026-10-05 |
 | L-PATCH | Local: patches/0001-scumm-add-speedrun-bridge.patch (lines 1932-1933, 2224, 2304) | 2026-10-05 |
+
+## Addendum, 2026-11-15: automated completions of adventure games, checked again
+
+Why: E027's search (no LLM, no game-specific input, no walkthrough) finished *The Secret of Monkey Island* from the
+boot (2026-11-13, and full4 on 2026-11-15). This pass asked whether any automated system had finished MI1, another
+LucasArts SCUMM game or another commercial graphic adventure end to end. Four searches (LLM agents on SCUMM games,
+ICARUS and game-testing tools, search bots, recent papers); every claimed completion was re-read in its primary
+source. Not covered: Reddit (refused to the tools), the ScummVM forums (behind an anti-bot challenge), X.
+
+**LLM agents on SCUMM games.**
+
+- tsilva/scummbench and tsilva/agentscumm: a Codex agent (gpt-6.1-sol, high effort) is recorded as finishing
+  *Indiana Jones and the Last Crusade* (Amiga, SCUMM v3) on 2026-11-07: 7 h 28 min, 2,769 actions, $30.71 of API.
+  The row is marked "Walkthrough assistance: Yes"; a human starts and resumes the sessions; the results page gives
+  its starting state as unknown. The project's own docs say such runs "should not be presented as closed-book
+  benchmark results". The same setup finished *Flight of the Amazon Queen* (four times, 2026-11-06 to 11-10) and
+  *Beneath a Steel Sky* (2026-11-08), also with walkthroughs; unassisted runs did not finish.
+  https://github.com/tsilva/scummbench/blob/main/BENCHMARKS.md
+- xavierhardy/scummvm-mcp and its "AI Adventure XP" videos (about 60, April to October 2026; MI1 demo, MI2, MI3, DOTT,
+  Indy3, FoA, Loom, others): no full game finished; its benchmark's goals are defined for demos only.
+- rabengraph/scummbench (MI1, April 2026) and philnash/monkey-island-webmcp (MI1, a human in the loop): no completion.
+- No record of any automated completion of MI1 was found.
+
+**Game-testing tools that finish commercial adventures (developer side).**
+
+- ICARUS (Pfau, Smeddinck, Malaka, CHI PLAY '17 Extended Abstracts, pp. 153-164, an industry case study): Lua inside
+  Daedalic's Visionaire engine, with the engine's own lists of targets, items and progress; reinforcement learning
+  with memory and heuristics; optional hand-written hints ("walkthrough-like actions ... manually defined in the
+  configuration"). It reports completion times of *The Pillars of the Earth* (an in-development build) and was used
+  on Daedalic titles. https://www.smeddinck.com/files/papers/AutomatedGameTestingwithICARUS.pdf
+- Wizarbox's solver for *So Blonde: Back to the Island* (Wii; Marlin, Game Developer, 2011-10-27): breadth-first
+  search over script events, scene by scene (depth about 17), with the developer's access to the scripts.
+- Eipix's autoplay for its hidden-object adventures (2016): the game's own skip and hint data, a fixed course.
+- Random autoplay (Gilbert's SCUMM autoplay, TesterTron3000, 2015-2018) and modl:test (2023) explore; they do not
+  finish games by themselves.
+
+**Search bots that finish whole commercial games** do it with game knowledge: Go-Explore on Montezuma's Revenge (cells
+from room, coordinates, level and keys), JaffarPlus TASes (per-level scripts), playfun (an objective from a human
+demonstration), BotHack (hand-coded strategy). Lester (2020) solved a cut-down Adventureland Sampler by model checking.
+
+**Benchmarks of agents on adventure games** (unchanged in kind since October): FlashAdventure (34 Flash adventures,
+best agents finish a small share, with walkthrough-built hints for the one full finish), VideoGameBench, AI GameStore,
+TextQuests.
+
+Inference, from these searches (evidence, not proof): no earlier automated completion of MI1 was found; no
+completion of a LucasArts SCUMM game without a walkthrough or a human was found; the developer-side solvers that
+finished commercial adventures (ICARUS, So Blonde) ran inside the studio's own engine with its scripts or hints.
+What E027 shares with them: deep access to the engine's state (a patched ScummVM, forks, objects owned). What it does
+not share: hints, walkthroughs, per-game input, a human. The method's family is Go-Explore's (an archive of states,
+returning to them by restoring the engine, exploring from there).
