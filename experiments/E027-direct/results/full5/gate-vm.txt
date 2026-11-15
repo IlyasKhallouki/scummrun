@@ -1,0 +1,7 @@
+p7top     stops   7 trials    7337 kept   134 digest aa25d4c5a4 mids max 120 | wall   32.5 s explore   31.1 commit   0.1 engines  0.0 | trial s: fork    9.8 run   13.1 read   1.3 inputs   0.4 quit  0.1
+cake      stops   7 trials   10800 kept   154 digest c738a50ae4 mids max 294 | wall   42.8 s explore   41.3 commit   0.2 engines  0.0 | trial s: fork   14.0 run   18.3 read   1.8 inputs   0.6 quit  0.1
+crew      stops   7 trials    5329 kept   306 digest b9ce9c2930 mids max  77 | wall   25.2 s explore   23.4 commit   0.3 engines  0.0 | trial s: fork    6.4 run    9.4 read   0.7 inputs   0.3 quit  0.0
+meathook  stops   7 trials   10799 kept    56 digest 22e11af161 mids max 106 | wall   43.9 s explore   42.2 commit   0.0 engines  0.0 | trial s: fork   16.1 run   16.9 read   1.9 inputs   0.7 quit  0.1
+boot      stops   7 trials    2219 kept    52 digest 644e9e311c mids max  19 | wall    8.5 s explore    8.3 commit   0.0 engines  0.0 | trial s: fork    2.6 run    3.5 read   0.3 inputs   0.1 quit  0.0
+demo      stops  25 trials    3163 kept   225 digest d2549dd5c3
+done
