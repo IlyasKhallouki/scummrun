@@ -1461,7 +1461,9 @@ fn clicks(
                                         back = touched.iter().filter(|&&(k, old)| r2.facts.val(k) == old).map(|t| t.0).collect();
                                         let room2 = r2.room;
                                         out.results.push(slim(r2, base));
-                                        if !touched.is_empty() && back.is_empty() && room2 == r0.room && go(&mut pb, RunSpec { frame: Some(at + PROBE_LONG), ..Default::default() })?.is_ok() {
+                                        // (where `calm` stood later than PROBE_LONG frames on, its stop's facts are
+                                        // the answer: a run back to an earlier frame is the bridge's error)
+                                        if !touched.is_empty() && back.is_empty() && room2 == r0.room && pb.status().frame < at + PROBE_LONG && go(&mut pb, RunSpec { frame: Some(at + PROBE_LONG), ..Default::default() })?.is_ok() {
                                             let w3 = pb.facts()?;
                                             back = touched.iter().filter(|&&(k, old)| w3.val(k) == old).map(|t| t.0).collect();
                                         }
